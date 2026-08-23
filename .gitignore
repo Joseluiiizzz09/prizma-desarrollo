@@ -1,0 +1,28 @@
+.env
+**/.env
+**/.env.*
+!**/.env.example
+*.log
+
+# Dependencias y builds locales
+**/node_modules/
+**/dist/
+
+# Datos y archivos operativos
+**/uploads/
+**/audios/
+**/fotos/
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
+**/imports/*.json
+**/imports/*.xlsx
+**/imports/*.csv
+
+# Herramientas locales
+**/.codex/
+**/.claude/
+.docker-codex/
+
+# Runtime Docker
+docker/mysql/

@@ -1,0 +1,585 @@
+﻿/* ================================================
+   DATABASE.JS â€” MySQL con mysql2
+   ================================================ */
+require('dotenv').config();
+const mysql  = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
+
+const pool = mysql.createPool({
+  host:     process.env.DB_HOST     || 'localhost',
+  port:     process.env.DB_PORT     || 3306,
+  user:     process.env.DB_USER     || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME     || 'netcontact',
+  waitForConnections: true,
+  connectionLimit:    50,
+  timezone: '-05:00', // Peru UTC-5
+  dateStrings: true,  // DATE/DATETIME se entregan sin conversión ISO/UTC
+});
+
+/* â”€â”€ CREAR TABLAS â”€â”€ */
+async function initDB() {
+  const conn = await pool.getConnection();
+  try {
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        nombre     VARCHAR(150) NOT NULL,
+        usuario    VARCHAR(100) UNIQUE NOT NULL,
+        password   VARCHAR(255) NOT NULL,
+        cargo      VARCHAR(50)  NOT NULL,
+        sala       VARCHAR(50),
+        genero     VARCHAR(1)   DEFAULT 'M',
+        activo     TINYINT(1)   DEFAULT 1,
+        permisos   TEXT,
+        created_at DATETIME     DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS ventas (
+        id               INT AUTO_INCREMENT PRIMARY KEY,
+        asesor_id        INT,
+        asesor_nombre    VARCHAR(150),
+        tipo_doc         VARCHAR(10)  DEFAULT 'DNI',
+        dni              VARCHAR(20),
+        nombre           VARCHAR(150),
+        email            VARCHAR(150),
+        telefono1        VARCHAR(20),
+        telefono2        VARCHAR(20),
+        departamento     VARCHAR(100),
+        provincia        VARCHAR(100),
+        distrito         VARCHAR(100),
+        direccion        TEXT,
+        coordenadas      VARCHAR(100),
+        fecha_nac        VARCHAR(20),
+        lugar_nac        VARCHAR(150),
+        padre            VARCHAR(150),
+        madre            VARCHAR(150),
+        predio           VARCHAR(100),
+        cuota_inst       VARCHAR(50),
+        claro_hogar      VARCHAR(100),
+        tecnologia       VARCHAR(50),
+        paquete          VARCHAR(200),
+        full_claro       VARCHAR(10),
+        cant_decos       INT          DEFAULT 0,
+        cant_mesh        INT          DEFAULT 0,
+        plano            VARCHAR(100),
+        estado           VARCHAR(50)  DEFAULT 'VENTA',
+        obs_backoffice   TEXT,
+        observacion      TEXT,
+        obs_programacion TEXT,
+        sot              VARCHAR(100),
+        fecha_programada DATE,
+        programacion_expira_at DATETIME NULL,
+        obs_validacion   TEXT,
+        obs_supgrab      TEXT,
+        estado_supgrab   VARCHAR(50),
+        estado_grab      VARCHAR(50)  DEFAULT 'pendiente',
+        audio_path       VARCHAR(255),
+        fotos            TEXT,
+        created_at       DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (asesor_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS venta_fotos (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        venta_id   INT NOT NULL,
+        nombre     VARCHAR(255) NOT NULL,
+        ruta       VARCHAR(255) NOT NULL,
+        mimetype   VARCHAR(100) DEFAULT 'image/jpeg',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS frases (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        texto         TEXT NOT NULL,
+        supervisor_id INT,
+        sala          VARCHAR(50),
+        created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (supervisor_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS leads (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        campana       VARCHAR(100) DEFAULT '',
+        distrito      VARCHAR(100) DEFAULT '',
+        n1            VARCHAR(20)  NOT NULL,
+        n2            VARCHAR(20),
+        usuario_whatsapp VARCHAR(100) DEFAULT '',
+        tipo_contacto VARCHAR(20)  DEFAULT 'LLAMADA',
+        direccion     TEXT,
+        coordenadas   VARCHAR(255) DEFAULT '',
+        distrito_sin_cobertura VARCHAR(100) DEFAULT '',
+        coordenadas_sin_cobertura VARCHAR(255) DEFAULT '',
+        obs_back      TEXT,
+        tipif_back    VARCHAR(100) DEFAULT '',
+        tipif_back_2  VARCHAR(100) DEFAULT '',
+        derivado_por_id INT NULL,
+        derivado_por_nombre VARCHAR(150) DEFAULT '',
+        derivado_por_2_id INT NULL,
+        derivado_por_2_nombre VARCHAR(150) DEFAULT '',
+        asesor_id     INT,
+        asesor_nombre VARCHAR(150),
+        fecha         DATE         NOT NULL,
+        hora_asig     VARCHAR(10)  DEFAULT '',
+        rotaciones    INT          DEFAULT 0,
+        sin_asignar   TINYINT(1)   DEFAULT 1,
+        tipif_vend    VARCHAR(100) DEFAULT '',
+        tipif_hora    VARCHAR(10)  DEFAULT '',
+        obs_asesor    TEXT,
+        historial     TEXT,
+        creado_por_id INT NULL,
+        creado_por_nombre VARCHAR(150) DEFAULT '',
+        creado_por_usuario VARCHAR(100) DEFAULT '',
+        creado_desde_ip VARCHAR(64) DEFAULT '',
+        lead_origen_id INT NULL,
+        instancia_venta_numero INT NULL,
+        instancia_tipo VARCHAR(50) DEFAULT '',
+        created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (asesor_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS lead_ciclos_venta (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        lead_id INT NOT NULL,
+        numero_ciclo INT NOT NULL,
+        tipo VARCHAR(50) NOT NULL DEFAULT 'OTRA_DIRECCION',
+        estado VARCHAR(30) NOT NULL DEFAULT 'ABIERTO',
+        asesor_id INT NULL,
+        asesor_nombre VARCHAR(150) DEFAULT '',
+        direccion TEXT,
+        distrito VARCHAR(100) DEFAULT '',
+        motivo TEXT,
+        venta_id INT NULL,
+        creado_por_id INT NULL,
+        creado_por_nombre VARCHAR(150) NOT NULL,
+        creado_por_usuario VARCHAR(100) DEFAULT '',
+        creado_desde_ip VARCHAR(64) DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        cerrado_at DATETIME NULL,
+        UNIQUE KEY uq_lead_ciclo (lead_id, numero_ciclo),
+        INDEX idx_ciclos_lead_estado (lead_id, estado),
+        INDEX idx_ciclos_venta (venta_id),
+        FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE,
+        FOREIGN KEY (asesor_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+        FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE SET NULL,
+        FOREIGN KEY (creado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS venta_asignaciones (
+        id                      INT AUTO_INCREMENT PRIMARY KEY,
+        venta_id                INT NOT NULL,
+        asesor_anterior_id      INT NULL,
+        asesor_anterior_nombre  VARCHAR(150),
+        asesor_anterior_sala    VARCHAR(50),
+        asesor_nuevo_id         INT NULL,
+        asesor_nuevo_nombre     VARCHAR(150) NOT NULL,
+        asesor_nuevo_sala       VARCHAR(50),
+        cambiado_por_id         INT NULL,
+        cambiado_por_nombre     VARCHAR(150) NOT NULL,
+        cambiado_por_cargo      VARCHAR(50) NOT NULL,
+        created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+        FOREIGN KEY (asesor_anterior_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+        FOREIGN KEY (asesor_nuevo_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+        FOREIGN KEY (cambiado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS venta_historial (
+        id                 INT AUTO_INCREMENT PRIMARY KEY,
+        venta_id           INT NOT NULL,
+        tipo               VARCHAR(50) NOT NULL DEFAULT 'ACTUALIZACION',
+        modulo             VARCHAR(80) NOT NULL,
+        campo              VARCHAR(80),
+        etiqueta           VARCHAR(120),
+        valor_anterior     TEXT,
+        valor_nuevo        TEXT,
+        descripcion        TEXT,
+        usuario_id         INT NULL,
+        usuario_nombre     VARCHAR(150) NOT NULL,
+        usuario_cargo      VARCHAR(50) NOT NULL,
+        usuario_sala       VARCHAR(50),
+        created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Compatibilidad con instalaciones existentes: CREATE TABLE no agrega
+    // columnas nuevas cuando la tabla ya fue creada.
+    const columnasLead = [
+      ['tipo_contacto', "VARCHAR(20) DEFAULT 'LLAMADA'"],
+      ['usuario_whatsapp', "VARCHAR(100) DEFAULT ''"],
+      ['direccion',     'TEXT'],
+      ['coordenadas',   "VARCHAR(255) DEFAULT ''"],
+      ['distrito_sin_cobertura', "VARCHAR(100) DEFAULT ''"],
+      ['coordenadas_sin_cobertura', "VARCHAR(255) DEFAULT ''"],
+      ['obs_back',      'TEXT'],
+      ['tipif_back_2',  "VARCHAR(100) DEFAULT ''"],
+      ['creado_por_id', 'INT NULL'],
+      ['creado_por_nombre', "VARCHAR(150) DEFAULT ''"],
+      ['creado_por_usuario', "VARCHAR(100) DEFAULT ''"],
+      ['creado_desde_ip', "VARCHAR(64) DEFAULT ''"],
+      ['lead_origen_id', 'INT NULL'],
+      ['instancia_venta_numero', 'INT NULL'],
+      ['instancia_tipo', "VARCHAR(50) DEFAULT ''"],
+    ];
+    for (const [columna, definicion] of columnasLead) {
+      await conn.query(`ALTER TABLE leads ADD COLUMN ${columna} ${definicion}`)
+        .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+    }
+
+    // Reclutamiento / RRHH — tabla completamente separada de `leads`
+    // (Backoffice comercial). Mismo patrón técnico (asesor_id + historial +
+    // rotaciones), sin campos comerciales (tipo_contacto/dirección/
+    // coordenadas/obs_back/tipif_back no existen aquí).
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS leads_reclutamiento (
+        id               INT AUTO_INCREMENT PRIMARY KEY,
+        campana          VARCHAR(100) DEFAULT '',
+        departamento     VARCHAR(100) DEFAULT '',
+        provincia        VARCHAR(100) DEFAULT '',
+        distrito         VARCHAR(100) DEFAULT '',
+        n1               VARCHAR(20)  NOT NULL,
+        n2               VARCHAR(20),
+        asesor_id        INT,
+        asesor_nombre    VARCHAR(150),
+        fecha            DATE         NOT NULL,
+        hora_asig        VARCHAR(10)  DEFAULT '',
+        rotaciones       INT          DEFAULT 0,
+        sin_asignar      TINYINT(1)   DEFAULT 1,
+        tipif_vend       VARCHAR(100) DEFAULT '',
+        tipif_hora       VARCHAR(10)  DEFAULT '',
+        obs_asesor       TEXT,
+        historial        TEXT,
+        usuario_back_id  INT,
+        created_at       DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (asesor_id)       REFERENCES usuarios(id) ON DELETE SET NULL,
+        FOREIGN KEY (usuario_back_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    const [idxLR] = await conn.query(`
+      SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads_reclutamiento' AND INDEX_NAME = 'idx_lr_asesor_fecha'
+    `);
+    if (!idxLR[0].n) {
+      await conn.query(`CREATE INDEX idx_lr_asesor_fecha ON leads_reclutamiento(asesor_id, fecha)`);
+    }
+    const [idxLR2] = await conn.query(`
+      SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads_reclutamiento' AND INDEX_NAME = 'idx_lr_n1'
+    `);
+    if (!idxLR2[0].n) {
+      await conn.query(`CREATE INDEX idx_lr_n1 ON leads_reclutamiento(n1)`);
+    }
+
+    // Postulantes de Reclutamiento ("Nuevo Postulante" en dashboardreclutamiento.jsx).
+    // Tabla completamente separada de `ventas` (comercial) — solo candidatos a
+    // contratación, nunca clientes. sheets_sync_status/synced_at soportan la
+    // copia operativa en Google Sheets sin bloquear el guardado en MySQL.
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS ventas_reclutamiento (
+        id                 INT AUTO_INCREMENT PRIMARY KEY,
+        nombre             VARCHAR(150) NOT NULL,
+        tipo_doc           VARCHAR(10)  DEFAULT 'DNI',
+        dni                VARCHAR(20)  NULL,
+        telefono1          VARCHAR(20)  DEFAULT '',
+        telefono2          VARCHAR(20)  DEFAULT '',
+        distrito           VARCHAR(100) DEFAULT '',
+        puesto             VARCHAR(100) DEFAULT '',
+        campana            VARCHAR(50)  DEFAULT '',
+        empresa            VARCHAR(50)  DEFAULT '',
+        experiencia        VARCHAR(100) DEFAULT '',
+        disponibilidad     VARCHAR(100) DEFAULT '',
+        estado_reclutamiento VARCHAR(50) DEFAULT 'NUEVO',
+        fecha_entrevista   DATE         NULL,
+        hora_entrevista    VARCHAR(10)  DEFAULT '',
+        observacion        TEXT,
+        usuario_id         INT,
+        sheets_sync_status VARCHAR(20)  DEFAULT 'PENDING',
+        sheets_synced_at   DATETIME     NULL,
+        created_at         DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        updated_at         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    const [idxVR] = await conn.query(`
+      SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventas_reclutamiento' AND INDEX_NAME = 'idx_vr_usuario_fecha'
+    `);
+    if (!idxVR[0].n) {
+      await conn.query(`CREATE INDEX idx_vr_usuario_fecha ON ventas_reclutamiento(usuario_id, created_at)`);
+    }
+    // DNI ahora es opcional al registrar un postulante (compatibilidad con
+    // instalaciones existentes donde la tabla ya se creó con dni NOT NULL).
+    await conn.query(`ALTER TABLE ventas_reclutamiento MODIFY dni VARCHAR(20) NULL`).catch(() => {});
+    const [idxVR2] = await conn.query(`
+      SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ventas_reclutamiento' AND INDEX_NAME = 'idx_vr_dni'
+    `);
+    if (!idxVR2[0].n) {
+      await conn.query(`CREATE INDEX idx_vr_dni ON ventas_reclutamiento(dni)`);
+    }
+
+    // Auditoría persistente de eliminaciones visibles desde Jefatura.
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS eliminaciones (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        actor_id     INT NULL,
+        actor_nombre VARCHAR(150) NOT NULL,
+        actor_cargo  VARCHAR(50)  DEFAULT '',
+        tipo         VARCHAR(50)  NOT NULL,
+        registro_id  VARCHAR(50)  NOT NULL,
+        detalle      TEXT,
+        snapshot_json LONGTEXT NULL,
+        created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_eliminaciones_fecha (created_at),
+        INDEX idx_eliminaciones_actor (actor_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    const columnasDerivacionLeads = [
+      ['derivado_por_id', 'INT NULL'],
+      ['derivado_por_nombre', "VARCHAR(150) DEFAULT ''"],
+      ['derivado_por_2_id', 'INT NULL'],
+      ['derivado_por_2_nombre', "VARCHAR(150) DEFAULT ''"],
+    ];
+    for (const [columna, definicion] of columnasDerivacionLeads) {
+      await conn.query(`ALTER TABLE leads ADD COLUMN ${columna} ${definicion}`)
+        .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+    }
+    await conn.query(`ALTER TABLE eliminaciones ADD COLUMN snapshot_json LONGTEXT NULL`)
+      .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+
+    // Responsable de "GRABANDO" en Grabaciones — columna independiente del
+    // estado_grab (que se mantiene únicamente en {"grabando"}), nullable
+    // para no romper ventas históricas. Se setea siempre server-side desde
+    // el token, nunca desde el frontend (ver PATCH /:id en routes/ventas.js).
+    await conn.query(`ALTER TABLE ventas ADD COLUMN grabando_por_id INT NULL`)
+      .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+    await conn.query(`ALTER TABLE ventas ADD COLUMN grabando_por_nombre VARCHAR(150) NULL`)
+      .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+    await conn.query(`
+      UPDATE ventas v
+      JOIN usuarios u ON u.id = v.grabando_por_id
+         SET v.grabando_por_nombre = u.nombre
+       WHERE NULLIF(TRIM(COALESCE(v.grabando_por_nombre, '')), '') IS NULL
+    `);
+    await conn.query(`
+      UPDATE ventas v
+         SET v.grabando_por_nombre = (
+           SELECT vh.usuario_nombre
+             FROM venta_historial vh
+            WHERE vh.venta_id = v.id
+              AND vh.campo = 'estado_grab'
+              AND LOWER(TRIM(vh.valor_nuevo)) = 'grabando'
+            ORDER BY vh.id DESC LIMIT 1
+         )
+       WHERE NULLIF(TRIM(COALESCE(v.grabando_por_nombre, '')), '') IS NULL
+         AND EXISTS (
+           SELECT 1 FROM venta_historial vh
+            WHERE vh.venta_id = v.id
+              AND vh.campo = 'estado_grab'
+              AND LOWER(TRIM(vh.valor_nuevo)) = 'grabando'
+         )
+    `);
+    // Verificación vía information_schema (portable entre MySQL y MariaDB,
+    // a diferencia de capturar códigos de error de ALTER que difieren entre
+    // motores) para no reintentar el ALTER si el FK ya existe.
+    const [fkExistente] = await conn.query(`
+      SELECT COUNT(*) AS n FROM information_schema.TABLE_CONSTRAINTS
+      WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'ventas'
+        AND CONSTRAINT_NAME = 'fk_ventas_grabando_por' AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+    `);
+    if (!fkExistente[0].n) {
+      await conn.query(`
+        ALTER TABLE ventas ADD CONSTRAINT fk_ventas_grabando_por
+          FOREIGN KEY (grabando_por_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      `);
+    }
+
+    // Seguimiento: tramo/comentario/motivo propios de esa etapa (nullable,
+    // no rompen ventas históricas). Independientes de `observacion` (nota
+    // original del asesor) y de obs_backoffice/obs_programacion/
+    // obs_validacion/obs_supgrab (una columna dedicada por etapa, mismo
+    // patrón aquí).
+    const columnasSeguimiento = [
+      ['obs_seguimiento',    'TEXT NULL'],
+      ['tramo_seguimiento',  'VARCHAR(20) NULL'],
+      ['motivo_seguimiento', 'VARCHAR(150) NULL'],
+      ['seguimiento_ingresado_at', 'DATETIME NULL'],
+    ];
+    for (const [columna, definicion] of columnasSeguimiento) {
+      await conn.query(`ALTER TABLE ventas ADD COLUMN ${columna} ${definicion}`)
+        .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+    }
+
+    // Programación: datos operativos requeridos al marcar una venta como
+    // PROGRAMADO. Nullable para conservar ventas históricas.
+    const columnasProgramacion = [
+      ['sot',              'VARCHAR(100) NULL'],
+      ['fecha_programada', 'DATE NULL'],
+      ['programacion_expira_at', 'DATETIME NULL'],
+    ];
+    for (const [columna, definicion] of columnasProgramacion) {
+      await conn.query(`ALTER TABLE ventas ADD COLUMN ${columna} ${definicion}`)
+        .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+    }
+
+    // -- INDICES PARA RENDIMIENTO (150+ usuarios) --
+    // MySQL 8 no admite CREATE INDEX IF NOT EXISTS. Se consulta el catálogo
+    // antes de crear cada índice para que el arranque sea idempotente.
+    const indices = [
+      ['idx_ventas_created', 'ventas', 'created_at'],
+      ['idx_ventas_asesor', 'ventas', 'asesor_id'],
+      ['idx_ventas_asesor_created', 'ventas', 'asesor_id, created_at'],
+      ['idx_ventas_estado', 'ventas', 'estado'],
+      ['idx_ventas_dni', 'ventas', 'dni'],
+      ['idx_ventas_telefono_id', 'ventas', 'telefono1, id'],
+      ['idx_ventas_grab', 'ventas', 'estado_grab'],
+      ['idx_ventas_supgrab', 'ventas', 'estado_supgrab'],
+      ['idx_leads_fecha', 'leads', 'fecha'],
+      ['idx_leads_asesor', 'leads', 'asesor_id'],
+      ['idx_leads_created', 'leads', 'created_at'],
+      ['idx_leads_n1', 'leads', 'n1'],
+      ['idx_leads_n2', 'leads', 'n2'],
+      ['idx_leads_fecha_created', 'leads', 'fecha, created_at'],
+      ['idx_leads_asesor_fecha_created', 'leads', 'asesor_id, fecha, created_at'],
+      ['idx_leads_fecha_n1', 'leads', 'fecha, n1'],
+      ['idx_frases_created', 'frases', 'created_at'],
+      ['idx_fotos_venta', 'venta_fotos', 'venta_id'],
+      ['idx_venta_asignaciones_venta', 'venta_asignaciones', 'venta_id, created_at'],
+      ['idx_venta_historial_venta', 'venta_historial', 'venta_id, created_at'],
+      ['idx_vh_campo_venta_fecha', 'venta_historial', 'campo, venta_id, created_at'],
+      ['idx_vh_tipo_venta_fecha', 'venta_historial', 'tipo, venta_id, created_at'],
+      ['idx_vh_validacion', 'venta_historial', 'campo, tipo, venta_id, id'],
+    ];
+    for (const [nombre, tabla, columnas] of indices) {
+      const [[existe]] = await conn.query(`
+        SELECT COUNT(*) AS total FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?
+      `, [tabla, nombre]);
+      if (!existe.total) await conn.query(`CREATE INDEX ${nombre} ON ${tabla}(${columnas})`);
+    }
+    // Consolida la primera entrada histórica. Desde ese momento la venta no
+    // vuelve a salir de Seguimiento aunque otra etapa cambie posteriormente.
+    await conn.query(`
+      UPDATE ventas v
+      JOIN (
+        SELECT venta_id, MIN(created_at) AS primera_entrada
+          FROM venta_historial
+         WHERE (campo = 'estado_supgrab' AND LOWER(TRIM(valor_nuevo)) = 'conforme')
+            OR campo IN ('obs_seguimiento','tramo_seguimiento','motivo_seguimiento')
+         GROUP BY venta_id
+      ) h ON h.venta_id = v.id
+         SET v.seguimiento_ingresado_at = h.primera_entrada
+       WHERE v.seguimiento_ingresado_at IS NULL
+    `);
+
+    for (const [columna, definicion] of [['lead_id', 'INT NULL'], ['lead_ciclo_id', 'INT NULL']]) {
+      await conn.query(`ALTER TABLE ventas ADD COLUMN ${columna} ${definicion}`)
+        .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+    }
+    console.log('Indices de rendimiento verificados');
+
+    // Repara ventas creadas desde la vista delegada de Jefatura/Backoffice.
+    // El token usado al guardar pertenecía al administrador y podía dejar la
+    // venta a su nombre, aunque el teléfono siguiera asignado a un asesor. Esa
+    // inconsistencia hacía que el asesor dejara de ver tanto el lead como la
+    // venta. Solo se corrigen propietarios administrativos y coincidencias
+    // exactas con un lead actualmente asignado a un usuario asesor activo.
+    const [ventasDelegadas] = await conn.query(`
+      UPDATE ventas v
+      INNER JOIN usuarios propietario ON propietario.id = v.asesor_id
+      INNER JOIN leads l ON TRIM(l.n1) = TRIM(v.telefono1)
+      INNER JOIN usuarios asesor ON asesor.id = l.asesor_id
+      SET v.asesor_id = asesor.id
+      WHERE propietario.cargo IN ('jefatura', 'backoffice', 'usuarios')
+        AND asesor.cargo = 'asesor'
+        AND asesor.activo = 1
+        AND l.asesor_id IS NOT NULL
+    `);
+    if (ventasDelegadas.affectedRows > 0) {
+      console.log(`Ventas delegadas reasignadas al asesor correcto: ${ventasDelegadas.affectedRows}`);
+    }
+
+    // Migra una sola vez los datos de SIN COBERTURA que históricamente se
+    // guardaron en los campos base del cliente. Desde ahora viven en columnas
+    // exclusivas para el libro de Back Data y no contaminan Zona/Ubicación.
+    await conn.query(`
+      UPDATE leads
+      SET distrito_sin_cobertura = distrito,
+          coordenadas_sin_cobertura = coordenadas,
+          distrito = '',
+          coordenadas = ''
+      WHERE UPPER(tipif_vend) = 'SIN COBERTURA'
+        AND COALESCE(distrito_sin_cobertura, '') = ''
+        AND COALESCE(coordenadas_sin_cobertura, '') = ''
+        AND (COALESCE(distrito, '') <> '' OR COALESCE(coordenadas, '') <> '')
+    `);
+
+    // Unifica campañas históricas para que CAMP YOPI, CAMP ADRI, etc. se
+    // midan junto con YOPI, ADRI, etc. Solo elimina el prefijo inicial CAMP.
+    const [campanasNormalizadas] = await conn.query(`
+      UPDATE leads
+      SET campana = TRIM(SUBSTRING(TRIM(campana), 6))
+      WHERE UPPER(TRIM(campana)) LIKE 'CAMP %'
+        AND TRIM(SUBSTRING(TRIM(campana), 6)) <> ''
+    `);
+    if (campanasNormalizadas.affectedRows > 0) {
+      console.log(`Campañas históricas normalizadas: ${campanasNormalizadas.affectedRows}`);
+    }
+
+    const [k9Normalizadas] = await conn.query(`
+      UPDATE leads
+      SET campana = 'K9'
+      WHERE UPPER(TRIM(campana)) IN ('—K9', '–K9', '-K9')
+    `);
+    if (k9Normalizadas.affectedRows > 0) {
+      console.log(`Campañas K9 normalizadas: ${k9Normalizadas.affectedRows}`);
+    }
+
+    // -- USUARIO ADMIN INICIAL --
+    const [rows] = await conn.query(`SELECT id FROM usuarios WHERE usuario = 'admin'`);
+    if (!rows.length) {
+      const adminPass = process.env.ADMIN_PASSWORD;
+      if (!adminPass) {
+        console.warn('[WARN] ADMIN_PASSWORD no está definida en .env. Usuario admin no fue creado.');
+      } else {
+        const hash = bcrypt.hashSync(adminPass, 10);
+        await conn.query(`
+          INSERT INTO usuarios (nombre, usuario, password, cargo, sala, genero, permisos)
+          VALUES ('ADMINISTRADOR', 'admin', ?, 'jefatura', 'SALA 1', 'M', '[]')
+        `, [hash]);
+        console.log('✅ Usuario admin creado con la contraseña de ADMIN_PASSWORD');
+      }
+    }
+
+    console.log('âœ… Base de datos MySQL iniciada correctamente');
+  } finally {
+    conn.release();
+  }
+}
+
+initDB().catch(err => {
+  console.error('âŒ Error iniciando base de datos:', err.message);
+  process.exit(1);
+});
+
+module.exports = pool;
+

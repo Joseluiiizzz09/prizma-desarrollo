@@ -1,0 +1,28 @@
+﻿node_modules/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.env
+.env.*
+!.env.example
+uploads/
+audios/
+fotos/
+
+# Archivos de importación sensibles
+imports/*.json
+imports/*.xlsx
+imports/*.csv
+
+# Credenciales y llaves
+credentials*.json
+*service-account*.json
+*service_account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

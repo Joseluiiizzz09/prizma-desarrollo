@@ -1,0 +1,130 @@
+name: prisma
+
+services:
+  prisma-mysql:
+    image: mysql:8.4
+    container_name: prisma-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${PRISMA_DB_NAME}
+      MYSQL_USER: ${PRISMA_DB_USER}
+      MYSQL_PASSWORD: ${PRISMA_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${PRISMA_DB_ROOT_PASSWORD}
+      TZ: America/Lima
+    ports:
+      - "${PRISMA_MYSQL_PORT:-3307}:3306"
+    volumes:
+      - prisma_mysql_data:/var/lib/mysql
+    networks:
+      - prisma-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  prisma-legacy-api:
+    build:
+      context: ./legacy-api
+      dockerfile: Dockerfile
+    container_name: prisma-legacy-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: prisma-mysql
+      DB_PORT: 3306
+      DB_NAME: ${PRISMA_DB_NAME}
+      DB_USER: ${PRISMA_DB_USER}
+      DB_PASSWORD: ${PRISMA_DB_PASSWORD}
+      JWT_SECRET: ${PRISMA_JWT_SECRET}
+      ADMIN_PASSWORD: ${PRISMA_ADMIN_PASSWORD}
+      FRONTEND_URL: http://localhost:${PRISMA_HTTP_PORT:-8080},http://localhost:${PRISMA_FRONTEND_PORT:-5174}
+      GOOGLE_SHEETS_RECLUTAMIENTO_ENABLED: ${GOOGLE_SHEETS_RECLUTAMIENTO_ENABLED:-false}
+      GOOGLE_SHEETS_SPREADSHEET_ID: ${GOOGLE_SHEETS_SPREADSHEET_ID:-}
+      GOOGLE_SERVICE_ACCOUNT_EMAIL: ${GOOGLE_SERVICE_ACCOUNT_EMAIL:-}
+      GOOGLE_PRIVATE_KEY: ${GOOGLE_PRIVATE_KEY:-}
+      TZ: America/Lima
+    command: npm run dev
+    ports:
+      - "${PRISMA_LEGACY_API_PORT:-3001}:3000"
+    volumes:
+      - ./legacy-api:/app
+      - prisma_legacy_node_modules:/app/node_modules
+      - prisma_legacy_uploads:/app/uploads
+    networks:
+      - prisma-network
+    depends_on:
+      prisma-mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const n=require('net').connect(3000,'127.0.0.1',()=>{n.end();process.exit(0)});n.on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  prisma-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: prisma-frontend
+    restart: unless-stopped
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    command: npm run dev -- --host 0.0.0.0
+    ports:
+      - "${PRISMA_FRONTEND_PORT:-5174}:5173"
+    volumes:
+      - ./frontend:/app
+      - prisma_frontend_node_modules:/app/node_modules
+    networks:
+      - prisma-network
+    depends_on:
+      prisma-legacy-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  prisma-nginx:
+    image: nginx:1.28-alpine
+    container_name: prisma-nginx
+    restart: unless-stopped
+    ports:
+      - "${PRISMA_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - prisma-network
+    depends_on:
+      prisma-frontend:
+        condition: service_healthy
+      prisma-legacy-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+networks:
+  prisma-network:
+    name: prisma-network
+    driver: bridge
+
+volumes:
+  prisma_mysql_data:
+    name: prisma_mysql_data
+  prisma_frontend_node_modules:
+    name: prisma_frontend_node_modules
+  prisma_legacy_node_modules:
+    name: prisma_legacy_node_modules
+  prisma_legacy_uploads:
+    name: prisma_legacy_uploads
+

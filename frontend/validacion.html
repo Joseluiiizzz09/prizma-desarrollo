@@ -1,0 +1,233 @@
+    <!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Validación — Netcontact</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/validacion.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="logo-circle">
+      <img src="assets/logo3.png" alt="NC" onerror="this.parentNode.textContent='NC'">
+    </div>
+    <div class="brand-text">
+      <h1>NET<span class="dot"></span><span class="red">CONTACT</span></h1>
+      <span class="brand-sub">Validación de Ventas</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-badge">VALIDACIÓN</span>
+    <span class="topbar-user" id="topbarUser">Validador</span>
+    <button id="btnSalir" class="topbar-salir" onclick="ncCerrarSesion()">Salir</button>
+  </div>
+</div>
+
+<div class="main-content">
+
+  <div class="page-header">
+    <div class="page-header-left">
+      <h2>Ventas — Validación</h2>
+      <p>Gestiona y valida las ventas del sistema · Mes actual por defecto</p>
+    </div>
+  </div>
+
+  <!-- KPI STRIP -->
+  <div class="kpi-strip">
+    <div class="kpi-item k-blue">
+      <div><div class="kpi-num" id="kpi-total">0</div><div class="kpi-label">Total ventas</div></div>
+    </div>
+    <div class="kpi-item k-green">
+      <div><div class="kpi-num" id="kpi-validados">0</div><div class="kpi-label">Validadas</div></div>
+    </div>
+    <div class="kpi-item k-red">
+      <div><div class="kpi-num" id="kpi-novalidados">0</div><div class="kpi-label">No validadas</div></div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filtros-panel">
+    <div class="filtros-titulo">Filtros de búsqueda</div>
+    <div class="filtros-grid">
+      <div class="fg">
+        <label>Estado</label>
+        <select id="f_estado" onchange="aplicarFiltros()">
+          <option value="">Todos los estados</option>
+          <option value="validado">VALIDADO</option>
+          <option value="novalidado">NO VALIDADO</option>
+          <option value="venta">VENTA</option>
+          <option value="instalado">INSTALADO</option>
+          <option value="programado">PROGRAMADO</option>
+          <option value="caida">CAÍDA</option>
+          <option value="observado">OBSERVADO</option>
+          <option value="pendiente">PENDIENTE</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Vendedor / Asesor</label>
+        <input id="f_asesor" placeholder="Buscar vendedor..." oninput="aplicarFiltros()">
+      </div>
+      <div class="fg">
+        <label>Desde</label>
+        <input type="date" id="f_desde" onchange="aplicarFiltros()">
+      </div>
+      <div class="fg">
+        <label>Hasta</label>
+        <input type="date" id="f_hasta" onchange="aplicarFiltros()">
+      </div>
+      <div class="filtros-acciones">
+        <button class="btn-borrar" onclick="limpiarFiltros()">✕ Limpiar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="tabla-wrap">
+    <div class="tabla-header">
+      <div class="tabla-header-left">
+        <span class="tabla-title">Registros de ventas</span>
+        <span class="tabla-count" id="tablaCount">0 registros</span>
+        <span class="paginacion-info" id="pagInfo"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="text" class="tabla-search" id="busquedaInput"
+          placeholder="Buscar por nombre, DNI, teléfono..."
+          oninput="busquedaVal=this.value;aplicarFiltros()">
+        <div class="pag-size">
+          <select id="selectPorPagina" title="Registros por página">
+            <option value="18">18 / pág</option>
+            <option value="30">30 / pág</option>
+            <option value="50">50 / pág</option>
+            <option value="100">100 / pág</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabla-scroll">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th class="th-accion">ACCIÓN</th>
+            <th class="th-estado">ESTADO VENTA</th>
+            <th class="th-obs-seg">OBS. SEGUIMIENTO</th>
+            <th class="th-fecha">FECHA INGRESO</th>
+            <th class="th-nombre">NOMBRE Y APELLIDOS</th>
+            <th class="th-dni">DNI / DOC.</th>
+            <th class="th-tel">TEL. CONTACTO</th>
+            <th class="th-tel">TEL. REFERENCIA</th>
+            <th class="th-dpto">DEPARTAMENTO</th>
+            <th class="th-prov">PROVINCIA</th>
+            <th class="th-dist">DISTRITO</th>
+            <th class="th-dir">DIRECCIÓN</th>
+            <th class="th-cuota">CUOTA INST.</th>
+            <th class="th-claro">CLARO HOGAR</th>
+            <th class="th-tec">TECNOLOGÍA</th>
+            <th class="th-paquete">PAQUETE</th>
+            <th class="th-full">FULL CLARO</th>
+            <th class="th-num">DECOS</th>
+            <th class="th-num">MESH</th>
+            <th class="th-plano">PLANO</th>
+            <th class="th-obs">OBSERVACIÓN</th>
+            <th class="th-vendedor">VENDEDOR</th>
+          </tr>
+        </thead>
+        <tbody id="tablaBody">
+          <tr class="tabla-empty"><td colspan="22">Cargando datos...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="paginacion">
+      <span class="pag-info" id="pagInfo2"></span>
+      <div class="pag-btns" id="paginacionBtns"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL: TIPIFICACIÓN + HISTORIAL -->
+<div class="modal-bg" id="modalEstado">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-title">Tipificar Venta</div>
+    <div class="modal-sub">Estado actual: <strong id="re_estadoActual"></strong></div>
+
+    <!-- Botones de tipificación -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px;">Seleccionar tipificación</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button class="tip-val-btn" data-id="corta_llamada" onclick="seleccionarTip(this)"
+          style="padding:8px 14px;border:2px solid #7dd3fc;background:#f0f9ff;color:#0c4a6e;border-radius:8px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;">
+          CORTA LLAMADA
+        </button>
+        <button class="tip-val-btn" data-id="fraude" onclick="seleccionarTip(this)"
+          style="padding:8px 14px;border:2px solid #fca5a5;background:#fee2e2;color:#991b1b;border-radius:8px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;">
+          FRAUDE
+        </button>
+        <button class="tip-val-btn" data-id="no_desea" onclick="seleccionarTip(this)"
+          style="padding:8px 14px;border:2px solid #fda4af;background:#ffe4e6;color:#881337;border-radius:8px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;">
+          NO DESEA
+        </button>
+        <button class="tip-val-btn" data-id="no_contesta" onclick="seleccionarTip(this)"
+          style="padding:8px 14px;border:2px solid #fde047;background:#fef9c3;color:#713f12;border-radius:8px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;">
+          NO CONTESTA
+        </button>
+        <button class="tip-val-btn" data-id="servicio_activo" onclick="seleccionarTip(this)"
+          style="padding:8px 14px;border:2px solid #d1d5db;background:#f3f4f6;color:#374151;border-radius:8px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;">
+          SERVICIO ACTIVO
+        </button>
+        <button class="tip-val-btn" data-id="validado" onclick="seleccionarTip(this)"
+          style="padding:8px 14px;border:2px solid #c4b5fd;background:#ede9fe;color:#4c1d95;border-radius:8px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;">
+          VALIDADO
+        </button>
+      </div>
+    </div>
+
+    <!-- Línea de tiempo -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px;">Historial</div>
+      <div id="lt_container" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;max-height:150px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- Observación nueva -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;">Nueva observación (opcional)</div>
+      <textarea id="re_nueva_obs" placeholder="Escribe una observación sobre esta venta..." rows="3"
+        style="width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;outline:none;"></textarea>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancelar-modal" onclick="cerrarModal('modalEstado')">Cancelar</button>
+      <button class="btn-guardar" onclick="guardarTipificacion()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: HISTORIAL COMPLETO -->
+<div class="modal-bg" id="modalObs">
+  <div class="modal-box" style="max-width:500px;">
+    <div class="modal-title">Historial de tipificaciones</div>
+    <div class="modal-sub" id="obs_nombre"></div>
+    <div id="obs_historial" style="padding:8px 0;max-height:400px;overflow-y:auto;"></div>
+    <div class="modal-btns">
+      <button class="btn-guardar" onclick="cerrarModal('modalObs')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.tip-val-btn.activo { outline: 3px solid #7C3AED !important; box-shadow: 0 0 0 3px rgba(124,58,237,.2); transform: scale(1.04); }
+.tip-val-btn:hover { opacity: .85; transform: translateY(-1px); }
+</style>
+<div class="toast" id="toast"></div>
+
+<script src="js/config.js"></script>
+<script src="js/session.js"></script>
+<script src="js/validacion.js"></script>
+<script src="js/fotos-modal.js"></script>
+</body>
+</html>
