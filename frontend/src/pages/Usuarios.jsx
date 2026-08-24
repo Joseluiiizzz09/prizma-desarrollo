@@ -205,9 +205,9 @@ export default function Usuarios() {
     <div className="usu-root">
       <div className="topbar">
         <div className="brand">
-          <div className="logo-circle"><img src="/assets/logo3.png" alt="KRONO" /></div>
+          <div className="logo-circle"><img src="/assets/logo3.png" alt="PRIZMA" /></div>
           <div className="brand-text">
-            <img src="/assets/krono-wordmark.png" alt="KRONO" style={{height:22,width:"auto",display:"block"}} />
+            <span style={{fontSize:22,fontWeight:800,letterSpacing:"0.08em",lineHeight:1}}>PRIZMA</span>
             <span className="brand-sub">Gestión de Usuarios</span>
           </div>
         </div>
@@ -222,7 +222,7 @@ export default function Usuarios() {
         <div className="page-header">
           <div>
             <h2>Usuarios del sistema</h2>
-            <p>Crea, activa o desactiva usuarios de KRONO</p>
+            <p>Crea, activa o desactiva usuarios de PRIZMA</p>
           </div>
           <button className="btn-nuevo" onClick={abrirModal}>+ Nuevo Usuario</button>
         </div>
