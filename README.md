@@ -47,3 +47,14 @@ docker compose down
 
 No usar `docker compose down -v` salvo que se quiera eliminar deliberadamente
 la base y los uploads de desarrollo de PRISMA.
+
+## Producción
+
+La configuración `docker-compose.production.yml` publica únicamente el puerto
+HTTP 80. MySQL, la API y el frontend permanecen dentro de la red privada de
+Docker. Copia `.env.production.example` como `.env.production`, reemplaza todos
+los valores de ejemplo y ejecuta:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+```

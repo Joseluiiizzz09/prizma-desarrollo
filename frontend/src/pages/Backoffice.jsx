@@ -2173,10 +2173,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
     if (!asesorNorm) return 'SIN ASIGNAR'
     return String(asesores.find(a=>String(a.nombre||'').trim().toUpperCase()===asesorNorm)?.sala || 'SIN SALA').trim().toUpperCase()
   }
-  const salasFiltroBase = [...new Set([
-    ...asesores.map(a=>String(a.sala||'').trim()).filter(Boolean),
-    ...todosLosRegistrosBase.map(salaDeRegistro).filter(Boolean),
-  ])].sort((a,b)=>a.localeCompare(b,'es'))
+  const salasFiltroBase = ['SALA 1', 'SALA 2']
 
   async function guardarTipifBack2(id, nuevoValor) {
     const found = findReg(id); if (!found) return
@@ -2380,7 +2377,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
     return data
   }, [baseData, ventasPorNumero, asesores, rendFiltroTipo, rendFiltroFecha, rendDesde, rendHasta, rendFiltroAsesor, rendFiltroSala, rendOrden])
 
-  const rendSalas = [...new Set(asesores.map(a=>String(a.sala||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'))
+  const rendSalas = ['SALA 1', 'SALA 2']
   const rendAsesoresDisponibles = asesores
     .filter(a=>!rendFiltroSala || String(a.sala||'').trim()===rendFiltroSala)
     .sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'))
@@ -2474,9 +2471,9 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
       <div className="topbar module-topbar-standard">
         <div className="bo-topbar-left">
           <div className="brand">
-            <div className="logo-circle"><img src="/assets/logo3.png" alt="KRONO" /></div>
+            <div className="logo-circle"><img src="/assets/logo3.png" alt="PRIZMA" /></div>
             <div className="brand-text">
-              <img src="/assets/krono-wordmark.png" alt="KRONO" style={{height:22,width:"auto",display:"block"}} />
+              <span style={{fontSize:22,fontWeight:800,letterSpacing:"0.08em",lineHeight:1}}>PRIZMA</span>
               <span className="brand-sub">Back Data</span>
             </div>
           </div>

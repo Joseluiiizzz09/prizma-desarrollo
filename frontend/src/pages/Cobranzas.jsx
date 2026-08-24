@@ -462,7 +462,7 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
         <div className="cobranzas-brand">
           <img className="cobranzas-logo" src="/assets/logo3.png" alt="" />
           <div>
-            <img className="cobranzas-wordmark" src="/assets/krono-wordmark.png" alt="KRONO" />
+            <span className="cobranzas-wordmark" style={{fontSize:22,fontWeight:800,letterSpacing:"0.08em",lineHeight:1}}>PRIZMA</span>
             <span>PANEL DE {areaNombre.toUpperCase()}</span>
           </div>
         </div>

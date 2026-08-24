@@ -1112,9 +1112,9 @@ export default function Backdatareclutamiento() {
       <div className="topbar module-topbar-standard">
         <div className="bo-topbar-left">
           <div className="brand">
-            <div className="logo-circle"><img src="/assets/logo3.png" alt="KRONO" /></div>
+            <div className="logo-circle"><img src="/assets/logo3.png" alt="PRIZMA" /></div>
             <div className="brand-text">
-              <img src="/assets/krono-wordmark.png" alt="KRONO" style={{height:22,width:"auto",display:"block"}} />
+              <span style={{fontSize:22,fontWeight:800,letterSpacing:"0.08em",lineHeight:1}}>PRIZMA</span>
               <span className="brand-sub">Back Data Reclutaminto</span>
             </div>
           </div>

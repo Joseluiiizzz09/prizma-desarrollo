@@ -36,7 +36,7 @@ const CARGOS = [
   { id:'backreclutamiento',   label:'Back Data Reclutaminto',  cls:'bc-backreclutamiento'   },
   { id:'asesorreclutamiento', label:'Asesor de Reclutamiento', cls:'bc-asesorreclutamiento' },
 ]
-const SALAS = ['SALA 1','SALA 2','SALA 3','SALA 4','SALA CHANCAY','SALA 5','SIN SALA']
+const SALAS = ['SALA 1','SALA 2']
 
 const SEG_MAP = {
   en_ejecucion:'ejecucion',
@@ -637,7 +637,7 @@ export default function Jefatura() {
       destroy('salas')
       const mesUsar   = mesReporte || mesActual()
       const ventasMes = ventasCache.filter(v => v._fecha && v._fecha.startsWith(mesUsar))
-      const salas     = ['SALA 1','SALA 2','SALA 3','SALA 4','SALA CHANCAY','SALA 5']
+      const salas     = SALAS
       const instaladas = salas.map(s => {
         const nombres = usuarios.filter(u=>u.sala===s).map(u=>u.nombre)
         return ventasMes.filter(v=>nombres.includes(v.asesor_nombre||'')&&(v.estado||'').toLowerCase()==='instalado').length
@@ -661,7 +661,7 @@ export default function Jefatura() {
       destroy('diario')
       const dias = []
       for (let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); dias.push(d.toISOString().split('T')[0]) }
-      const salas  = ['SALA 1','SALA 2','SALA 3','SALA 4','SALA CHANCAY','SALA 5']
+      const salas  = SALAS
       const colors = ['#3b82f6','#8b5cf6','#22c55e','#f97316','#06b6d4','#f43f5e']
       const datasets = salas.map((s,i) => {
         const nombres = usuarios.filter(u=>u.sala===s).map(u=>u.nombre)
@@ -1113,7 +1113,7 @@ export default function Jefatura() {
           <div className="brand">
           <div className="logo-circle"><img src="/assets/logo3.png" alt="NC" onError={e=>{e.target.parentNode.textContent='NC'}} /></div>
           <div className="brand-text">
-            <img src="/assets/krono-wordmark.png" alt="KRONO" style={{height:22,width:"auto",display:"block"}} />
+            <span style={{fontSize:22,fontWeight:800,letterSpacing:"0.08em",lineHeight:1}}>PRIZMA</span>
             <span className="brand-sub">Panel de Jefatura</span>
           </div>
           </div>
@@ -1649,10 +1649,6 @@ export default function Jefatura() {
                 { id:'todas', label:'Todas las salas' },
                 { id:'SALA 1', label:'Sala 1' },
                 { id:'SALA 2', label:'Sala 2' },
-                { id:'SALA 3', label:'Sala 3' },
-                { id:'SALA 4', label:'Sala 4' },
-                { id:'SALA CHANCAY', label:'Sala Chancay' },
-                { id:'SALA 5', label:'Sala 5' },
               ].map(tab => (
                 <button key={tab.id}
                   className={`sala-tab${salaReporte===tab.id?' active':''}`}

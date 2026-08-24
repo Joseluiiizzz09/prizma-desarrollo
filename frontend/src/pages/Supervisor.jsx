@@ -546,7 +546,7 @@ export default function Supervisor() {
             <img src="/assets/logo3.png" alt="NC" style={{width:26,height:26,objectFit:'contain'}} />
           </div>
           <div className="topbar-brand-text">
-            <img src="/assets/krono-wordmark.png" alt="KRONO" style={{height:22,width:"auto",display:"block"}} />
+            <span style={{fontSize:22,fontWeight:800,letterSpacing:"0.08em",lineHeight:1}}>PRIZMA</span>
             <span className="brand-sub">Supervisor</span>
           </div>
           <button
