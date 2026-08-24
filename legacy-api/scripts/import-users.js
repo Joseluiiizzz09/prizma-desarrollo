@@ -39,7 +39,7 @@ const CARGOS_VALIDOS = new Set([
   'backreclutamiento', 'asesorreclutamiento', 'seguimiento',
   'validacion', 'programacion', 'usuarios', 'supervisor', 'asesor',
 ]);
-const SALAS_VALIDAS = new Set(['SALA 1', 'SALA 2', 'SALA 3', 'SALA 4', 'SALA CHANCAY']);
+const SALAS_VALIDAS = new Set(['SALA 1', 'SALA 2']);
 const TOTAL_ESPERADO = 127;
 
 /* ── Helpers ────────────────────────────────────────────────────────── */

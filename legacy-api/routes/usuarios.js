@@ -11,6 +11,7 @@ const { desbloquearLogin } = require('../security/loginRateLimit');
 
 const ROLES = ['jefatura','usuarios'];
 const CARGOS_VALIDOS = ['jefatura','usuarios','supervisor','backoffice','asesor','validacion','grabaciones','seguimiento','programacion','cobranzas','calidad','supcalidad','supgrabaciones','backreclutamiento','asesorreclutamiento'];
+const SALAS_VALIDAS = ['SALA 1', 'SALA 2'];
 
 function normalizarNombrePersonal(nombre) {
   return String(nombre || '').trim().replace(/\s+/g, ' ').toUpperCase();
@@ -53,6 +54,8 @@ router.post('/', auth(ROLES), async (req, res) => {
 
     if (!CARGOS_VALIDOS.includes(cargo))
       return res.status(400).json({ ok: false, mensaje: 'Cargo inválido' });
+    if (!SALAS_VALIDAS.includes(sala))
+      return res.status(400).json({ ok: false, mensaje: 'Sala inválida. Usa SALA 1 o SALA 2.' });
 
     // Solo jefatura puede crear usuarios con cargo elevado
     if (cargo === 'jefatura' && req.user.cargo !== 'jefatura')
@@ -92,6 +95,8 @@ router.patch('/:id', auth(ROLES), async (req, res) => {
 
     const [rows] = await db.query(`SELECT id, cargo FROM usuarios WHERE id = ?`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
+    if (!SALAS_VALIDAS.includes(sala))
+      return res.status(400).json({ ok: false, mensaje: 'Sala inválida. Usa SALA 1 o SALA 2.' });
 
     // Solo jefatura puede cambiar el cargo o los permisos de un usuario
     if ((cargo !== undefined && cargo !== rows[0].cargo) || permisos !== undefined) {

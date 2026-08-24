@@ -42,7 +42,8 @@ const CARGOS = [
   { value: 'asesorreclutamiento', label: 'Asesor de Reclutamiento' },
 ]
 
-const FORM_VACIO = { nombre: '', usuario: '', pass: '', pass2: '', cargo: '', cargo2: '', sala: '', genero: 'M', activo: true }
+const SALAS_VALIDAS = ['SALA 1', 'SALA 2']
+const FORM_VACIO = { nombre: '', usuario: '', pass: '', pass2: '', cargo: '', cargo2: '', sala: 'SALA 1', genero: 'M', activo: true }
 
 export default function Usuarios() {
   const navigate = useNavigate()
@@ -114,7 +115,7 @@ export default function Usuarios() {
   function abrirModalEditar(u) {
     setEditandoId(u.id)
     const cargo2 = permisosDeUsuario(u).find(c => c !== u.cargo) || ''
-    setForm({ nombre: u.nombre || '', usuario: u.usuario || '', pass: '', pass2: '', cargo: u.cargo || '', cargo2, sala: u.sala || '', genero: u.genero || 'M', activo: !!u.activo })
+    setForm({ nombre: u.nombre || '', usuario: u.usuario || '', pass: '', pass2: '', cargo: u.cargo || '', cargo2, sala: SALAS_VALIDAS.includes(u.sala) ? u.sala : 'SALA 1', genero: u.genero || 'M', activo: !!u.activo })
     setErrores({})
     setModalOpen(true)
   }
@@ -396,13 +397,8 @@ export default function Usuarios() {
                 <div className="campo">
                   <label>Sala</label>
                   <select value={form.sala} onChange={e => setField('sala', e.target.value)}>
-                    <option value="">— Sin sala —</option>
                     <option value="SALA 1">Sala 1</option>
                     <option value="SALA 2">Sala 2</option>
-                    <option value="SALA 3">Sala 3</option>
-                    <option value="SALA 4">Sala 4</option>
-                    <option value="SALA CHANCAY">Sala Chancay</option>
-                    <option value="SALA 5">Sala 5</option>
                   </select>
                 </div>
                 <div className="campo">
