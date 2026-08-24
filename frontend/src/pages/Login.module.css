@@ -1,7 +1,7 @@
 /* ===== PAGE / FONDO ===== */
 .page {
   font-family: 'Inter', -apple-system, sans-serif;
-  background: #f2f2f7;
+  background: #f7f4f1;
   min-height: 100vh;
   width: 100%;
   display: flex;
@@ -14,18 +14,18 @@
 .page::before {
   content: "";
   position: absolute;
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(249,115,22,.16), transparent 70%);
-  top: -150px; left: -150px;
+  width: 640px; height: 640px;
+  background: radial-gradient(circle, rgba(249,115,22,.28), transparent 70%);
+  top: -200px; left: -200px;
   animation: glowMove 10s infinite alternate ease-in-out;
   z-index: 0;
 }
 .page::after {
   content: "";
   position: absolute;
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(99,102,241,.1), transparent 70%);
-  bottom: -100px; right: -100px;
+  width: 480px; height: 480px;
+  background: radial-gradient(circle, rgba(251,146,60,.20), transparent 70%);
+  bottom: -140px; right: -140px;
   animation: glowMove 12s infinite alternate-reverse ease-in-out;
   z-index: 0;
 }
@@ -42,7 +42,7 @@
 .particles span {
   position: absolute;
   width: 5px; height: 5px;
-  background: rgba(249,115,22,.3);
+  background: rgba(249,115,22,.4);
   border-radius: 50%;
   animation: moveP linear infinite;
 }
@@ -63,11 +63,18 @@
   overflow: visible;
   z-index: 1;
   box-shadow: 0 24px 60px rgba(0,0,0,.1), inset 0 1px 1px rgba(255,255,255,.8);
-  animation: floatCard 4s ease-in-out infinite;
+  opacity: 0;
+  animation:
+    cardIn .65s cubic-bezier(.34,1.56,.64,1) both,
+    floatCard 4s ease-in-out .65s infinite;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(22px) scale(.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes floatCard { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
 
-/* ===== BLOB ===== */
+/* ===== BLOB (color que se asoma a traves del vidrio) ===== */
 .blobClip {
   position: absolute;
   inset: 0;
@@ -76,13 +83,30 @@
   z-index: 0;
   pointer-events: none;
 }
+.blobClip::before {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  background: #fdba74;
+  filter: blur(16px);
+  opacity: .85;
+  animation: blob-bounce-2 7s infinite ease;
+}
+@keyframes blob-bounce-2 {
+  0%   { transform: translate(-100%, -100%) translate3d(100%, 100%, 0); }
+  30%  { transform: translate(-100%, -100%) translate3d(10%,  90%,  0); }
+  65%  { transform: translate(-100%, -100%) translate3d(0,    0,    0); }
+  100% { transform: translate(-100%, -100%) translate3d(100%, 100%, 0); }
+}
 .blob {
   position: absolute;
   top: 50%; left: 50%;
-  width: 160px; height: 160px;
+  width: 175px; height: 175px;
   border-radius: 50%;
   background: #f97316;
-  filter: blur(14px);
+  filter: blur(15px);
   opacity: 1;
   animation: blob-bounce 5s infinite ease;
 }
@@ -115,12 +139,32 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  animation: floatLogo 4s ease-in-out infinite;
+  opacity: 0;
+  animation:
+    logoIn .7s .12s cubic-bezier(.34,1.56,.64,1) both,
+    floatLogo 4s ease-in-out .82s infinite;
+}
+.logoCircle::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 78px; height: 78px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(249,115,22,.4), transparent 72%);
+  animation: haloPulse 2.4s ease-in-out infinite;
 }
 .logoCircle img { width: 90px; height: 90px; object-fit: contain; }
+@keyframes logoIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-16px) scale(.7); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
 @keyframes floatLogo {
   0%,100% { transform: translateX(-50%) translateY(0) }
   50% { transform: translateX(-50%) translateY(-6px) }
+}
+@keyframes haloPulse {
+  0%,100% { transform: scale(.9); opacity: .7; }
+  50% { transform: scale(1.25); opacity: .25; }
 }
 
 /* ===== TEXTOS ===== */
@@ -130,6 +174,8 @@
   color: #111827;
   margin-bottom: 4px;
   letter-spacing: -.3px;
+  opacity: 0;
+  animation: fadeUp .5s .38s ease both;
 }
 .nombreUsuario {
   margin: 8px auto 18px;
@@ -142,6 +188,12 @@
   font-size: 13px;
   min-height: 28px;
   min-width: 60px;
+  opacity: 0;
+  animation: fadeUp .5s .46s ease both;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ===== INPUTS ===== */
@@ -150,7 +202,11 @@
   margin-bottom: 12px;
   position: relative;
   text-align: left;
+  opacity: 0;
+  animation: fadeUp .5s ease both;
 }
+.inputGroup:nth-of-type(1) { animation-delay: .54s; }
+.inputGroup:nth-of-type(2) { animation-delay: .62s; }
 .inputGroup input {
   width: 100%;
   height: 46px;
@@ -169,6 +225,11 @@
   border-color: rgba(249,115,22,.5);
   box-shadow: 0 0 0 3px rgba(249,115,22,.1);
   background: rgba(255,255,255,.95);
+  animation: focusPulse .5s ease;
+}
+@keyframes focusPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(249,115,22,.35); }
+  100% { box-shadow: 0 0 0 3px rgba(249,115,22,.1); }
 }
 .inputGroup input.error { border-color: rgba(249,115,22,.7) !important; }
 .inputGroup label {
@@ -209,7 +270,7 @@
 .submitBtn {
   width: 100%;
   height: 44px;
-  background: #111827;
+  background: linear-gradient(135deg, #fb923c, #f97316);
   color: #fff;
   border: none;
   border-radius: 12px;
@@ -220,8 +281,12 @@
   font-size: 14px;
   font-family: inherit;
   letter-spacing: .1px;
+  box-shadow: 0 10px 22px rgba(234,88,12,.3);
+  opacity: 0;
+  animation: btnFadeIn .5s .7s ease both;
 }
-.submitBtn:hover { background: #374151; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.15); }
+@keyframes btnFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.submitBtn:hover { filter: brightness(1.05); transform: translateY(-2px); box-shadow: 0 12px 26px rgba(234,88,12,.4); }
 .submitBtn:active { transform: scale(.97); }
 .submitBtn:disabled { opacity: .65; cursor: not-allowed; transform: none; }
 
@@ -332,3 +397,16 @@
 .dot:nth-child(2) { animation-delay: .2s }
 .dot:nth-child(3) { animation-delay: .4s }
 @keyframes blink { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
+
+@media (prefers-reduced-motion: reduce) {
+  .loginBox, .blob, .blobClip::before, .logoCircle, .logoCircle::before,
+  .page::before, .page::after, .saludo, .nombreUsuario, .inputGroup,
+  .inputGroup input:focus, .submitBtn {
+    animation: none !important;
+  }
+  .loginBox, .logoCircle, .saludo, .nombreUsuario, .inputGroup, .submitBtn {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .logoCircle { transform: translateX(-50%) !important; }
+}
