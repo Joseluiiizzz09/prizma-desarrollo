@@ -7,7 +7,7 @@ const path     = require('path');
 const fs       = require('fs');
 const { validar, errorTexto, errorEmail, errorDni, errorFecha, errorEnteroPositivo, errorId, errorEnum, TIPO_DOC_OK } = require('../middleware/validar');
 
-const ROLES_VENTAS       = ['asesor','supervisor','backoffice','validacion','grabaciones','seguimiento','jefatura','usuarios','programacion','cobranzas','calidad','supcalidad','supgrabaciones'];
+const ROLES_VENTAS       = ['asesor','supervisor','backoffice','validacion','grabaciones','seguimiento','jefatura','usuarios','programacion','cobranzas','calidad','supcalidad'];
 const CACHE_VENTAS_TTL = 5000;
 const cacheVentas = new Map();
 
@@ -157,7 +157,7 @@ const MODULOS_POR_CARGO = {
   backoffice: 'Back Data',
   validacion: 'Validación',
   grabaciones: 'Grabaciones',
-  supgrabaciones: 'Supervisión de grabaciones',
+  supgrabaciones: 'Grabaciones (histórico)',
   programacion: 'Programación',
   seguimiento: 'Seguimiento',
   jefatura: 'Jefatura',
@@ -172,7 +172,7 @@ const CAMPOS_HISTORIAL = {
   sot: 'SOT',
   fecha_programada: 'Fecha programada',
   obs_validacion: 'Observación de Validación',
-  obs_supgrab: 'Observación de Supervisión de grabaciones',
+  obs_supgrab: 'Observación de grabación',
   estado_supgrab: 'Revisión de la grabación',
   estado_grab: 'Estado de grabación',
   obs_seguimiento: 'Observación de Seguimiento',
@@ -1759,18 +1759,6 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
       });
     }
 
-    const resultadoSuper = String(estado_supgrab || '').trim().toLowerCase();
-    if (
-      cargoEfectivo === 'supgrabaciones' &&
-      rows[0].tuvo_programacion &&
-      ['aprobado', 'observado'].includes(resultadoSuper)
-    ) {
-      return res.status(409).json({
-        ok: false,
-        mensaje: 'Esta venta está en el segundo ciclo. Selecciona CONFORME, NO CONFORME o RECHAZADO.',
-      });
-    }
-
     if (cargoEfectivo === 'grabaciones' && String(rows[0].estado || '').toUpperCase() !== 'VALIDADO') {
       return res.status(403).json({ ok: false, mensaje: 'Solo puedes gestionar ventas con estado VALIDADO' });
     }
@@ -1896,13 +1884,8 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
     // Cada usuario de Grabaciones que marque GRABANDO toma la venta. Así,
     // si Brito continúa una venta que antes tenía Iris, todos verán
     // inmediatamente "GRABANDO BRITO" en la cola compartida.
-    // La devolución de Super de Grabaciones (observado) envía SIEMPRE
-    // estado_grab:'grabando' junto con estado_supgrab:'observado' en el
-    // mismo PATCH (ver SupGrabaciones.jsx guardarRevision) — se detecta por
-    // esa combinación, no por el cargo del usuario (un cargo con permiso
-    // delegado de supgrabaciones podría no coincidir con el check de rol).
-    // Así, en el caso borde de una venta histórica sin responsable
-    // registrado, jamás queda atribuida a quien la está revisando.
+    // Conserva compatibilidad con devoluciones históricas registradas antes
+    // de retirar el módulo separado de supervisión de grabaciones.
     const esDevolucionSuper = estado_supgrab !== undefined && (
       String(estado_supgrab).toLowerCase() === 'observado' ||
       (String(estado_supgrab).toLowerCase() === 'no_conforme' && String(rows[0].estado || '').toUpperCase() === 'PROGRAMADO')
@@ -2134,7 +2117,7 @@ router.post('/:id/enviar-seguimiento-whatsapp', auth(['seguimiento', 'jefatura']
 });
 
 // Parsea líneas de historial con formato "[dd/mm/yyyy, hh:mm - usuario] texto"
-// (mismo formato que ya generan Validacion.jsx y SupGrabaciones.jsx al hacer
+// (mismo formato que ya genera Validacion.jsx al hacer
 // append de cada tipificación). Devuelve fecha en "YYYY-MM-DD HH:MM:00" para
 // que el frontend (textoFecha en VentaAssignmentModal.jsx) la formatee igual
 // que un DATETIME real de MySQL. Líneas que no calcen con el formato se

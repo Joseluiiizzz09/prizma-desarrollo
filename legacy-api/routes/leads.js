@@ -8,7 +8,7 @@ const auth    = require('../middleware/auth');
 const { validar, errorTexto, errorFecha, errorHora, errorHistorial } = require('../middleware/validar');
 
 const ROLES_BO  = ['backoffice','jefatura','usuarios'];
-const ROLES_ALL = ['backoffice','jefatura','usuarios','asesor','supervisor','supgrabaciones'];
+const ROLES_ALL = ['backoffice','jefatura','usuarios','asesor','supervisor'];
 // Sólo estos estados cierran definitivamente el flujo de asignación/rotación.
 const TIPIF_PROHIBIDAS_ASIGNACION = new Set(['VENTA CERRADA', 'NO TOCAR', 'SH NO TOCAR', 'NO ROTAR', 'SH NO ROTAR']);
 const CACHE_LISTADO_TTL = 5000;
@@ -2045,4 +2045,3 @@ router.post('/masivo-lote', auth(['jefatura']), async (req, res) => {
 });
 
 module.exports = router;
-

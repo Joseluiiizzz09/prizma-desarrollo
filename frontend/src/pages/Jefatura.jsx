@@ -32,7 +32,6 @@ const CARGOS = [
   { id:'cobranzas',      label:'Cobranzas',         cls:'bc-cobranzas'      },
   { id:'calidad',        label:'Calidad',           cls:'bc-calidad'        },
   { id:'supcalidad',     label:'Super de Calidad',  cls:'bc-calidad'        },
-  { id:'supgrabaciones', label:'Sup. Grabaciones',  cls:'bc-supgrabaciones' },
   { id:'backreclutamiento',   label:'Back Data Reclutaminto',  cls:'bc-backreclutamiento'   },
   { id:'asesorreclutamiento', label:'Asesor de Reclutamiento', cls:'bc-asesorreclutamiento' },
 ]
@@ -98,7 +97,6 @@ const ACCESOS_MODS = [
   { nombre:'Cobranzas',        desc:'Clientes instalados y contratos',icon:'wallet',    path:'/cobranzas',       color:'#fdba74', cargo:'cobranzas' },
   { nombre:'Calidad',          desc:'Control de clientes instalados',   icon:'quality',   path:'/calidad',         color:'#fb923c', cargo:'calidad' },
   { nombre:'Super de Calidad', desc:'Supervisión del equipo de Calidad',icon:'quality',   path:'/sup-calidad',     color:'#f97316', cargo:'supcalidad' },
-  { nombre:'Sup. Grabaciones', desc:'Supervisión del equipo de audio',icon:'headphones',path:'/sup-grabaciones',color:'#ea580c', cargo:'supgrabaciones' },
   { nombre:'Back Data Reclutaminto',        desc:'Gestión y asignación de candidatos', icon:'clipboard', path:'/backdata-reclutamiento', color:'#4338ca', cargo:'backreclutamiento' },
   { nombre:'Sistema de Llamadas Reclutamiento', desc:'Contacto y seguimiento de postulantes', icon:'chart', path:'/reclutamiento', color:'#0e7490', cargo:'asesorreclutamiento' },
 ]

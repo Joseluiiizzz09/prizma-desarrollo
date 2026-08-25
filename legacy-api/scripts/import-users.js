@@ -35,7 +35,7 @@ const filePath = path.resolve(args[fileArg + 1]);
 
 /* ── Constantes de validación ───────────────────────────────────────── */
 const CARGOS_VALIDOS = new Set([
-  'backoffice', 'jefatura', 'grabaciones', 'supgrabaciones',
+  'backoffice', 'jefatura', 'grabaciones',
   'backreclutamiento', 'asesorreclutamiento', 'seguimiento',
   'validacion', 'programacion', 'usuarios', 'supervisor', 'asesor',
 ]);

@@ -325,7 +325,6 @@ body{
 .bc-seguimiento{background:#ccfbf1;color:#134e4a;border-color:#5eead4;}
 .bc-jefatura{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;border-color:transparent;}
 .bc-programacion{background:#fed7aa;color:#7c2d12;border-color:#fdba74;}
-.bc-supgrabaciones{background:#ede9fe;color:#4c1d95;border-color:#c4b5fd;}
 .bc-usuarios{background:#e2e8f0;color:#334155;border-color:#cbd5e1;}
 .bc-default{background:#e2e8f0;color:#1e293b;border-color:#cbd5e1;}
 .bu-activo{background:#d1fae5;color:#065f46;border-color:#6ee7b7;}

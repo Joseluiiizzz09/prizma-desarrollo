@@ -323,7 +323,6 @@ body{
 .bc-seguimiento{background:#f0fdfa;color:#134e4a;}
 .bc-jefatura{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;}
 .bc-programacion{background:#fff7ed;color:#c2410c;}
-.bc-supgrabaciones{background:#f5f3ff;color:#5b21b6;}
 .bc-usuarios{background:#f8fafc;color:var(--ink-3);}
 .bc-default{background:#f8fafc;color:var(--ink-2);}
 .bu-activo{background:#ecfdf5;color:#065f46;}
