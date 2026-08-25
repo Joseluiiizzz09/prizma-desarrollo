@@ -698,7 +698,7 @@ body {
 .usuario-cargos{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 
 .tabla-usuarios-pro {
-  width: 1560px;
+  width: 100%;
   min-width: 1560px;
   table-layout: fixed;
 }
