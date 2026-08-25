@@ -1012,7 +1012,7 @@ export default function DashboardReclutamiento() {
               />
             </div>
             <button onClick={irANuevaVentaDesdeModal}
-              style={{width:'100%',padding:'12px',border:'none',borderRadius:'10px',background:'#22c55e',color:'#fff',fontSize:'14px',fontWeight:700,fontFamily:'inherit',cursor:'pointer',marginBottom:'8px'}}>
+              style={{width:'100%',padding:'12px',border:'none',borderRadius:'10px',background:'#ea580c',color:'#fff',fontSize:'14px',fontWeight:700,fontFamily:'inherit',cursor:'pointer',marginBottom:'8px'}}>
               Confirmar
             </button>
             <button onClick={cerrarModales}

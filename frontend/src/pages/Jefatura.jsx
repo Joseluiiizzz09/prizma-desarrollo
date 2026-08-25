@@ -82,18 +82,18 @@ function estadoProg(raw) {
 }
 
 const ACCESOS_MODS = [
-  { nombre:'Back Data',        desc:'Gestión y asignación de leads', icon:'clipboard', path:'/backoffice',      color:'#dc3545', cargo:'backoffice' },
-  { nombre:'Validación',       desc:'Control y revisión de ventas',  icon:'shield',    path:'/validacion',      color:'#059669', cargo:'validacion' },
-  { nombre:'Grabaciones',      desc:'Auditoría de llamadas',         icon:'mic',       path:'/grabaciones',     color:'#0f766e', cargo:'grabaciones' },
-  { nombre:'Seguimiento',      desc:'Seguimiento postventa',         icon:'activity',  path:'/seguimiento',     color:'#0284c7', cargo:'seguimiento' },
-  { nombre:'Supervisor',       desc:'Gestión de equipos y salas',    icon:'briefcase', path:'/supervisor',      color:'#7c3aed', cargo:'supervisor' },
-  { nombre:'Dashboard CRM',    desc:'Panel individual del asesor',   icon:'chart',     path:'/dashboard',       color:'#2563eb', cargo:'asesor' },
-  { nombre:'Gestión Usuarios', desc:'Administración de accesos',     icon:'users',     path:'/usuarios',        color:'#be185d', cargo:'usuarios' },
-  { nombre:'Programación',     desc:'Agenda de instalaciones',       icon:'calendar',  path:'/programacion',    color:'#c2410c', cargo:'programacion' },
-  { nombre:'Cobranzas',        desc:'Clientes instalados y contratos',icon:'wallet',    path:'/cobranzas',       color:'#0f766e', cargo:'cobranzas' },
-  { nombre:'Calidad',          desc:'Control de clientes instalados',   icon:'quality',   path:'/calidad',         color:'#2563eb', cargo:'calidad' },
-  { nombre:'Super de Calidad', desc:'Supervisión del equipo de Calidad',icon:'quality',   path:'/sup-calidad',     color:'#7c3aed', cargo:'supcalidad' },
-  { nombre:'Sup. Grabaciones', desc:'Supervisión del equipo de audio',icon:'headphones',path:'/sup-grabaciones',color:'#047857', cargo:'supgrabaciones' },
+  { nombre:'Back Data',        desc:'Gestión y asignación de leads', icon:'clipboard', path:'/backoffice',      color:'#fed7aa', cargo:'backoffice' },
+  { nombre:'Validación',       desc:'Control y revisión de ventas',  icon:'shield',    path:'/validacion',      color:'#fdba74', cargo:'validacion' },
+  { nombre:'Grabaciones',      desc:'Auditoría de llamadas',         icon:'mic',       path:'/grabaciones',     color:'#fb923c', cargo:'grabaciones' },
+  { nombre:'Seguimiento',      desc:'Seguimiento postventa',         icon:'activity',  path:'/seguimiento',     color:'#f97316', cargo:'seguimiento' },
+  { nombre:'Supervisor',       desc:'Gestión de equipos y salas',    icon:'briefcase', path:'/supervisor',      color:'#ea580c', cargo:'supervisor' },
+  { nombre:'Dashboard CRM',    desc:'Panel individual del asesor',   icon:'chart',     path:'/dashboard',       color:'#c2410c', cargo:'asesor' },
+  { nombre:'Gestión Usuarios', desc:'Administración de accesos',     icon:'users',     path:'/usuarios',        color:'#9a3412', cargo:'usuarios' },
+  { nombre:'Programación',     desc:'Agenda de instalaciones',       icon:'calendar',  path:'/programacion',    color:'#7c2d12', cargo:'programacion' },
+  { nombre:'Cobranzas',        desc:'Clientes instalados y contratos',icon:'wallet',    path:'/cobranzas',       color:'#fdba74', cargo:'cobranzas' },
+  { nombre:'Calidad',          desc:'Control de clientes instalados',   icon:'quality',   path:'/calidad',         color:'#fb923c', cargo:'calidad' },
+  { nombre:'Super de Calidad', desc:'Supervisión del equipo de Calidad',icon:'quality',   path:'/sup-calidad',     color:'#f97316', cargo:'supcalidad' },
+  { nombre:'Sup. Grabaciones', desc:'Supervisión del equipo de audio',icon:'headphones',path:'/sup-grabaciones',color:'#ea580c', cargo:'supgrabaciones' },
   { nombre:'Back Data Reclutaminto',        desc:'Gestión y asignación de candidatos', icon:'clipboard', path:'/backdata-reclutamiento', color:'#4338ca', cargo:'backreclutamiento' },
   { nombre:'Sistema de Llamadas Reclutamiento', desc:'Contacto y seguimiento de postulantes', icon:'chart', path:'/reclutamiento', color:'#0e7490', cargo:'asesorreclutamiento' },
 ]
@@ -649,8 +649,8 @@ export default function Jefatura() {
       chartInst.current.salas = new Chart(canvasSalas.current, {
         type: 'bar',
         data: { labels:salas, datasets:[
-          { label:'Instaladas', data:instaladas, backgroundColor:'#16a34a', borderRadius:6 },
-          { label:'Caídas',     data:caidas,     backgroundColor:'#f97316', borderRadius:6 },
+          { label:'Instaladas', data:instaladas, backgroundColor:'#fb923c', borderRadius:6 },
+          { label:'Caídas',     data:caidas,     backgroundColor:'#7c2d12', borderRadius:6 },
         ]},
         options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:12}}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'#f3f4f6'}},x:{grid:{display:false}}} }
       })
@@ -1169,7 +1169,7 @@ export default function Jefatura() {
               <div className="kpi-card k-orange"><div className="kpi-num">{kpis.grabadas}</div>      <div className="kpi-label">Grabadas</div>           <div className="kpi-sub">con audio</div></div>
               <div className="kpi-card k-yellow"><div className="kpi-num">{kpis.noGrabadas}</div>    <div className="kpi-label">No grabadas</div>        <div className="kpi-sub">esperando audio</div></div>
               <div className="kpi-card k-teal">  <div className="kpi-num">{kpis.enEjecucion}</div>   <div className="kpi-label">En ejecución</div>       <div className="kpi-sub">programadas</div></div>
-              <div className="kpi-card" style={{borderTopColor:'#94a3b8'}}><div className="kpi-num">{kpis.noProgramadas}</div><div className="kpi-label">No programadas</div><div className="kpi-sub">esperando prog.</div></div>
+              <div className="kpi-card" style={{borderTopColor:'#c2825f'}}><div className="kpi-num">{kpis.noProgramadas}</div><div className="kpi-label">No programadas</div><div className="kpi-sub">esperando prog.</div></div>
               <div className="kpi-card k-green"> <div className="kpi-num">{kpis.instaladas}</div>    <div className="kpi-label">Instaladas</div>         <div className="kpi-sub">completadas</div></div>
               <div className="kpi-card k-red">   <div className="kpi-num">{kpis.caidas}</div>        <div className="kpi-label">Caídas + Rechazos</div>  <div className="kpi-sub">fallidas</div></div>
               <div className="kpi-card k-purple"><div className="kpi-num">{kpis.conv}</div>          <div className="kpi-label">Efectividad mes</div>    <div className="kpi-sub">inst / (inst+caídas)</div></div>
@@ -1239,7 +1239,7 @@ export default function Jefatura() {
           <section className={`section${seccion==='seguimiento'?' active':''}`}>
             <div className="sec-header">
               <div><h2>Seguimiento en campo</h2><p>Estado actual de todas las ventas — se actualiza automáticamente</p></div>
-              <button className="btn-nuevo" style={{background:'#0891b2'}} onClick={cargarSeguimiento}>↻ Actualizar</button>
+              <button className="btn-nuevo" style={{background:'#ea580c'}} onClick={cargarSeguimiento}>↻ Actualizar</button>
             </div>
             <div className="kpi-grid seguimiento-kpi-grid">
               <div className="kpi-card k-teal">  <div className="kpi-num">{kpisSeg.ejecucion}</div><div className="kpi-label">En ejecución</div></div>
@@ -1340,7 +1340,7 @@ export default function Jefatura() {
             <div className="sec-header">
               <div><h2>Dashboard de Leads por Campaña</h2><p>Información de altas y resultados para el área de Marketing</p></div>
               <div style={{display:'flex',gap:8}}>
-                <button className="btn-nuevo" style={{background:'#0f766e'}} onClick={exportarMarketingExcel} disabled={!marketingData.length}>Exportar Excel</button>
+                <button className="btn-nuevo" style={{background:'#ea580c'}} onClick={exportarMarketingExcel} disabled={!marketingData.length}>Exportar Excel</button>
                 <button className="btn-nuevo" onClick={()=>cargarMarketing(marketingFiltros)}>Actualizar</button>
               </div>
             </div>

@@ -622,8 +622,8 @@ export default function Dashboard() {
     instDiario.current = new Chart(canvasDiario.current, {
       type: 'bar',
       data: { labels: diario.labels, datasets: [
-        { label:'Ventas',    data:diario.ventas,    backgroundColor:'rgba(34,197,94,0.8)',  borderRadius:6 },
-        { label:'Instaladas',data:diario.instaladas,backgroundColor:'rgba(139,92,246,0.8)',borderRadius:6 },
+        { label:'Ventas',    data:diario.ventas,    backgroundColor:'rgba(249,115,22,0.85)',  borderRadius:6 },
+        { label:'Instaladas',data:diario.instaladas,backgroundColor:'rgba(124,45,18,0.85)',borderRadius:6 },
       ]},
       options: barOpts({ ticks: { stepSize: 1 } }),
     })
@@ -632,8 +632,8 @@ export default function Dashboard() {
     instSemanal.current = new Chart(canvasSemanal.current, {
       type: 'bar',
       data: { labels: semanal.labels, datasets: [
-        { label:'Ventas',    data:semanal.ventas,    backgroundColor:'rgba(34,197,94,0.75)', borderRadius:6 },
-        { label:'Instaladas',data:semanal.instaladas,backgroundColor:'rgba(139,92,246,0.75)',borderRadius:6 },
+        { label:'Ventas',    data:semanal.ventas,    backgroundColor:'rgba(249,115,22,0.8)', borderRadius:6 },
+        { label:'Instaladas',data:semanal.instaladas,backgroundColor:'rgba(124,45,18,0.8)',borderRadius:6 },
       ]},
       options: barOpts({ ticks: { stepSize: 1 }, suggestedMin: 0 }),
     })
@@ -642,8 +642,8 @@ export default function Dashboard() {
     instMensual.current = new Chart(canvasMensual.current, {
       type: 'line',
       data: { labels: mensual.labels, datasets: [
-        { label:'Ventas',    data:mensual.ventas,    borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.08)',  tension:0.4, fill:true, pointRadius:4 },
-        { label:'Instaladas',data:mensual.instaladas,borderColor:'#8b5cf6',backgroundColor:'rgba(139,92,246,0.08)', tension:0.4, fill:true, pointRadius:4 },
+        { label:'Ventas',    data:mensual.ventas,    borderColor:'#f97316',backgroundColor:'rgba(249,115,22,0.1)',  tension:0.4, fill:true, pointRadius:4 },
+        { label:'Instaladas',data:mensual.instaladas,borderColor:'#7c2d12',backgroundColor:'rgba(124,45,18,0.08)', tension:0.4, fill:true, pointRadius:4 },
       ]},
       options: barOpts({ ticks: { stepSize: 1 }, suggestedMin: 0 }),
     })

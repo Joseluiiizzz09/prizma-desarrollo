@@ -310,7 +310,7 @@ export default function SupGrabaciones() {
         <div className="topbar-right">
           <JefaturaViewControls>
             <span className="topbar-fecha">{fechaLabel}</span>
-            <span className="topbar-badge" style={{ background: '#16a34a' }}>SUP. GRABACIONES</span>
+            <span className="topbar-badge" style={{ background: '#ea580c' }}>SUP. GRABACIONES</span>
             <span className="topbar-user">{usuarioActual}</span>
           </JefaturaViewControls>
           <CambiarAreaMenu />
@@ -523,7 +523,7 @@ export default function SupGrabaciones() {
               {audioSrc && (
                 <div style={{ marginTop: '8px' }}>
                   <a href={audioSrc} download={`grabacion_${modalRevisar.id}.mp3`}
-                    style={{ padding: '7px 14px', background: '#2563eb', color: '#fff', borderRadius: '8px', fontSize: '12px', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    style={{ padding: '7px 14px', background: '#ea580c', color: '#fff', borderRadius: '8px', fontSize: '12px', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     Descargar audio
                   </a>
                 </div>

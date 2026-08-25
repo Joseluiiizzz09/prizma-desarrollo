@@ -274,6 +274,7 @@ async function expirarProgramacionesVencidas() {
      WHERE LOWER(TRIM(COALESCE(estado_supgrab, ''))) = 'programado'
        AND programacion_expira_at IS NOT NULL
        AND programacion_expira_at <= NOW()
+       AND seguimiento_ingresado_at IS NULL
   `).catch(error => {
     console.error('[EXPIRAR PROGRAMACIONES]', error.message);
   }).finally(() => {
@@ -615,6 +616,26 @@ function asegurarTablaCobranza() {
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+      const [columnasCobranza] = await db.query('SHOW COLUMNS FROM cobranza_gestiones');
+      const existentesCobranza = new Set(columnasCobranza.map(columna => columna.Field));
+      const nuevasCobranza = [
+        ['comentario', 'TEXT NULL'],
+        ['recibo1_tipificacion_llamada', 'VARCHAR(40) NULL'],
+        ['recibo1_fecha_llamada', 'DATETIME NULL'],
+        ['recibo2_tipificacion_llamada', 'VARCHAR(40) NULL'],
+        ['recibo2_fecha_llamada', 'DATETIME NULL'],
+        ['recibo3_tipificacion_llamada', 'VARCHAR(40) NULL'],
+        ['recibo3_fecha_llamada', 'DATETIME NULL'],
+        ['recibo4_tipificacion_llamada', 'VARCHAR(40) NULL'],
+        ['recibo4_fecha_llamada', 'DATETIME NULL'],
+        ['recibo5_tipificacion_llamada', 'VARCHAR(40) NULL'],
+        ['recibo5_fecha_llamada', 'DATETIME NULL'],
+        ['recibo6_tipificacion_llamada', 'VARCHAR(40) NULL'],
+        ['recibo6_fecha_llamada', 'DATETIME NULL'],
+      ];
+      for (const [columna, definicion] of nuevasCobranza) {
+        if (!existentesCobranza.has(columna)) await db.query(`ALTER TABLE cobranza_gestiones ADD COLUMN ${columna} ${definicion}`);
+      }
       await db.query(`
         CREATE TABLE IF NOT EXISTS cobranza_historial (
           id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -641,7 +662,7 @@ router.get('/cobranzas-listado', auth(['cobranzas','calidad','supcalidad','jefat
     // Jefatura puede supervisar estos campos únicamente al entrar al módulo
     // mediante Accesos directos; la escritura continúa reservada a Calidad.
     const incluyeCalidad = ['calidad','supcalidad'].includes(req.user.cargo);
-    const incluyeCobranza = req.user.cargo === 'cobranzas';
+    const incluyeCobranza = req.user.cargo === 'cobranzas' || (req.user.permisos || []).includes('cobranzas');
     if (incluyeCalidad) await asegurarTablaCalidad();
     if (incluyeCobranza) await asegurarTablaCobranza();
     const camposCalidad = incluyeCalidad ? `,
@@ -668,9 +689,33 @@ router.get('/cobranzas-listado', auth(['cobranzas','calidad','supcalidad','jefat
              COALESCE(cb.recibo4_tipificacion, 'PENDIENTE') AS cobranza_recibo4_tipificacion,
              COALESCE(cb.recibo5_tipificacion, 'PENDIENTE') AS cobranza_recibo5_tipificacion,
              COALESCE(cb.recibo6_tipificacion, 'PENDIENTE') AS cobranza_recibo6_tipificacion,
+             cb.comentario AS cobranza_comentario,
+             cb.recibo1_tipificacion_llamada AS cobranza_recibo1_tipificacion_llamada,
+             cb.recibo1_fecha_llamada AS cobranza_recibo1_fecha_llamada,
+             cb.recibo2_tipificacion_llamada AS cobranza_recibo2_tipificacion_llamada,
+             cb.recibo2_fecha_llamada AS cobranza_recibo2_fecha_llamada,
+             cb.recibo3_tipificacion_llamada AS cobranza_recibo3_tipificacion_llamada,
+             cb.recibo3_fecha_llamada AS cobranza_recibo3_fecha_llamada,
+             cb.recibo4_tipificacion_llamada AS cobranza_recibo4_tipificacion_llamada,
+             cb.recibo4_fecha_llamada AS cobranza_recibo4_fecha_llamada,
+             cb.recibo5_tipificacion_llamada AS cobranza_recibo5_tipificacion_llamada,
+             cb.recibo5_fecha_llamada AS cobranza_recibo5_fecha_llamada,
+             cb.recibo6_tipificacion_llamada AS cobranza_recibo6_tipificacion_llamada,
+             cb.recibo6_fecha_llamada AS cobranza_recibo6_fecha_llamada,
              cb.updated_at AS cobranza_updated_at` : '';
     const joinCalidad = incluyeCalidad ? 'LEFT JOIN calidad_gestiones cg ON cg.venta_id = v.id' : '';
     const joinCobranza = incluyeCobranza ? 'LEFT JOIN cobranza_gestiones cb ON cb.venta_id = v.id' : '';
+    // Calidad solo debe ver clientes cuyo estado ACTUAL siga siendo de instalación
+    // (si la venta cayó/fue rechazada después de instalada, sale del listado de Calidad).
+    // Cobranza sí conserva la lógica histórica: una vez instalada, permanece disponible
+    // para gestión de cobranza aunque el estado operativo avance después.
+    const soloInstaladoActual = incluyeCalidad && !incluyeCobranza;
+    const filtroInstalado = soloInstaladoActual
+      ? `REPLACE(UPPER(TRIM(COALESCE(v.estado, ''))), '_', ' ') IN
+             ('INSTALADO', 'INSTALADO NO VALIDADO', 'REASIGNACION', 'SERVICIO ACTIVO')`
+      : `inst.fecha_instalacion IS NOT NULL
+          OR REPLACE(UPPER(TRIM(COALESCE(v.estado, ''))), '_', ' ') IN
+             ('INSTALADO', 'INSTALADO NO VALIDADO', 'REASIGNACION', 'SERVICIO ACTIVO')`;
     const [data] = await db.query(`
       SELECT v.id, v.nombre, v.dni, v.sot, v.telefono1, v.telefono2, v.paquete,
              COALESCE(u.nombre, v.asesor_nombre) AS vendedor_nombre${camposCalidad}${camposCobranza},
@@ -691,9 +736,7 @@ router.get('/cobranzas-listado', auth(['cobranzas','calidad','supcalidad','jefat
                  ('INSTALADO', 'INSTALADO NO VALIDADO', 'REASIGNACION', 'SERVICIO ACTIVO')
            GROUP BY venta_id
         ) inst ON inst.venta_id = v.id
-       WHERE inst.fecha_instalacion IS NOT NULL
-          OR REPLACE(UPPER(TRIM(COALESCE(v.estado, ''))), '_', ' ') IN
-             ('INSTALADO', 'INSTALADO NO VALIDADO', 'REASIGNACION', 'SERVICIO ACTIVO')
+       WHERE ${filtroInstalado}
        ORDER BY fecha_instalacion DESC, v.id DESC
     `);
     const [usuariosCalidad] = incluyeCalidad
@@ -823,8 +866,15 @@ router.get('/calidad/:id/historial', auth(['calidad','supcalidad','jefatura']), 
 
 const COBRANZA_TIPIFICACIONES = ['PAGADO', 'PENDIENTE', 'BAJA', 'SUSPENDIDO', 'VENCIDO'];
 
+// Resultado de la llamada de cobranza a un recibo puntual (no del estado de pago).
+const COBRANZA_TIPIFICACIONES_LLAMADA = [
+  'PAGO', 'NO CONTESTA', 'CORTA LLAMADA', 'GENERAR DESCUENTO', 'NO PAGARÁ',
+  'CONFORME', 'PROBLEMAS CON EL SERVICIO', 'AGENDADO', 'NUMERO INCORRECTO', 'NO TIENE WHATSAPP',
+];
+
 function esEscrituraCobranzaValida(req) {
-  return req.user.cargo === 'cobranzas' && !req.user.accesoDirectoJefatura;
+  const tieneCargoCobranza = req.user.cargo === 'cobranzas' || (req.user.permisos || []).includes('cobranzas');
+  return tieneCargoCobranza && !req.user.accesoDirectoJefatura;
 }
 
 router.patch('/cobranza/:id/ciclo', auth(['cobranzas']), async (req, res) => {
@@ -910,6 +960,65 @@ router.patch('/cobranza/:id/recibo', auth(['cobranzas']), async (req, res) => {
   } catch (e) {
     console.error('[PATCH /ventas/cobranza/:id/recibo]', e.message || e);
     res.status(500).json({ ok:false, mensaje:'Error al guardar la tipificación del recibo' });
+  }
+});
+
+router.patch('/cobranza/:id/recibo-llamada', auth(['cobranzas']), async (req, res) => {
+  try {
+    if (!esEscrituraCobranzaValida(req)) {
+      return res.status(403).json({ ok:false, mensaje:'Esta gestión es exclusiva del área de Cobranza' });
+    }
+    await asegurarTablaCobranza();
+    const ventaId = Number(req.params.id);
+    const numero = Number(req.body?.numero);
+    const valor = String(req.body?.valor || '').trim().toUpperCase();
+    if (!Number.isInteger(ventaId) || ventaId <= 0 || !Number.isInteger(numero) || numero < 1 || numero > 6 || !COBRANZA_TIPIFICACIONES_LLAMADA.includes(valor)) {
+      return res.status(400).json({ ok:false, mensaje:'Tipificación de llamada no válida' });
+    }
+    const columna = `recibo${numero}_tipificacion_llamada`;
+    const columnaFecha = `recibo${numero}_fecha_llamada`;
+    const [venta] = await db.query(`SELECT v.id, cb.${columna} AS valor_anterior FROM ventas v LEFT JOIN cobranza_gestiones cb ON cb.venta_id=v.id WHERE v.id=? LIMIT 1`, [ventaId]);
+    if (!venta.length) return res.status(404).json({ ok:false, mensaje:'Cliente no encontrado' });
+    await db.query(`
+      INSERT INTO cobranza_gestiones (venta_id, ${columna}, ${columnaFecha}, actualizado_por_id, actualizado_por_nombre)
+      VALUES (?, ?, NOW(), ?, ?)
+      ON DUPLICATE KEY UPDATE ${columna}=VALUES(${columna}), ${columnaFecha}=NOW(),
+        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), updated_at=CURRENT_TIMESTAMP
+    `, [ventaId, valor, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
+    await db.query(`INSERT INTO cobranza_historial (venta_id,campo,valor_anterior,valor_nuevo,usuario_id,usuario_nombre) VALUES (?,?,?,?,?,?)`,
+      [ventaId, columna, venta[0].valor_anterior || '—', valor, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
+    res.json({ ok:true, numero, valor });
+  } catch (e) {
+    console.error('[PATCH /ventas/cobranza/:id/recibo-llamada]', e.message || e);
+    res.status(500).json({ ok:false, mensaje:'Error al guardar la tipificación de la llamada' });
+  }
+});
+
+router.patch('/cobranza/:id/comentario', auth(['cobranzas']), async (req, res) => {
+  try {
+    if (!esEscrituraCobranzaValida(req)) {
+      return res.status(403).json({ ok:false, mensaje:'Esta gestión es exclusiva del área de Cobranza' });
+    }
+    await asegurarTablaCobranza();
+    const ventaId = Number(req.params.id);
+    const comentario = String(req.body?.comentario || '').trim();
+    if (!Number.isInteger(ventaId) || ventaId <= 0 || comentario.length > 1500) {
+      return res.status(400).json({ ok:false, mensaje:'El comentario no puede superar 1500 caracteres' });
+    }
+    const [venta] = await db.query('SELECT v.id, cb.comentario AS valor_anterior FROM ventas v LEFT JOIN cobranza_gestiones cb ON cb.venta_id=v.id WHERE v.id=? LIMIT 1', [ventaId]);
+    if (!venta.length) return res.status(404).json({ ok:false, mensaje:'Cliente no encontrado' });
+    await db.query(`
+      INSERT INTO cobranza_gestiones (venta_id, comentario, actualizado_por_id, actualizado_por_nombre)
+      VALUES (?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE comentario=VALUES(comentario),
+        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), updated_at=CURRENT_TIMESTAMP
+    `, [ventaId, comentario || null, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
+    await db.query(`INSERT INTO cobranza_historial (venta_id,campo,valor_anterior,valor_nuevo,usuario_id,usuario_nombre) VALUES (?,?,?,?,?,?)`,
+      [ventaId, 'comentario', venta[0].valor_anterior || '', comentario, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
+    res.json({ ok:true, comentario });
+  } catch (e) {
+    console.error('[PATCH /ventas/cobranza/:id/comentario]', e.message || e);
+    res.status(500).json({ ok:false, mensaje:'Error al guardar el comentario' });
   }
 });
 
@@ -1014,19 +1123,25 @@ router.get('/calidad-rendimiento', auth(['supcalidad','jefatura']), async (req, 
 // Programación, Seguimiento, WhatsApp y Grabaciones que esta pantalla no usa.
 router.get('/validacion-listado', auth(['validacion','jefatura']), async (req, res) => {
   try {
+    // Resolver el último estado en bloque. La subconsulta correlacionada anterior
+    // recorría venta_historial una vez por cada venta y terminaba bloqueando el
+    // endpoint cuando crecía el historial.
     const [data] = await db.query(`
       SELECT v.*, COALESCE(u.nombre, v.asesor_nombre) AS asesor_nombre, u.sala,
-             COALESCE(LOWER((
-               SELECT vh.valor_nuevo
-                 FROM venta_historial vh
-                WHERE vh.venta_id = v.id
-                  AND vh.campo = 'estado'
-                  AND vh.tipo = 'CAMBIO_VALIDACION'
-                ORDER BY vh.id DESC
-                LIMIT 1
-             )), 'venta') AS estado_validacion
+             COALESCE(LOWER(cv.valor_nuevo), 'venta') AS estado_validacion
         FROM ventas v
         LEFT JOIN usuarios u ON v.asesor_id = u.id
+        LEFT JOIN (
+          SELECT vh.venta_id, vh.valor_nuevo
+            FROM venta_historial vh
+            INNER JOIN (
+              SELECT venta_id, MAX(id) AS ultimo_id
+                FROM venta_historial
+               WHERE campo = 'estado'
+                 AND tipo = 'CAMBIO_VALIDACION'
+               GROUP BY venta_id
+            ) ult ON ult.ultimo_id = vh.id
+        ) cv ON cv.venta_id = v.id
        ORDER BY v.created_at DESC
     `);
     res.json({ ok: true, data });
@@ -1613,7 +1728,13 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
       SELECT id, asesor_id, estado, obs_backoffice, observacion,
              obs_programacion, sot, fecha_programada, obs_validacion, obs_supgrab,
              estado_supgrab, estado_grab, audio_path, obs_seguimiento,
-             tramo_seguimiento, motivo_seguimiento, seguimiento_ingresado_at
+             tramo_seguimiento, motivo_seguimiento, seguimiento_ingresado_at,
+             EXISTS (
+               SELECT 1 FROM venta_historial vh
+                WHERE vh.venta_id = ventas.id
+                  AND vh.campo = 'estado'
+                  AND UPPER(TRIM(vh.valor_nuevo)) = 'PROGRAMADO'
+             ) AS tuvo_programacion
         FROM ventas
        WHERE id = ?
     `, [req.params.id]);
@@ -1625,6 +1746,27 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
       return res.status(403).json({ ok: false, mensaje: 'Sin permiso para operar en esta área' });
     }
     const cargoEfectivo = areaSolicitada || req.user.cargo;
+
+    const modificaFlujo = estado !== undefined || estado_supgrab !== undefined ||
+      estado_grab !== undefined || fecha_programada !== undefined;
+    if (rows[0].seguimiento_ingresado_at && cargoEfectivo !== 'seguimiento' && modificaFlujo) {
+      return res.status(409).json({
+        ok: false,
+        mensaje: 'Esta venta ya ingresó a Seguimiento y no puede retroceder a una etapa anterior.',
+      });
+    }
+
+    const resultadoSuper = String(estado_supgrab || '').trim().toLowerCase();
+    if (
+      cargoEfectivo === 'supgrabaciones' &&
+      rows[0].tuvo_programacion &&
+      ['aprobado', 'observado'].includes(resultadoSuper)
+    ) {
+      return res.status(409).json({
+        ok: false,
+        mensaje: 'Esta venta está en el segundo ciclo. Selecciona CONFORME, NO CONFORME o RECHAZADO.',
+      });
+    }
 
     if (cargoEfectivo === 'grabaciones' && String(rows[0].estado || '').toUpperCase() !== 'VALIDADO') {
       return res.status(403).json({ ok: false, mensaje: 'Solo puedes gestionar ventas con estado VALIDADO' });
@@ -2155,3 +2297,4 @@ router.delete('/:id', auth(['supervisor','jefatura']), async (req, res) => {
 });
 
 module.exports = router;
+

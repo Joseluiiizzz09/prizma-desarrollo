@@ -273,7 +273,7 @@ export default function Programacion() {
         </div>
         <div className="topbar-right">
           <JefaturaViewControls>
-            <span className="topbar-badge" style={{ background: '#7c3aed' }}>PROGRAMACIÓN</span>
+            <span className="topbar-badge" style={{ background: '#ea580c' }}>PROGRAMACIÓN</span>
             <span className="topbar-user">{sesion?.nombre || '—'}</span>
           </JefaturaViewControls>
           <CambiarAreaMenu />
@@ -456,7 +456,7 @@ export default function Programacion() {
                   ))}
                 </div>
                 {estadoModal && (
-                  <div style={{ marginTop: '8px', fontSize: '11px', color: '#7c3aed', fontWeight: 600 }}>
+                  <div style={{ marginTop: '8px', fontSize: '11px', color: '#c2410c', fontWeight: 600 }}>
                     {estadoModal === modalDet.estado ? 'Estado actual: ' : 'Nuevo estado: '}
                     {ESTADO_LABELS[estadoModal] || estadoModal}
                   </div>

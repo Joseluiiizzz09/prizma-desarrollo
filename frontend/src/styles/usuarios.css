@@ -2,7 +2,7 @@
 
 :root {
   --red:#f97316; --dark:#111827; --mid:#374151; --soft:#6b7280;
-  --muted:#9ca3af; --border:#e5e7eb; --bg:#f2f2f7;
+  --muted:#9ca3af; --border:#e5e7eb; --bg: #f7f4f1;
   --green:#16a34a; --blue:#2563eb; --orange:#f97316; --purple:#7c3aed;
   --sp: cubic-bezier(.34,1.2,.64,1);
   --shadow-sm: 0 1px 3px rgba(0,0,0,.06);
@@ -15,8 +15,8 @@ body {
   font-family: 'DM Sans', -apple-system, sans-serif;
   background: var(--bg);
   background-image:
-    radial-gradient(ellipse at 0% 0%, rgba(255,180,180,.22) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 100%, rgba(200,210,240,.22) 0%, transparent 50%);
+    radial-gradient(ellipse at 0% 0%, rgba(249,115,22,.18) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 100%, rgba(251,146,60,.14) 0%, transparent 50%);
   min-height: 100vh; color: var(--dark);
   -webkit-font-smoothing: antialiased;
 }
@@ -90,17 +90,19 @@ body {
 /* ===== KPI STRIP ===== */
 .kpi-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
 .kpi {
-  flex: 1; min-width: 100px; background: #fff;
-  border: 1px solid var(--border); border-radius: 12px;
+  flex: 1; min-width: 100px; background: rgba(255,255,255,.7);
+  border: 1px solid rgba(255,255,255,.7); border-radius: 12px;
   padding: 12px 16px; box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
   border-top: 3px solid transparent; transition: all .2s var(--sp);
 }
-.kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-.kpi-blue   { border-top-color: var(--blue); }
-.kpi-green  { border-top-color: var(--green); }
-.kpi-red    { border-top-color: var(--red); }
-.kpi-purple { border-top-color: var(--purple); }
-.kpi-orange { border-top-color: var(--orange); }
+.kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(234,88,12,.14); }
+.kpi-blue   { border-top-color: #fdba74; }
+.kpi-green  { border-top-color: #fb923c; }
+.kpi-red    { border-top-color: #ea580c; }
+.kpi-purple { border-top-color: #f97316; }
+.kpi-orange { border-top-color: #c2410c; }
 .kpi-num   { font-size: 24px; font-weight: 800; color: var(--dark); line-height:1; letter-spacing:-.5px; }
 .kpi-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 3px; }
 

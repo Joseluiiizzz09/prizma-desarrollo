@@ -651,7 +651,7 @@ export default function Supervisor() {
                           <td><div className={`pos-badge${i<3?' '+['p1','p2','p3'][i]:''}`}>{i+1}</div></td>
                           <td><div className="asesor-cell"><div className="av-circle" style={{background:colorFor(r.nombre)}}>{iniciales(r.nombre)}</div><div><div style={{fontWeight:700,fontSize:12}}>{r.nombre}</div><div style={{fontSize:10,color:'#9ca3af'}}>{r.usuario}</div></div></div></td>
                           <td style={{fontWeight:700}}>{r.total}</td>
-                          <td style={{color:'#16a34a',fontWeight:700}}>{r.inst}</td>
+                          <td style={{color:'#fb923c',fontWeight:700}}>{r.inst}</td>
                           <td><div className="bar-mini-wrap"><div className="bar-mini"><div className="bar-mini-fill" style={{width:`${r.conv}%`}} /></div><span style={{fontSize:11,color:'#9ca3af'}}>{r.conv}%</span></div></td>
                         </tr>
                       ))
@@ -897,10 +897,10 @@ export default function Supervisor() {
                         {/* B. M?tricas */}
                         <div className="eq-metrics">
                           {[
-                            ['HOY',   hoyV,       '#374151'],
-                            ['MES',   mesV,       '#2563eb'],
-                            ['INST.', inst,       '#16a34a'],
-                            ['CONV.', `${conv}%`, '#7c3aed'],
+                            ['HOY',   hoyV,       '#1c140f'],
+                            ['MES',   mesV,       '#fdba74'],
+                            ['INST.', inst,       '#fb923c'],
+                            ['CONV.', `${conv}%`, '#c2410c'],
                           ].map(([label, value, color]) => (
                             <div key={label} className="eq-metric">
                               <div className="eq-metric-label">{label}</div>
@@ -957,7 +957,7 @@ export default function Supervisor() {
                         <div className="ac-sala">{a.sala} - {a.usuario||''}</div>
                         <div className="ac-stats">
                           <div className="ac-stat"><div className="ac-stat-num">{mis.length}</div><div className="ac-stat-label">Total</div></div>
-                          <div className="ac-stat"><div className="ac-stat-num" style={{color:'#16a34a'}}>{inst}</div><div className="ac-stat-label">Inst.</div></div>
+                          <div className="ac-stat"><div className="ac-stat-num" style={{color:'#fb923c'}}>{inst}</div><div className="ac-stat-label">Inst.</div></div>
                           <div className="ac-stat"><div className="ac-stat-num" style={{color:'#ea580c'}}>{noVal}</div><div className="ac-stat-label">No Val.</div></div>
                           <div className="ac-stat"><div className="ac-stat-num" style={{color:'#c2410c'}}>{caida}</div><div className="ac-stat-label">Caídas</div></div>
                         </div>
@@ -988,7 +988,7 @@ export default function Supervisor() {
                             <td><div className={`pos-badge${i<3?' '+['p1','p2','p3'][i]:''}`}>{i+1}</div></td>
                             <td><div className="asesor-cell"><div className="av-circle" style={{background:colorFor(a.nombre)}}>{iniciales(a.nombre)}</div><div><div style={{fontWeight:700,fontSize:12}}>{a.nombre}</div><div style={{fontSize:10,color:'#9ca3af'}}>{a.usuario}</div></div></div></td>
                             {meses.map((cnt,mi)=><td key={mi} style={{fontWeight:mi===0?800:400,color:mi===0?'#111827':'#6b7280'}}>{cnt}</td>)}
-                            <td style={{fontWeight:800,color:'#16a34a'}}>{total}</td>
+                            <td style={{fontWeight:800,color:'#fb923c'}}>{total}</td>
                           </tr>
                         )
                       })
@@ -1102,7 +1102,7 @@ export default function Supervisor() {
                   <div><div style={{fontSize:16,fontWeight:800}}>{a.nombre}</div><div style={{fontSize:12,color:'#9ca3af'}}>@{a.usuario||'—'} · {a.sala||'—'}</div></div>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:18}}>
-                  {[['Hoy',hoyV,'#111827'],['Este mes',mesV,'#2563eb'],['Instaladas',inst,'#16a34a'],['Conv.',conv+'%','#7c3aed']].map(([l,v,c])=>(
+                  {[['Hoy',hoyV,'#1c140f'],['Este mes',mesV,'#fdba74'],['Instaladas',inst,'#fb923c'],['Conv.',conv+'%','#c2410c']].map(([l,v,c])=>(
                     <div key={l} style={{background:'#f9fafb',borderRadius:10,padding:12,textAlign:'center'}}>
                       <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
                       <div style={{fontSize:10,color:'#9ca3af',textTransform:'uppercase',marginTop:3}}>{l}</div>
@@ -1146,7 +1146,7 @@ export default function Supervisor() {
             </div>
             {blLeads && blLeads.length > 0 && (
               <div style={{padding:'10px 24px',display:'flex',gap:10,flexWrap:'wrap',borderBottom:'1px solid #f3f4f6'}}>
-                {[{l:'Leads',v:blLeads.length,c:'#2563eb'},{l:'Tipificados',v:blLeads.filter(l=>(l.tipif_vend||'').trim()!=='').length,c:'#16a34a'},{l:'VENTA CERRADA',v:blLeads.filter(l=>(l.tipif_vend||'').toUpperCase()==='VENTA CERRADA').length,c:'#7c3aed'},{l:'NC/Buzón',v:blLeads.filter(l=>['NO CONTESTA','BUZON DE VOZ'].includes((l.tipif_vend||'').toUpperCase())).length,c:'#d97706'}].map(k=>(
+                {[{l:'Leads',v:blLeads.length,c:'#fdba74'},{l:'Tipificados',v:blLeads.filter(l=>(l.tipif_vend||'').trim()!=='').length,c:'#fb923c'},{l:'VENTA CERRADA',v:blLeads.filter(l=>(l.tipif_vend||'').toUpperCase()==='VENTA CERRADA').length,c:'#ea580c'},{l:'NC/Buzón',v:blLeads.filter(l=>['NO CONTESTA','BUZON DE VOZ'].includes((l.tipif_vend||'').toUpperCase())).length,c:'#c2410c'}].map(k=>(
                   <div key={k.l} style={{background:'#f9fafb',borderRadius:10,padding:'8px 14px',display:'flex',flexDirection:'column',gap:2,minWidth:100}}>
                     <div style={{fontSize:18,fontWeight:800,color:k.c}}>{k.v}</div>
                     <div style={{fontSize:10,color:'#9ca3af',textTransform:'uppercase'}}>{k.l}</div>

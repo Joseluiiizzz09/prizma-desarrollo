@@ -747,7 +747,7 @@ export default function Grabaciones() {
             <div className="modal-sub">Cliente: <strong>{vSubir?.nombreApellidos||'—'}</strong></div>
             <div
               className="upload-zone"
-              style={subirDrag?{borderColor:'#2563eb',background:'#eff6ff'}:{}}
+              style={subirDrag?{borderColor:'#ea580c',background:'#fff7ed'}:{}}
               onClick={()=>fileInputRef.current?.click()}
               onDragOver={e=>{ e.preventDefault(); setSubirDrag(true) }}
               onDragLeave={()=>setSubirDrag(false)}
@@ -802,11 +802,11 @@ export default function Grabaciones() {
             <div className="modal-btns">
               <button className="btn-cancelar-m" onClick={cerrarModalAudio}>Cerrar</button>
               {audioSrc && (
-                <button className="btn-guardar" style={{background:'#059669'}} onClick={()=>descargarAudio(modalAudio.id)}>Descargar</button>
+                <button className="btn-guardar" style={{background:'#c2410c'}} onClick={()=>descargarAudio(modalAudio.id)}>Descargar</button>
               )}
               <button
                 className="btn-guardar"
-                style={{background:'#2563eb'}}
+                style={{background:'#ea580c'}}
                 onClick={()=>{ cerrarModalAudio(); abrirModalSubir(modalAudio.id) }}
               >
                 Cambiar archivo

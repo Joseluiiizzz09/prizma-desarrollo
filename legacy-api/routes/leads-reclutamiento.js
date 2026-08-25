@@ -8,10 +8,44 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('../database');
 const auth    = require('../middleware/auth');
-const { validar, errorTexto, errorFecha, errorHora, errorHistorial } = require('../middleware/validar');
+const { validar, errorTexto, errorFecha, errorHora, errorHistorial, errorEnum } = require('../middleware/validar');
 
 const ROLES_BACK = ['backreclutamiento', 'jefatura', 'usuarios'];
 const ROLES_ALL  = ['backreclutamiento', 'jefatura', 'usuarios', 'asesorreclutamiento'];
+const ROLES_ENTREVISTAS = ['entrevistas', 'backreclutamiento', 'jefatura', 'usuarios'];
+const TURNOS_ENTREVISTA = ['TURNO 1', 'TURNO 2'];
+
+let promesaTablaEntrevistas;
+function asegurarTablaEntrevistas() {
+  if (!promesaTablaEntrevistas) {
+    promesaTablaEntrevistas = db.query(`
+      CREATE TABLE IF NOT EXISTS reclutamiento_entrevistas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        lead_id INT NOT NULL,
+        nombre_postulante VARCHAR(150) NOT NULL,
+        numero VARCHAR(30) NOT NULL,
+        numero_ref VARCHAR(30) NULL,
+        turno VARCHAR(20) NOT NULL,
+        fecha_agendamiento DATE NOT NULL,
+        observacion VARCHAR(2000) NULL,
+        creado_por_id INT NULL,
+        creado_por_nombre VARCHAR(150) NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_entrevistas_lead (lead_id),
+        INDEX idx_entrevistas_fecha (fecha_agendamiento)
+      )
+    `).catch(error => { promesaTablaEntrevistas = null; throw error; });
+  }
+  return promesaTablaEntrevistas;
+}
+
+function normalizarN1(valor) {
+  return String(valor || '').replace(/\D+/g, '');
+}
+
+function normalizarUsuarioWhatsapp(valor) {
+  return String(valor || '').trim().replace(/^@+/, '').substring(0, 100);
+}
 
 function fechaPeruHoy() {
   const ahora = new Date();
@@ -41,7 +75,7 @@ router.get('/', auth(ROLES_ALL), async (req, res) => {
     const errGet = validar([errorFecha(fecha, 'fecha')]);
     if (errGet) return res.status(400).json({ ok: false, mensaje: errGet[0] });
 
-    let sql = `SELECT l.* FROM leads_reclutamiento l WHERE 1=1`;
+    let sql = `SELECT l.*, ub.nombre AS creado_por_nombre FROM leads_reclutamiento l LEFT JOIN usuarios ub ON ub.id = l.usuario_back_id WHERE 1=1`;
     const params = [];
 
     if (req.user.cargo === 'asesorreclutamiento') {
@@ -75,15 +109,25 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
     const ids = [];
 
     for (const l of items) {
+      const n1Normalizado = normalizarN1(l.n1);
+      const usuarioWhatsapp = normalizarUsuarioWhatsapp(l.usuario_whatsapp);
       const errores = validar([
         errorFecha(l.fecha || fechaHoy, 'fecha'),
-        errorTexto(l.n1, 'n1', { requerido: true, max: 30 }),
+        errorTexto(l.n1, 'n1', { max: 30 }),
+        errorTexto(usuarioWhatsapp, 'usuario_whatsapp', { max: 100 }),
+        errorTexto(l.tipif_back, 'tipif_back', { max: 100 }),
+        errorTexto(l.obs_asesor, 'obs_asesor', { max: 2000 }),
       ]);
       if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
+      if (!n1Normalizado && !usuarioWhatsapp) {
+        return res.status(400).json({ ok: false, mensaje: 'Ingresa un N1 o un usuario de WhatsApp' });
+      }
     }
 
     for (const l of items) {
-      if (!l.n1) continue;
+      const n1Normalizado = normalizarN1(l.n1);
+      const usuarioWhatsapp = normalizarUsuarioWhatsapp(l.usuario_whatsapp);
+      if (!n1Normalizado && !usuarioWhatsapp) continue;
       const fechaLead = l.fecha || fechaHoy;
 
       let asesorId = null;
@@ -96,18 +140,24 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
         }
       }
 
-      const horaFinal = asesorId ? horaAhora : '';
-      const historial = asesorId
-        ? JSON.stringify([{ asesor: asesorNombre, hora: horaFinal, fecha: fechaHoy, motivo: 'Asignacion inicial' }])
-        : '[]';
+      // hora_asig/historial: si vienen explicitos (ej. importacion Legacy con
+      // fecha/hora reales del sistema anterior) se respetan tal cual, en vez de
+      // sobreescribirlos con la hora actual como hacia el alta normal.
+      const horaFinal = l.hora_asig || (asesorId ? horaAhora : '');
+      const historial = Array.isArray(l.historial) && l.historial.length
+        ? JSON.stringify(l.historial)
+        : (asesorId
+            ? JSON.stringify([{ asesor: asesorNombre, hora: horaFinal, fecha: fechaHoy, motivo: 'Asignacion inicial' }])
+            : '[]');
 
       const [result] = await db.query(`
         INSERT INTO leads_reclutamiento
-          (campana, departamento, provincia, distrito, n1, n2, asesor_id, asesor_nombre,
+          (campana, departamento, provincia, distrito, n1, n2, usuario_whatsapp, tipif_back, obs_asesor, asesor_id, asesor_nombre,
            fecha, hora_asig, sin_asignar, historial, usuario_back_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `, [
-        l.campana||'', l.departamento||'', l.provincia||'', l.distrito||'', l.n1, l.n2||null,
+        l.campana||'', l.departamento||'', l.provincia||'', l.distrito||'', l.n1||null, l.n2||null, usuarioWhatsapp||null,
+        l.tipif_back||null, l.obs_asesor||null,
         asesorId, asesorNombre, fechaLead, horaFinal, asesorId?0:1, historial, req.user.id,
       ]);
       ids.push(result.insertId);
@@ -196,11 +246,31 @@ router.patch('/:id/obs', auth(ROLES_ALL), async (req, res) => {
   }
 });
 
-// PATCH /api/leads-reclutamiento/:id/datos-back — compatibilidad con la
-// llamada existente en Backdatareclutamiento.jsx; sin campos comerciales
-// (tipo_contacto/dirección/coordenadas/obs_back no existen en este módulo).
+// PATCH /api/leads-reclutamiento/:id/datos-back — editar campaña/contacto de
+// un candidato ya creado (campaña, N1, N2, usuario de WhatsApp).
 router.patch('/:id/datos-back', auth(ROLES_BACK), async (req, res) => {
-  res.json({ ok: true, mensaje: 'Sin datos adicionales para este módulo' });
+  try {
+    const n1Normalizado = normalizarN1(req.body.n1);
+    const usuarioWhatsapp = normalizarUsuarioWhatsapp(req.body.usuario_whatsapp);
+    const errores = validar([
+      errorTexto(req.body.campana, 'campana', { max: 100 }),
+      errorTexto(req.body.n1, 'n1', { max: 30 }),
+      errorTexto(usuarioWhatsapp, 'usuario_whatsapp', { max: 100 }),
+    ]);
+    if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
+    if (!n1Normalizado && !usuarioWhatsapp) {
+      return res.status(400).json({ ok: false, mensaje: 'Ingresa un N1 o un usuario de WhatsApp' });
+    }
+    const [rows] = await db.query(`SELECT id FROM leads_reclutamiento WHERE id = ?`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Candidato no encontrado' });
+    await db.query(`
+      UPDATE leads_reclutamiento SET campana=?, n1=?, n2=?, usuario_whatsapp=? WHERE id=?
+    `, [req.body.campana||'', req.body.n1||null, req.body.n2||null, usuarioWhatsapp||null, req.params.id]);
+    res.json({ ok: true, mensaje: 'Candidato actualizado' });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ ok: false, mensaje: 'Error al actualizar candidato' });
+  }
 });
 
 // DELETE /api/leads-reclutamiento/:id
@@ -237,4 +307,56 @@ router.delete('/:id', auth(ROLES_BACK), async (req, res) => {
   }
 });
 
+// POST /api/leads-reclutamiento/:id/entrevista — agenda una entrevista al
+// tipificar un candidato como VENTA CERRADA ("Acepta propuesta").
+router.post('/:id/entrevista', auth(ROLES_ALL), async (req, res) => {
+  try {
+    await asegurarTablaEntrevistas();
+    const { nombre_postulante, numero, numero_ref, turno, fecha_agendamiento, observacion } = req.body;
+    const errores = validar([
+      errorTexto(nombre_postulante, 'nombre_postulante', { requerido: true, max: 150 }),
+      errorTexto(numero, 'numero', { requerido: true, max: 30 }),
+      errorTexto(numero_ref, 'numero_ref', { max: 30 }),
+      errorTexto(turno, 'turno', { requerido: true, max: 20 }),
+      errorEnum(turno, 'turno', TURNOS_ENTREVISTA),
+      errorFecha(fecha_agendamiento, 'fecha_agendamiento'),
+      errorTexto(observacion, 'observacion', { max: 2000 }),
+    ]);
+    if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
+    if (!fecha_agendamiento) return res.status(400).json({ ok: false, mensaje: 'fecha_agendamiento es obligatoria' });
+    const [rows] = await db.query(`SELECT id FROM leads_reclutamiento WHERE id = ?`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Candidato no encontrado' });
+    await db.query(`
+      INSERT INTO reclutamiento_entrevistas
+        (lead_id, nombre_postulante, numero, numero_ref, turno, fecha_agendamiento, observacion, creado_por_id, creado_por_nombre)
+      VALUES (?,?,?,?,?,?,?,?,?)
+    `, [req.params.id, nombre_postulante.trim(), numero.trim(), (numero_ref||'').trim()||null, turno, fecha_agendamiento,
+        (observacion||'').trim()||null, req.user.id, req.user.nombre || req.user.usuario || 'Back Data']);
+    res.json({ ok: true, mensaje: 'Entrevista agendada' });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ ok: false, mensaje: 'Error al agendar la entrevista' });
+  }
+});
+
+// GET /api/leads-reclutamiento/entrevistas — listado para el apartado de Entrevistas
+router.get('/entrevistas', auth(ROLES_ENTREVISTAS), async (req, res) => {
+  try {
+    await asegurarTablaEntrevistas();
+    const [data] = await db.query(`
+      SELECT e.id, e.nombre_postulante, e.numero, e.numero_ref, e.turno, e.fecha_agendamiento,
+             e.observacion, e.creado_por_nombre, e.created_at,
+             l.campana, l.n1 AS lead_n1, l.n2 AS lead_n2
+        FROM reclutamiento_entrevistas e
+        JOIN leads_reclutamiento l ON l.id = e.lead_id
+       ORDER BY e.fecha_agendamiento DESC, e.id DESC
+    `);
+    res.json({ ok: true, data });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ ok: false, mensaje: 'Error al obtener entrevistas' });
+  }
+});
+
 module.exports = router;
+

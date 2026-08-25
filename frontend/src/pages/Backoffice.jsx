@@ -22,7 +22,7 @@ function CampanaSelect({ value, onChange, plain }) {
         <div style={{display:'flex',flexDirection:'column',gap:4,width:'100%',minWidth:0}}>
           <div style={{width:'100%',padding:'7px 8px',border:'1px solid #86efac',borderRadius:8,background:'#f0fdf4',color:'#166534',fontSize:11,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={value}>✓ {value}</div>
           <div style={{display:'flex',justifyContent:'space-between',gap:4}}>
-            <button type="button" onClick={()=>setManualConfirmada(false)} style={{width:'auto',border:'none',background:'transparent',padding:'2px 0',cursor:'pointer',color:'#2563eb',fontSize:10}}>Editar</button>
+            <button type="button" onClick={()=>setManualConfirmada(false)} style={{width:'auto',border:'none',background:'transparent',padding:'2px 0',cursor:'pointer',color:'#ea580c',fontSize:10}}>Editar</button>
             <button type="button" onClick={()=>{ setManual(false); setManualConfirmada(false); onChange('') }} style={{width:'auto',border:'none',background:'transparent',padding:'2px 0',cursor:'pointer',color:'#6b7280',fontSize:10}}>↩ Volver a lista</button>
           </div>
         </div>
@@ -2676,7 +2676,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                   setBasePage(1)
                   if (activar) setFiltros({tipBack1:[],tipBack2:[],tipVend:[],asesor:[],campana:[],sala:[],numero:'',desde:'',hasta:'',global:false,verTipVend:true})
                 }}
-                style={{background:ordenDiarioActivo?'#16a34a':'linear-gradient(135deg,#7c3aed,#ea580c)'}}>
+                style={{background:ordenDiarioActivo?'#16a34a':'linear-gradient(135deg,#fb923c,#ea580c)'}}>
                 {ordenDiarioActivo?'✓ Orden diario activo':'Ordenar base del día'}
               </button>
             </div>
@@ -2801,7 +2801,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                                   </div>
                                 )}
                                 {r.n1 && r.usuarioWhatsapp && <div className="num-secondary"><span>@{r.usuarioWhatsapp}</span><button type="button" className="num-copy-btn" onClick={()=>copiarNumero(r.usuarioWhatsapp)} title="Copiar usuario de WhatsApp"><CopyIcon /></button></div>}
-                                {r.cicloAbiertoNumero>0 && <div style={{marginTop:3,fontSize:8,fontWeight:800,color:'#7c3aed'}}>VENTA {r.cicloAbiertoNumero} · OTRA DIRECCIÓN</div>}
+                                {r.cicloAbiertoNumero>0 && <div style={{marginTop:3,fontSize:8,fontWeight:800,color:'#c2410c'}}>VENTA {r.cicloAbiertoNumero} · OTRA DIRECCIÓN</div>}
                               </div>
                             </td>
 
@@ -3687,7 +3687,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
             </div>
             {blLeads && blLeads.length > 0 && (
               <div style={{padding:'10px 24px',display:'flex',gap:10,flexWrap:'wrap',borderBottom:'1px solid #f3f4f6'}}>
-                {[{label:'Leads',val:blLeads.length,color:'#2563eb'},{label:'Tipificados',val:blLeads.filter(l=>(l.tipif_vend||'').trim()!=='').length,color:'#16a34a'},{label:'Derivados',val:blLeads.filter(l=>l.obs_back==='DERIVADO').length,color:'#0284c7'},{label:'VENTA CERRADA',val:blLeads.filter(l=>(l.tipif_vend||'').toUpperCase()==='VENTA CERRADA').length,color:'#7c3aed'},{label:'NC/Buzón',val:blLeads.filter(l=>['NO CONTESTA','BUZON DE VOZ'].includes((l.tipif_vend||'').toUpperCase())).length,color:'#d97706'}]
+                {[{label:'Leads',val:blLeads.length,color:'#fed7aa'},{label:'Tipificados',val:blLeads.filter(l=>(l.tipif_vend||'').trim()!=='').length,color:'#fdba74'},{label:'Derivados',val:blLeads.filter(l=>l.obs_back==='DERIVADO').length,color:'#fb923c'},{label:'VENTA CERRADA',val:blLeads.filter(l=>(l.tipif_vend||'').toUpperCase()==='VENTA CERRADA').length,color:'#ea580c'},{label:'NC/Buzón',val:blLeads.filter(l=>['NO CONTESTA','BUZON DE VOZ'].includes((l.tipif_vend||'').toUpperCase())).length,color:'#c2410c'}]
                   .map(k=>(
                     <div key={k.label} style={{background:'#f9fafb',borderRadius:10,padding:'8px 14px',display:'flex',flexDirection:'column',gap:2,minWidth:100}}>
                       <div style={{fontSize:18,fontWeight:800,color:k.color}}>{k.val}</div>

@@ -319,8 +319,8 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
             {
               type: 'line', label: 'Efectividad', yAxisID: 'y1', order: 1,
               data: serieDiariaRendimiento.map(dia => dia.efectividad),
-              borderColor: '#0f766e', backgroundColor: 'rgba(15,118,110,.08)',
-              tension: .35, pointRadius: 2, pointBackgroundColor: '#0f766e', fill: true,
+              borderColor: '#ea580c', backgroundColor: 'rgba(234,88,12,.08)',
+              tension: .35, pointRadius: 2, pointBackgroundColor: '#ea580c', fill: true,
             },
           ],
         },
