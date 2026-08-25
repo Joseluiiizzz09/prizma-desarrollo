@@ -54,12 +54,36 @@ const PAQUETES_POR_REGION = {
   ],
 }
 
+const ADICIONALES_POR_REGION = {
+  LIMA: [
+    { id:'FonoWin', detalle:'S/ 10.00/mes' },
+    { id:'WINTV Premium', detalle:'S/ 49.00/mes' },
+    { id:'WINTV L1Max', detalle:'S/ 59.00/mes · Liga 1' },
+    { id:'WINTV L1Max Premium', detalle:'S/ 69.00/mes' },
+    { id:'DGO Hogar', detalle:'S/ 59.00/mes' },
+    { id:'DGO Full', detalle:'S/ 76.00/mes' },
+    { id:'Win Box', detalle:'S/ 15.00/mes · Equipo físico' },
+    { id:'Mesh adicional', detalle:'S/ 9.90/mes · Por equipo' },
+    { id:'KIT WIFI PRO', detalle:'S/ 169.00 · Pago único' },
+  ],
+  PROVINCIA: [
+    { id:'FonoWin', detalle:'S/ 1.00/mes por 6 meses; luego S/ 10.00/mes' },
+    { id:'Win Box', detalle:'S/ 15.00/mes · Equipo físico' },
+    { id:'Mesh adicional', detalle:'S/ 9.90/mes · Por equipo' },
+    { id:'DGO Hogar', detalle:'S/ 59.00/mes' },
+    { id:'DGO Full', detalle:'S/ 76.00/mes' },
+    { id:'WINTV Premium', detalle:'S/ 49.00/mes' },
+    { id:'WINTV L1Max', detalle:'S/ 59.00/mes · Liga 1' },
+    { id:'WINTV L1Max Premium', detalle:'S/ 69.00/mes' },
+  ],
+}
+
 const NV_DEFAULT = {
   nombre:'', tipoDoc:'DNI', dni:'', email:'', tel1:'', tel2:'',
   dpto:'', prov:'', dist:'', dir:'', coord:'',
   fechaNac:'', lugarNac:'', padre:'', madre:'',
   cuota:'', hogar:'', tec:'', paquete:'',
-  full:'', decos:'0', mesh:'0', plano:'',
+  full:'', decos:'0', mesh:'0', plano:'', adicionales:[],
   estado:'VENTA', obs:'',
 }
 
@@ -863,6 +887,7 @@ export default function Dashboard() {
       full:     v.full_claro  || '',
       decos:    String(v.cant_decos || '0'),
       mesh:     String(v.cant_mesh  || '0'),
+      adicionales: (() => { try { return JSON.parse(v.adicionales || '[]') } catch { return [] } })(),
       plano:    v.plano       || '',
       estado:   (v.estado||'VENTA').toUpperCase() === 'PROGRAMADO' ? 'PROGRAMADO' : 'VENTA',
       obs:      v.observacion || '',
@@ -889,8 +914,17 @@ export default function Dashboard() {
   }
 
   function nvOnRegion(region) {
-    setNvForm(p => ({ ...p, hogar:region, paquete:'' }))
+    setNvForm(p => ({ ...p, hogar:region, paquete:'', adicionales:[] }))
     setNvPaquetes(PAQUETES_POR_REGION[region] || [])
+  }
+
+  function nvToggleAdicional(id) {
+    setNvForm(p => ({
+      ...p,
+      adicionales: p.adicionales.includes(id)
+        ? p.adicionales.filter(item => item !== id)
+        : [...p.adicionales, id],
+    }))
   }
 
   async function guardarNuevaVenta() {
@@ -938,6 +972,7 @@ export default function Dashboard() {
       cuotaInstalacion:nvForm.cuota, hogar:nvForm.hogar,
       tec:nvForm.tec, paquete:nvForm.paquete,
       full:nvForm.full, cantDecos:nvForm.decos, cantMesh:nvForm.mesh,
+      adicionales:nvForm.adicionales,
       plano:nvForm.plano.trim(), estado: nvEditId ? nvForm.estado : 'VENTA', obs:nvForm.obs.trim(),
     }
     setGuardandoNV(true)
@@ -1594,6 +1629,23 @@ export default function Dashboard() {
                   <select className="nv-select" value={nvForm.mesh} onChange={e => nvSet('mesh', e.target.value)}>
                     {[0,1,2,3,4,5].map(n => <option key={n} value={String(n)}>{n}</option>)}
                   </select>
+                </div>
+                <div className="nv-field nv-full">
+                  <label className="nv-label">Adicionales <small>(opcional)</small></label>
+                  <div className={`nv-adicionales${nvForm.hogar ? '' : ' is-disabled'}`}>
+                    {!nvForm.hogar ? (
+                      <div className="nv-adicionales-empty">Primero selecciona Lima o Provincia.</div>
+                    ) : ADICIONALES_POR_REGION[nvForm.hogar].map(item => (
+                      <label className={`nv-adicional${nvForm.adicionales.includes(item.id) ? ' is-selected' : ''}`} key={item.id}>
+                        <input
+                          type="checkbox"
+                          checked={nvForm.adicionales.includes(item.id)}
+                          onChange={() => nvToggleAdicional(item.id)}
+                        />
+                        <span><strong>{item.id}</strong><small>{item.detalle}</small></span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="nv-field">
                   <label className="nv-label">Estado Venta</label>

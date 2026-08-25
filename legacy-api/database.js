@@ -65,6 +65,7 @@ async function initDB() {
         full_claro       VARCHAR(10),
         cant_decos       INT          DEFAULT 0,
         cant_mesh        INT          DEFAULT 0,
+        adicionales      TEXT,
         plano            VARCHAR(100),
         estado           VARCHAR(50)  DEFAULT 'VENTA',
         obs_backoffice   TEXT,
@@ -435,6 +436,9 @@ async function initDB() {
         .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
     }
 
+    await conn.query(`ALTER TABLE ventas ADD COLUMN adicionales TEXT NULL`)
+      .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+
     // Programación: datos operativos requeridos al marcar una venta como
     // PROGRAMADO. Nullable para conservar ventas históricas.
     const columnasProgramacion = [
@@ -588,5 +592,4 @@ initDB().catch(err => {
 });
 
 module.exports = pool;
-
 

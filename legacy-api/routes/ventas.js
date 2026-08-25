@@ -197,6 +197,7 @@ const CAMPOS_HISTORIAL = {
   full_claro: 'Full Claro',
   cant_decos: 'Cantidad de Winbox',
   cant_mesh: 'Cantidad de mesh',
+  adicionales: 'Adicionales',
   plano: 'Plano',
   fecha_nac: 'Fecha de nacimiento',
   lugar_nac: 'Lugar de nacimiento',
@@ -350,6 +351,16 @@ router.post('/', auth(['asesor','backoffice','jefatura','usuarios']), async (req
   try {
     const v = req.body;
 
+    const adicionalesPermitidos = {
+      LIMA: ['FonoWin','WINTV Premium','WINTV L1Max','WINTV L1Max Premium','DGO Hogar','DGO Full','Win Box','Mesh adicional','KIT WIFI PRO'],
+      PROVINCIA: ['FonoWin','Win Box','Mesh adicional','DGO Hogar','DGO Full','WINTV Premium','WINTV L1Max','WINTV L1Max Premium'],
+    };
+    const adicionales = Array.isArray(v.adicionales) ? [...new Set(v.adicionales)] : [];
+    if (v.adicionales !== undefined && !Array.isArray(v.adicionales))
+      return res.status(400).json({ ok:false, mensaje:'Los adicionales tienen un formato inválido.' });
+    if (adicionales.some(item => !adicionalesPermitidos[v.hogar]?.includes(item)))
+      return res.status(400).json({ ok:false, mensaje:'Uno o más adicionales no corresponden a la región seleccionada.' });
+
     const errores = validar([
       errorTexto(v.nombre,  'nombre',  { requerido: true, max: 150 }),
       errorTexto(v.dni,     'dni',     { requerido: true }),
@@ -475,9 +486,9 @@ router.post('/', auth(['asesor','backoffice','jefatura','usuarios']), async (req
         telefono1, telefono2, departamento, provincia, distrito,
         direccion, coordenadas, fecha_nac, lugar_nac, padre, madre,
         cuota_inst, claro_hogar, tecnologia, paquete,
-        full_claro, cant_decos, cant_mesh, plano, estado, observacion,
+        full_claro, cant_decos, cant_mesh, adicionales, plano, estado, observacion,
         lead_id, lead_ciclo_id
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `, [
       asesorVentaId, nombreAsesor, v.tipoDoc||'DNI', v.dni||null, v.nombre||null, v.email||null,
       v.telefono1||null, v.telefono2||null, v.departamento||null,
@@ -486,7 +497,7 @@ router.post('/', auth(['asesor','backoffice','jefatura','usuarios']), async (req
       v.padre||null, v.madre||null,
       v.cuotaInstalacion||null, v.hogar||null, v.tec||null,
       v.paquete||null, v.full||null,
-      parseInt(v.cantDecos)||0, parseInt(v.cantMesh)||0,
+      parseInt(v.cantDecos)||0, parseInt(v.cantMesh)||0, JSON.stringify(adicionales),
       v.plano||null, estadoFinal, v.obs||null,
       leadVenta?.id || null, cicloVentaAbierto?.id || null
     ]);
@@ -1944,7 +1955,7 @@ router.patch('/:id/datos', auth(['supervisor','jefatura','seguimiento','usuarios
       departamento, provincia, distrito, direccion, coordenadas,
       paquete, cuotaInstalacion, hogar, tec, full, plano,
       fechaNac, lugarNac, padre, madre,
-      cantDecos, cantMesh,
+      cantDecos, cantMesh, adicionales,
       observacion,
     } = req.body;
 
@@ -2015,6 +2026,7 @@ router.patch('/:id/datos', auth(['supervisor','jefatura','seguimiento','usuarios
     agregar('madre',       madre);
     agregar('cant_decos',  cantDecos !== undefined ? (parseInt(cantDecos) || 0) : undefined);
     agregar('cant_mesh',   cantMesh  !== undefined ? (parseInt(cantMesh)  || 0) : undefined);
+    agregar('adicionales', adicionales !== undefined ? JSON.stringify(Array.isArray(adicionales) ? [...new Set(adicionales)] : []) : undefined);
     agregar('observacion', observacion);
 
     if (!campos.length) return res.status(400).json({ ok: false, mensaje: 'Nada que actualizar.' });
