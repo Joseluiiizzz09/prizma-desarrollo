@@ -695,8 +695,8 @@ body{
 .kpi-item.k-tec{border-left-color:#ec4899!important;}
 
 .seguimiento-ventas-tabla {
-  width: 2990px !important;
-  min-width: 2990px !important;
+  width: 2900px !important;
+  min-width: 2900px !important;
   table-layout: fixed !important;
 }
 
@@ -704,6 +704,18 @@ body{
 .seguimiento-ventas-tabla td {
   box-sizing: border-box;
   vertical-align: middle !important;
+}
+
+.seguimiento-ventas-tabla th {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+  padding: 9px 10px !important;
+}
+
+.seguimiento-ventas-tabla td {
+  padding-left: 10px !important;
+  padding-right: 10px !important;
 }
 
 .seguimiento-ventas-tabla th:first-child,
