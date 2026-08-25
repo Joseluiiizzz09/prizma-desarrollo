@@ -29,13 +29,29 @@ const TIPS = [
   { label: 'SERVICIO ACTIVO',         cls: 'tip-servicio' },
 ]
 
-const PAQUETES_POR_PLAN = {
-  '1 PLAY': ['150 MBPS S/70.00','300 MBPS S/75.00','800 MBPS S/100.00','1500 MBPS S/200.00','PROM ENTRADA 200 X 12 M 400 MBPS X 6M 39.5','PROM GRANDE 1000 MBPS X 6M 59.9','PROM GRANDE 850 X 12M 1000 MBPS X 4M 55','PROM LIM/ARQ 400 X 12 M 1000 MBPS X 2 M 1 SOL','PROM MEDIANA 400 X 12M 1000 MBPS X 6M 55','REG PRO 1000 MBPS','REG PRO 500 MBPS'],
-  '2 PLAY INTERNET + TELEFONO': ['150 MBPS S/70.00','1000 MBPS S/150.00','1500 MBPS S/205.00','300 MBPS S/80.00','300 MPBS 84.00','400 MBPS 94.00 S','400 MBPS S/90.00','800 MBPS S/105.00'],
-  '2 PLAY INTERNET + CABLE ESTANDAR': ['1000 MBPS S/230.00','150 MBPS S/150.00','1500 MBPS S/285.00','300 MBPS S/160.00','400 MBPS S/170.00','800 MBPS S/185.00'],
-  '2 PLAY INTERNET + CABLE SUPERIOR': ['1000 MBPS S/270.00','150 MBPS S/190.00','1500 MBPS S/325.00','300 MBPS S/200.00','400 MBPS S/210.00','800 MBPS S/225.00'],
-  '3 PLAY ESTANDAR': ['1000 MBPS S/235.00','150 MBPS S/155.00','1500 MBPS S/290.00','300 MBPS S/165.00','400 MBPS S/175.00','800 MBPS S/190.00'],
-  '3 PLAY SUPERIOR': ['1000 MBPS S/275.00','150 MBPS S/195.00','1500 MBPS S/330.00','300 MBPS S/205.00','400 MBPS S/215.00','800 MBPS S/230.00'],
+const PAQUETES_POR_REGION = {
+  LIMA: [
+    'Mono 1000 Mbps', 'Mono 850 Mbps', 'Mono 750 Mbps', 'Mono 500 Mbps',
+    'XGSPON 2.5 GB', 'XGSPON 2.0 GB', 'XGSPON 1.5 GB',
+    'Gamer 1000 Mbps', 'Gamer 600 Mbps',
+    '1000 Mbps + WINTV L1Max Premium', '1000 Mbps + WINTV Premium',
+    '850 Mbps + WINTV L1Max Premium', '850 Mbps + WINTV Premium',
+    '750 Mbps + WINTV L1Max Premium', '750 Mbps + WINTV Premium',
+    '500 Mbps + WINTV Premium', 'XGSPON 2.5 GB + DGO Full',
+    'XGSPON 2.0 GB + DGO Hogar', '1000 Mbps + DGO Full',
+    '1000 Mbps + DGO Hogar', '850 Mbps + DGO Hogar',
+    'Gamer 1000 Mbps + DGO Full', 'Gamer 1000 Mbps + DGO Hogar',
+    'Gamer 1000 Mbps + WINTV L1Max Premium', 'Gamer 600 Mbps + DGO Hogar',
+    'Gamer 600 Mbps + WINTV L1Max Premium', 'Mono 850 Mbps - Pago Adelantado',
+    'RUC20 1000 Mbps', 'RUC20 850 Mbps', 'RUC20 750 Mbps',
+  ],
+  PROVINCIA: [
+    'Mono 1000 Mbps', 'Mono 750 Mbps', 'Mono 550 Mbps',
+    '750 Mbps + WINTV Premium', '550 Mbps + WINTV Premium',
+    '350 Mbps + FonoWin', '1000 Mbps + DGO Full',
+    '1000 Mbps + WINTV L1Max Premium', '1000 Mbps + DGO Hogar',
+    '750 Mbps + WINTV L1Max Premium',
+  ],
 }
 
 const NV_DEFAULT = {
@@ -855,7 +871,7 @@ export default function Dashboard() {
     const provs = form.dpto && UBIGEO[form.dpto] ? Object.keys(UBIGEO[form.dpto]) : []
     const dists = form.dpto && form.prov && UBIGEO[form.dpto]?.[form.prov] ? UBIGEO[form.dpto][form.prov] : []
     setNvProvs(provs); setNvDists(dists)
-    setNvPaquetes(PAQUETES_POR_PLAN[form.hogar] || [])
+    setNvPaquetes(PAQUETES_POR_REGION[form.hogar] || [])
     setPanelNV(true); document.body.style.overflow = 'hidden'
   }
 
@@ -872,9 +888,9 @@ export default function Dashboard() {
     setNvDists(prov && nvForm.dpto && UBIGEO[nvForm.dpto]?.[prov] ? UBIGEO[nvForm.dpto][prov] : [])
   }
 
-  function nvOnHogar(hogar) {
-    setNvForm(p => ({ ...p, hogar, paquete:'' }))
-    setNvPaquetes(PAQUETES_POR_PLAN[hogar] || [])
+  function nvOnRegion(region) {
+    setNvForm(p => ({ ...p, hogar:region, paquete:'' }))
+    setNvPaquetes(PAQUETES_POR_REGION[region] || [])
   }
 
   async function guardarNuevaVenta() {
@@ -906,7 +922,7 @@ export default function Dashboard() {
     const requeridos = [
       ['Departamento', nvForm.dpto], ['Provincia', nvForm.prov], ['Distrito', nvForm.dist],
       ['Coordenadas', nvForm.coord], ['Dirección', nvForm.dir],
-      ['Claro Hogar', nvForm.hogar], ['Paquete Real', nvForm.paquete], ['Observación', nvForm.obs],
+      ['Región del servicio', nvForm.hogar], ['Paquete', nvForm.paquete], ['Observación', nvForm.obs],
     ]
     const faltante = requeridos.find(([,valor]) => !String(valor || '').trim())
     if (faltante) return mostrarToast(`${faltante[0]} es obligatorio para cerrar la venta`)
@@ -1260,9 +1276,9 @@ export default function Dashboard() {
                 <th>Departamento</th><th>Provincia</th><th>Distrito</th>
                 <th>Dirección</th><th>Coordenadas</th>
                 <th>F. Nacimiento</th><th>Lugar Nac.</th><th>Padre</th><th>Madre</th>
-                <th>Cuota Inst.</th><th>Claro Hogar</th><th>Tecnología</th>
+                <th>Cuota Inst.</th><th>Región</th><th>Tecnología</th>
                 <th>Paquete</th><th>Full Claro</th>
-                <th>Decos</th><th>Mesh</th><th>Plano</th>
+                <th>Winbox</th><th>Mesh</th><th>Plano</th>
                 <th>Vendedor</th><th>Supervisor</th><th>Observación</th>
                 <th style={{minWidth:'130px'}}>Acción</th>
               </tr>
@@ -1553,21 +1569,22 @@ export default function Dashboard() {
               <div className="nv-section-title">Datos del Servicio</div>
               <div className="nv-grid nv-grid-3">
                 <div className="nv-field">
-                  <label className="nv-label">Claro Hogar</label>
-                  <select className="nv-select" value={nvForm.hogar} onChange={e => nvOnHogar(e.target.value)}>
+                  <label className="nv-label">Región del servicio</label>
+                  <select className="nv-select" value={nvForm.hogar} onChange={e => nvOnRegion(e.target.value)}>
                     <option value="">Seleccionar</option>
-                    {Object.keys(PAQUETES_POR_PLAN).map(h => <option key={h} value={h}>{h}</option>)}
+                    <option value="LIMA">Lima</option>
+                    <option value="PROVINCIA">Provincia</option>
                   </select>
                 </div>
                 <div className="nv-field nv-full">
-                  <label className="nv-label">Paquete Real</label>
-                  <select className="nv-select" value={nvForm.paquete} onChange={e => nvSet('paquete', e.target.value)}>
-                    <option value="">Seleccionar</option>
+                  <label className="nv-label">Paquete</label>
+                  <select className="nv-select" value={nvForm.paquete} onChange={e => nvSet('paquete', e.target.value)} disabled={!nvForm.hogar}>
+                    <option value="">{nvForm.hogar ? 'Seleccionar paquete' : 'Primero selecciona Lima o Provincia'}</option>
                     {nvPaquetes.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div className="nv-field">
-                  <label className="nv-label">Cantidad Decos</label>
+                  <label className="nv-label">Cantidad Winbox</label>
                   <select className="nv-select" value={nvForm.decos} onChange={e => nvSet('decos', e.target.value)}>
                     {[0,1,2,3,4,5].map(n => <option key={n} value={String(n)}>{n}</option>)}
                   </select>

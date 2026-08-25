@@ -192,10 +192,10 @@ const CAMPOS_HISTORIAL = {
   coordenadas: 'Coordenadas',
   paquete: 'Paquete',
   cuota_inst: 'Cuota de instalación',
-  claro_hogar: 'Claro Hogar',
+  claro_hogar: 'Región del servicio',
   tecnologia: 'Tecnología',
   full_claro: 'Full Claro',
-  cant_decos: 'Cantidad de decos',
+  cant_decos: 'Cantidad de Winbox',
   cant_mesh: 'Cantidad de mesh',
   plano: 'Plano',
   fecha_nac: 'Fecha de nacimiento',
@@ -364,19 +364,11 @@ router.post('/', auth(['asesor','backoffice','jefatura','usuarios']), async (req
       errorTexto(v.distrito, 'distrito', { requerido: true, max: 100 }),
       errorTexto(v.direccion, 'direccion', { requerido: true, max: 1000 }),
       errorTexto(v.coordenadas, 'coordenadas', { requerido: true, max: 255 }),
-      errorTexto(v.fechaNac, 'fechaNac', { requerido: true, max: 10 }),
-      errorFecha(v.fechaNac, 'fechaNac'),
-      errorTexto(v.lugarNac, 'lugarNac', { requerido: true, max: 150 }),
-      errorTexto(v.padre, 'padre', { requerido: true, max: 150 }),
-      errorTexto(v.madre, 'madre', { requerido: true, max: 150 }),
-      errorTexto(v.cuotaInstalacion, 'cuotaInstalacion', { requerido: true, max: 100 }),
-      errorTexto(v.hogar, 'hogar', { requerido: true, max: 150 }),
-      errorTexto(v.tec, 'tecnologia', { requerido: true, max: 100 }),
+      errorTexto(v.hogar, 'regionServicio', { requerido: true, max: 20 }),
+      errorEnum(v.hogar, 'regionServicio', ['LIMA', 'PROVINCIA']),
       errorTexto(v.paquete, 'paquete', { requerido: true, max: 255 }),
-      errorTexto(v.full, 'fullClaro', { requerido: true, max: 20 }),
-      errorTexto(v.plano, 'plano', { requerido: true, max: 100 }),
       errorTexto(v.obs, 'observacion', { requerido: true, max: 1000 }),
-      errorEnteroPositivo(v.cantDecos, 'cantDecos', { max: 10 }),
+      errorEnteroPositivo(v.cantDecos, 'cantWinbox', { max: 10 }),
       errorEnteroPositivo(v.cantMesh,  'cantMesh',  { max: 10 }),
     ]);
     if (errores) return res.status(400).json({ ok: false, mensaje: errores[0], errores });
@@ -2297,4 +2289,3 @@ router.delete('/:id', auth(['supervisor','jefatura']), async (req, res) => {
 });
 
 module.exports = router;
-
