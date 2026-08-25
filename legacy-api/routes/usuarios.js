@@ -12,6 +12,12 @@ const { desbloquearLogin } = require('../security/loginRateLimit');
 const ROLES = ['jefatura','usuarios'];
 const CARGOS_VALIDOS = ['jefatura','usuarios','supervisor','backoffice','asesor','validacion','grabaciones','seguimiento','programacion','cobranzas','calidad','supcalidad','supgrabaciones','backreclutamiento','asesorreclutamiento','entrevistas'];
 const SALAS_VALIDAS = ['SALA 1', 'SALA 2'];
+const CARGOS_CON_SALA = ['asesor', 'supervisor'];
+
+function requiereSala(cargo, permisos = []) {
+  const cargos = [cargo, ...(Array.isArray(permisos) ? permisos : [])];
+  return cargos.some(valor => CARGOS_CON_SALA.includes(String(valor || '').toLowerCase()));
+}
 
 function normalizarNombrePersonal(nombre) {
   return String(nombre || '').trim().replace(/\s+/g, ' ').toUpperCase();
@@ -54,7 +60,8 @@ router.post('/', auth(ROLES), async (req, res) => {
 
     if (!CARGOS_VALIDOS.includes(cargo))
       return res.status(400).json({ ok: false, mensaje: 'Cargo inválido' });
-    if (!SALAS_VALIDAS.includes(sala))
+    const salaFinal = requiereSala(cargo, permisos) ? sala : null;
+    if (requiereSala(cargo, permisos) && !SALAS_VALIDAS.includes(salaFinal))
       return res.status(400).json({ ok: false, mensaje: 'Sala inválida. Usa SALA 1 o SALA 2.' });
 
     // Solo jefatura puede crear usuarios con cargo elevado
@@ -69,7 +76,7 @@ router.post('/', auth(ROLES), async (req, res) => {
     const [result] = await db.query(`
       INSERT INTO usuarios (nombre, usuario, password, cargo, sala, genero, activo, permisos)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [nombreNormalizado, usuario.toLowerCase(), hash, cargo, sala||null, genero||'M', activo!==false?1:0, permisosJSON]);
+    `, [nombreNormalizado, usuario.toLowerCase(), hash, cargo, salaFinal, genero||'M', activo!==false?1:0, permisosJSON]);
 
     res.json({ ok: true, id: result.insertId, mensaje: 'Usuario creado' });
   } catch(e) {
@@ -93,10 +100,8 @@ router.patch('/:id', auth(ROLES), async (req, res) => {
     ]);
     if (errores) return res.status(400).json({ ok: false, mensaje: errores[0], errores });
 
-    const [rows] = await db.query(`SELECT id, cargo FROM usuarios WHERE id = ?`, [req.params.id]);
+    const [rows] = await db.query(`SELECT id, cargo, permisos FROM usuarios WHERE id = ?`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
-    if (!SALAS_VALIDAS.includes(sala))
-      return res.status(400).json({ ok: false, mensaje: 'Sala inválida. Usa SALA 1 o SALA 2.' });
 
     // Solo jefatura puede cambiar el cargo o los permisos de un usuario
     if ((cargo !== undefined && cargo !== rows[0].cargo) || permisos !== undefined) {
@@ -112,23 +117,29 @@ router.patch('/:id', auth(ROLES), async (req, res) => {
 
     const cargofinal    = req.user.cargo === 'jefatura' ? (cargo || rows[0].cargo) : rows[0].cargo;
     const permisosJSON  = req.user.cargo === 'jefatura' ? JSON.stringify(permisos || []) : undefined;
+    const permisosFinales = req.user.cargo === 'jefatura'
+      ? (permisos || [])
+      : (() => { try { return JSON.parse(rows[0].permisos || '[]'); } catch { return []; } })();
+    const salaFinal = requiereSala(cargofinal, permisosFinales) ? sala : null;
+    if (requiereSala(cargofinal, permisosFinales) && !SALAS_VALIDAS.includes(salaFinal))
+      return res.status(400).json({ ok: false, mensaje: 'Sala inválida. Usa SALA 1 o SALA 2.' });
 
     if (password) {
       const hash = bcrypt.hashSync(password, 10);
       if (permisosJSON !== undefined) {
         await db.query(`UPDATE usuarios SET nombre=?, usuario=?, cargo=?, sala=?, password=?, permisos=? WHERE id=?`,
-          [nombreNormalizado, usuario.toLowerCase(), cargofinal, sala||null, hash, permisosJSON, req.params.id]);
+          [nombreNormalizado, usuario.toLowerCase(), cargofinal, salaFinal, hash, permisosJSON, req.params.id]);
       } else {
         await db.query(`UPDATE usuarios SET nombre=?, usuario=?, cargo=?, sala=?, password=? WHERE id=?`,
-          [nombreNormalizado, usuario.toLowerCase(), cargofinal, sala||null, hash, req.params.id]);
+          [nombreNormalizado, usuario.toLowerCase(), cargofinal, salaFinal, hash, req.params.id]);
       }
     } else {
       if (permisosJSON !== undefined) {
         await db.query(`UPDATE usuarios SET nombre=?, usuario=?, cargo=?, sala=?, permisos=? WHERE id=?`,
-          [nombreNormalizado, usuario.toLowerCase(), cargofinal, sala||null, permisosJSON, req.params.id]);
+          [nombreNormalizado, usuario.toLowerCase(), cargofinal, salaFinal, permisosJSON, req.params.id]);
       } else {
         await db.query(`UPDATE usuarios SET nombre=?, usuario=?, cargo=?, sala=? WHERE id=?`,
-          [nombreNormalizado, usuario.toLowerCase(), cargofinal, sala||null, req.params.id]);
+          [nombreNormalizado, usuario.toLowerCase(), cargofinal, salaFinal, req.params.id]);
       }
     }
     res.json({ ok: true, mensaje: 'Usuario actualizado' });

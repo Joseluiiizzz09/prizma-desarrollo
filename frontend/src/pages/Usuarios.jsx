@@ -43,7 +43,12 @@ const CARGOS = [
 ]
 
 const SALAS_VALIDAS = ['SALA 1', 'SALA 2']
-const FORM_VACIO = { nombre: '', usuario: '', pass: '', pass2: '', cargo: '', cargo2: '', sala: 'SALA 1', genero: 'M', activo: true }
+const CARGOS_CON_SALA = ['asesor', 'supervisor']
+const FORM_VACIO = { nombre: '', usuario: '', pass: '', pass2: '', cargo: '', cargo2: '', sala: '', genero: 'M', activo: true }
+
+function usuarioRequiereSala(cargo, cargo2) {
+  return CARGOS_CON_SALA.includes(cargo) || CARGOS_CON_SALA.includes(cargo2)
+}
 
 export default function Usuarios() {
   const navigate = useNavigate()
@@ -144,13 +149,14 @@ export default function Usuarios() {
     if (form.pass && form.pass !== form.pass2) errs.pass2 = 'Las contraseñas no coinciden'
     if (!form.cargo) errs.cargo = 'Selecciona un cargo'
     if (form.cargo2 && form.cargo2 === form.cargo) errs.cargo2 = 'El cargo adicional debe ser diferente'
+    if (usuarioRequiereSala(form.cargo, form.cargo2) && !SALAS_VALIDAS.includes(form.sala)) errs.sala = 'Selecciona Sala 1 o Sala 2'
     if (Object.keys(errs).length) { setErrores(errs); return }
 
     setGuardando(true)
     try {
       let res, data
       if (editandoId) {
-        const body = { nombre: form.nombre, usuario: form.usuario, cargo: form.cargo, sala: form.sala, genero: form.genero, permisos: form.cargo2 ? [form.cargo2] : [] }
+        const body = { nombre: form.nombre, usuario: form.usuario, cargo: form.cargo, sala: usuarioRequiereSala(form.cargo, form.cargo2) ? form.sala : null, genero: form.genero, permisos: form.cargo2 ? [form.cargo2] : [] }
         if (form.pass) body.password = form.pass
         res  = await fetch(`${API}/usuarios/${editandoId}`, { method: 'PATCH', headers: ncHeaders(), body: JSON.stringify(body) })
         data = await res.json()
@@ -163,7 +169,7 @@ export default function Usuarios() {
       } else {
         res  = await fetch(`${API}/usuarios`, {
           method: 'POST', headers: ncHeaders(),
-          body: JSON.stringify({ nombre: form.nombre, usuario: form.usuario, password: form.pass, cargo: form.cargo, sala: form.sala, genero: form.genero, activo: form.activo, permisos: form.cargo2 ? [form.cargo2] : [] }),
+          body: JSON.stringify({ nombre: form.nombre, usuario: form.usuario, password: form.pass, cargo: form.cargo, sala: usuarioRequiereSala(form.cargo, form.cargo2) ? form.sala : null, genero: form.genero, activo: form.activo, permisos: form.cargo2 ? [form.cargo2] : [] }),
         })
         data = await res.json()
         if (!data.ok) {
@@ -394,13 +400,17 @@ export default function Usuarios() {
               </div>
 
               <div className="campo-row">
-                <div className="campo">
-                  <label>Sala</label>
-                  <select value={form.sala} onChange={e => setField('sala', e.target.value)}>
-                    <option value="SALA 1">Sala 1</option>
-                    <option value="SALA 2">Sala 2</option>
-                  </select>
-                </div>
+                {usuarioRequiereSala(form.cargo, form.cargo2) && (
+                  <div className="campo">
+                    <label>Sala *</label>
+                    <select value={form.sala} onChange={e => setField('sala', e.target.value)}>
+                      <option value="">— Seleccione sala —</option>
+                      <option value="SALA 1">Sala 1</option>
+                      <option value="SALA 2">Sala 2</option>
+                    </select>
+                    {errores.sala && <span className="campo-error">{errores.sala}</span>}
+                  </div>
+                )}
                 <div className="campo">
                   <label>Género</label>
                   <select value={form.genero} onChange={e => setField('genero', e.target.value)}>

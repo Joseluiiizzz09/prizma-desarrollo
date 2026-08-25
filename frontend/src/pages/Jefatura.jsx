@@ -37,6 +37,11 @@ const CARGOS = [
   { id:'asesorreclutamiento', label:'Asesor de Reclutamiento', cls:'bc-asesorreclutamiento' },
 ]
 const SALAS = ['SALA 1','SALA 2']
+const CARGOS_CON_SALA = ['asesor','supervisor']
+
+function usuarioRequiereSala(cargo, cargo2) {
+  return CARGOS_CON_SALA.includes(cargo) || CARGOS_CON_SALA.includes(cargo2)
+}
 
 const SEG_MAP = {
   en_ejecucion:'ejecucion',
@@ -999,6 +1004,7 @@ export default function Jefatura() {
     if (!usuario.trim())             { errs.usuario = true; primerError ||= 'El usuario es obligatorio.' }
     if (!cargo)                      { errs.cargo  = true; primerError ||= 'Selecciona un cargo principal.' }
     if (cargo2 && cargo2 === cargo)  { errs.cargo2 = true; primerError ||= 'El cargo adicional debe ser diferente al principal.' }
+    if (usuarioRequiereSala(cargo, cargo2) && !SALAS.includes(sala)) { errs.sala = true; primerError ||= 'Selecciona Sala 1 o Sala 2.' }
     if (!editandoId && !pass)        { errs.pass   = true; primerError ||= 'La contraseña es obligatoria.' }
     if (pass && pass.length < 6)     { errs.pass   = true; primerError ||= 'La contraseña debe tener al menos 6 caracteres.' }
     if (pass && pass !== pass2)      { errs.pass2  = true; primerError ||= 'Las contraseñas no coinciden.' }
@@ -1009,13 +1015,13 @@ export default function Jefatura() {
       const loginNorm = usuario.trim().toLowerCase().replace(/\s+/g, '.')
       let res
       if (editandoId) {
-        const body = { nombre, usuario: loginNorm, cargo, sala: sala || null, permisos: cargo2 ? [cargo2] : [] }
+        const body = { nombre, usuario: loginNorm, cargo, sala: usuarioRequiereSala(cargo, cargo2) ? sala : null, permisos: cargo2 ? [cargo2] : [] }
         if (pass) body.password = pass
         res = await fetch(`${API}/usuarios/${editandoId}`, { method: 'PATCH', headers: ncHeaders(), body: JSON.stringify(body) })
       } else {
         res = await fetch(`${API}/usuarios`, {
           method: 'POST', headers: ncHeaders(),
-          body: JSON.stringify({ nombre, usuario: loginNorm, password: pass, cargo, sala: sala || null, activo: true, permisos: cargo2 ? [cargo2] : [] })
+          body: JSON.stringify({ nombre, usuario: loginNorm, password: pass, cargo, sala: usuarioRequiereSala(cargo, cargo2) ? sala : null, activo: true, permisos: cargo2 ? [cargo2] : [] })
         })
       }
       const ct   = res.headers.get('content-type') || ''
@@ -1900,13 +1906,15 @@ export default function Jefatura() {
                   {CARGOS.filter(c=>c.id!==modForm.cargo && c.id!=='jefatura').map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
                 </select>
               </div>
-              <div className="modal-campo">
-                <label>Sala / Equipo</label>
-                <select value={modForm.sala} onChange={e=>setField('sala',e.target.value)}>
-                  <option value="">— Sin sala —</option>
-                  {SALAS.map(s=><option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
+              {usuarioRequiereSala(modForm.cargo, modForm.cargo2) && (
+                <div className={`modal-campo${modErrores.sala?' error':''}`}>
+                  <label>Sala / Equipo *</label>
+                  <select value={modForm.sala} onChange={e=>setField('sala',e.target.value)} className={modErrores.sala?'error':''}>
+                    <option value="">— Seleccionar sala —</option>
+                    {SALAS.map(s=><option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="modal-sep">Contraseña</div>
               <div className={`modal-campo${modErrores.pass?' error':''}`}>
                 <label>Contraseña *</label>
