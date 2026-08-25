@@ -105,7 +105,6 @@ function etiquetaCargo(cargo) {
     validacion: 'Validación',
     grabaciones: 'Grabaciones',
     supcalidad: 'Supervisión de calidad',
-    programacion: 'Programación',
     seguimiento: 'Seguimiento',
     jefatura: 'Jefatura',
     usuarios: 'Gestión de usuarios',

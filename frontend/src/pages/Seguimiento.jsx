@@ -4,7 +4,6 @@ import { useAuth } from '../hooks/useAuth'
 import JefaturaViewControls from '../components/JefaturaViewControls'
 import MediaViewer from '../components/MediaViewer'
 import CambiarAreaMenu from '../components/CambiarAreaMenu'
-import ProgramacionInfoCell from '../components/ProgramacionInfoCell'
 import WhatsappSeguimientoBoton from '../components/WhatsappSeguimientoBoton'
 import { API, ncHeaders } from '../services/api'
 import { responseChanged, setVisibleInterval, clearVisibleInterval } from '../utils/polling'
@@ -12,6 +11,7 @@ import { adicionalesTexto } from '../utils/ventaServicio'
 import '../styles/seguimiento.css'
 
 const ESTADOS = [
+  { id: 'grabado',   label: 'GRABADO',          cls: 'bs-grabado', fila: 'fila-grabado' },
   { id: 'ejecucion', label: 'EN EJECUCION',    cls: 'bs-ejec',    fila: 'fila-ejec'    },
   { id: 'instalado', label: 'INSTALADO',        cls: 'bs-inst',    fila: 'fila-inst'    },
   { id: 'caida',     label: 'CAIDA',            cls: 'bs-caida',   fila: 'fila-caida'   },
@@ -33,6 +33,7 @@ const TRAMOS        = ['AM','PM','PM 3']
 const RESULTADOS    = ['Contactado -- conforme','Contactado -- con problema','No contesta','Buzon de voz','Numero equivocado','Solicita rellamada','SE LEVANTO','MASIVO ENVIADO','DERIVADO A GRABAR','DERIVADO A AGILIZAR','En Agenda']
 
 const ESTADO_BD_MAP = {
+  grabado: 'grabado',
   ejecucion: 'en_ejecucion',
   instalado: 'instalado',
   caida:     'caida',
@@ -85,11 +86,12 @@ function mapearEstado(e) {
   if (est.includes('rechazo'))   return 'rechazo'
   if (est.includes('ejecucion')) return 'ejecucion'
   const m = {
+    grabado: 'grabado', validado: 'grabado',
     aprobado: 'ejecucion', en_ejecucion: 'ejecucion',
     instalado: 'instalado', caida: 'caida',
     observado: 'ejecucion', rechazo_campo: 'rechazo', tecnico_casa: 'tecnico',
   }
-  return m[est] || 'ejecucion'
+  return m[est] || 'grabado'
 }
 
 function Paginacion({ total, pagina, porPagina, onChange }) {
@@ -185,11 +187,7 @@ export default function Seguimiento() {
   const [estTramo, setEstTramo]             = useState('')
   const [estMotivo, setEstMotivo]           = useState('')
   const [estObs, setEstObs]                 = useState('')
-
-  // Modal datos de programación
-  const [modalProgramacion, setModalProgramacion] = useState(null)
-  const [progSot, setProgSot]                     = useState('')
-  const [progFecha, setProgFecha]                 = useState('')
+  const [estFechaInstalacion, setEstFechaInstalacion] = useState('')
 
   // Modal llamada
   const [modalObs, setModalObs]             = useState(null)
@@ -205,9 +203,6 @@ export default function Seguimiento() {
   // Modal historial
   const [modalHist, setModalHist]           = useState(null)
   const [mediaVenta, setMediaVenta]         = useState(null)
-
-  // Modal SOT
-  const [sotModal, setSotModal] = useState(null) // { id, valor, guardando }
 
   const [toastMsg, setToastMsg] = useState('')
   const toastRef = useRef(null)
@@ -300,7 +295,7 @@ export default function Seguimiento() {
       const b = busqueda.toLowerCase()
       if (![
         v.nombreApellidos, v.dni, v.telefonoContacto, v.vendedor,
-        v.distrito, v._comentario, v.sot,
+        v.distrito, v._comentario,
       ].some(x => String(x || '').toLowerCase().includes(b))) return false
     }
     return true
@@ -320,12 +315,13 @@ export default function Seguimiento() {
 
   const kpis = useMemo(() => ({
     total:     ventasEnRango.length,
+    grabado:   ventasEnRango.filter(v => v._estadoSeg === 'grabado').length,
     ejecucion: ventasEnRango.filter(v => v._estadoSeg === 'ejecucion').length,
     instalado: ventasEnRango.filter(v => v._estadoSeg === 'instalado').length,
     rechazo:   ventasEnRango.filter(v => v._estadoSeg === 'rechazo').length,
     caida:     ventasEnRango.filter(v => v._estadoSeg === 'caida').length,
     tecnico:   ventasEnRango.filter(v => v._estadoSeg === 'tecnico').length,
-    adicionales: ESTADOS.slice(5).reduce((acc, e) => ({
+    adicionales: ESTADOS.slice(6).reduce((acc, e) => ({
       ...acc,
       [e.id]: ventasEnRango.filter(v => v._estadoSeg === e.id).length,
     }), {}),
@@ -349,6 +345,7 @@ export default function Seguimiento() {
     setEstTramo(v._tramo || '')
     setEstMotivo(v._motivoRech || '')
     setEstObs(v._comentario || '')
+    setEstFechaInstalacion(v.fecha_programada ? String(v.fecha_programada).slice(0, 10) : '')
   }
 
   async function guardarEstado() {
@@ -357,6 +354,10 @@ export default function Seguimiento() {
     const comentario = estObs.trim() || modalEstado._comentario
     const motivoAplica = estNuevo === 'caida' || estNuevo === 'rechazo'
     const body = { estado: estadoBD, obs_seguimiento: comentario, tramo_seguimiento: estTramo }
+    if (estNuevo === 'ejecucion') {
+      if (!estFechaInstalacion) { mostrarToast('Ingresa la fecha de instalación'); return }
+      body.fecha_programada = estFechaInstalacion
+    }
     if (estNuevo === 'rechazo_programacion') body.estado_supgrab = 'aprobado'
     if (motivoAplica) body.motivo_seguimiento = estMotivo
     try {
@@ -372,70 +373,10 @@ export default function Seguimiento() {
     } catch (e) { console.error(e); mostrarToast('No se pudo guardar el estado'); return }
     setVentas(list => list.map(x =>
       x.id === modalEstado.id
-        ? { ...x, _estadoSeg: estNuevo, _tramo: estTramo, _comentario: comentario, _motivoRech: motivoAplica ? estMotivo : x._motivoRech }
+        ? { ...x, _estadoSeg: estNuevo, _tramo: estTramo, _comentario: comentario, fecha_programada: estNuevo === 'ejecucion' ? estFechaInstalacion : x.fecha_programada, _motivoRech: motivoAplica ? estMotivo : x._motivoRech }
         : x
     ))
     setModalEstado(null)
-  }
-
-  function abrirModalProgramacion(v) {
-    setModalProgramacion(v)
-    setProgSot(v.sot || '')
-    setProgFecha(v.fecha_programada ? String(v.fecha_programada).slice(0, 10) : '')
-  }
-
-  async function guardarProgramacion() {
-    if (!modalProgramacion) return
-    const sot = progSot.trim()
-    if (!sot || !progFecha) {
-      mostrarToast('Ingrese la SOT y la fecha programada')
-      return
-    }
-    try {
-      const res = await fetch(`${API}/ventas/${modalProgramacion.id}`, {
-        method: 'PATCH',
-        headers: ncHeaders(),
-        body: JSON.stringify({ sot, fecha_programada: progFecha }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok || data.ok === false) {
-        mostrarToast(data.mensaje || 'No se pudo actualizar la programación')
-        return
-      }
-    } catch (e) {
-      console.error(e)
-      mostrarToast('No se pudo actualizar la programación')
-      return
-    }
-    setVentas(list => list.map(v => v.id === modalProgramacion.id
-      ? { ...v, sot, fecha_programada: progFecha }
-      : v
-    ))
-    if (estNuevo === 'rechazo_programacion') {
-      setVentas(list => list.filter(x => x.id !== modalEstado.id))
-    }
-    setModalProgramacion(null)
-  }
-
-  async function guardarSot() {
-    if (!sotModal || sotModal.guardando) return
-    const valor = String(sotModal.valor || '').trim()
-    if (!valor) { mostrarToast('Ingresa el número de SOT'); return }
-    setSotModal(prev => prev ? { ...prev, guardando: true } : prev)
-    try {
-      const res = await fetch(`${API}/ventas/${sotModal.id}`, {
-        method: 'PATCH', headers: ncHeaders(),
-        body: JSON.stringify({ sot: valor }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok || data.ok === false) {
-        mostrarToast(data.mensaje || 'No se pudo actualizar la SOT')
-        setSotModal(prev => prev ? { ...prev, guardando: false } : prev)
-        return
-      }
-    } catch (e) { console.error(e); mostrarToast('No se pudo actualizar la SOT'); setSotModal(prev => prev ? { ...prev, guardando: false } : prev); return }
-    setVentas(list => list.map(v => v.id === sotModal.id ? { ...v, sot: valor } : v))
-    setSotModal(null)
   }
 
   async function enviarWhatsapp(v, plantilla) {
@@ -554,12 +495,13 @@ export default function Seguimiento() {
         <div className="leyenda">
           {[
             { id: '',          label: 'Todos',            cnt: kpis.total,     cls: 'l-todos'   },
+            { id: 'grabado',   label: 'GRABADO',          cnt: kpis.grabado,   cls: 'l-grabado' },
             { id: 'ejecucion', label: 'EN EJECUCIÓN',     cnt: kpis.ejecucion, cls: 'l-ejec'    },
             { id: 'instalado', label: 'INSTALADO',        cnt: kpis.instalado, cls: 'l-inst'    },
             { id: 'rechazo',   label: 'RECHAZO EN CAMPO', cnt: kpis.rechazo,   cls: 'l-rech'    },
             { id: 'caida',     label: 'CAÍDA',            cnt: kpis.caida,     cls: 'l-caida'   },
             { id: 'tecnico',   label: 'TÉCNICOS EN CASA', cnt: kpis.tecnico,   cls: 'l-tecnico' },
-            ...ESTADOS.slice(5).map(e => ({ id:e.id, label:e.label, cnt:kpis.adicionales[e.id] || 0, cls:'l-ejec' })),
+            ...ESTADOS.slice(6).map(e => ({ id:e.id, label:e.label, cnt:kpis.adicionales[e.id] || 0, cls:'l-ejec' })),
           ].map(item => (
             <div
               key={item.id}
@@ -598,7 +540,7 @@ export default function Seguimiento() {
               <label>Filtrar por</label>
               <select value={fTipoFecha} onChange={e => { setFTipoFecha(e.target.value); setPagina(1) }}>
                 <option value="fecha">Fecha</option>
-                <option value="programados">Programados</option>
+                <option value="programados">Fecha de instalación</option>
               </select>
             </div>
             <div className="fg">
@@ -626,7 +568,7 @@ export default function Seguimiento() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input type="text" className="tabla-search" value={busqueda}
                 onChange={e => { setBusqueda(e.target.value); setPagina(1) }}
-                placeholder="Buscar nombre, DNI, vendedor o SOT..." />
+                placeholder="Buscar nombre, DNI o vendedor..." />
               <div className="pag-size">
                 <select value={porPagina} onChange={e => { setPorPagina(parseInt(e.target.value) || 18); setPagina(1) }}>
                   <option value="18">18 / pág.</option>
@@ -665,9 +607,8 @@ export default function Seguimiento() {
                 <tr>
                   <th className="th-acc">ACCIÓN</th>
                   <th className="th-fecha">FECHA PREVENTA</th>
-                  <th>OBS. PROGRAMACIÓN</th>
+                  <th>FECHA INSTALACIÓN</th>
                   <th className="th-est">ESTADO</th>
-                  <th>SOT</th>
                   <th className="th-tramo">TRAMO</th>
                   <th className="th-comment">COMENTARIO</th>
                   <th className="th-cliente">NOMBRE Y APELLIDOS</th>
@@ -688,7 +629,7 @@ export default function Seguimiento() {
               </thead>
               <tbody>
                 {ventasPag.length === 0 ? (
-                  <tr><td colSpan="21" style={{ textAlign: 'center', color: '#9ca3af', padding: '36px', fontSize: '13px' }}>Sin registros.</td></tr>
+                  <tr><td colSpan="20" style={{ textAlign: 'center', color: '#9ca3af', padding: '36px', fontSize: '13px' }}>Sin registros.</td></tr>
                 ) : ventasPag.map(v => {
                   const est     = estadoObj(v._estadoSeg)
                   const motCls  = motivoBadgeCls(v._motivoRech)
@@ -710,27 +651,12 @@ export default function Seguimiento() {
                       </td>
                       <td style={{ fontWeight: 700, color: '#185FA5', fontSize: '10px' }}>{formatF(v.fechaIngreso)}</td>
                       <td>
-                        <ProgramacionInfoCell
-                          fecha={v.fecha_programada}
-                          soloFecha
-                          soloFechaLabel="Fecha programada:"
-                          onEdit={() => abrirModalProgramacion(v)}
-                        />
+                        <strong>{formatF(v.fecha_programada)}</strong>
                       </td>
                       <td className="td-estado">
                         <span className={`badge-seg ${est.cls}`} onClick={() => abrirModalEstado(v)} style={{ cursor: 'pointer' }} title="Click para cambiar estado">
                           {est.label}
                         </span>
-                      </td>
-                      <td style={{ textAlign:'center' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:4, justifyContent:'center' }}>
-                          <span style={{ fontFamily:'monospace', fontSize:11, fontWeight:700, color:'#374151' }}>{v.sot || '—'}</span>
-                          <button type="button" title="Editar SOT"
-                            onClick={() => setSotModal({ id:v.id, valor:v.sot||'', guardando:false })}
-                            style={{ border:'none', background:'transparent', cursor:'pointer', padding:2, color:'#64748b', lineHeight:1, flexShrink:0 }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="11" height="11"><path d="M4 20h4l11-11a2.1 2.1 0 0 0-3-3L5 17l-1 3z" strokeLinejoin="round"/><path d="m14.5 7.5 3 3"/></svg>
-                          </button>
-                        </div>
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         {v._tramo ? <span className="badge-tramo">{v._tramo}</span> : '--'}
@@ -801,6 +727,12 @@ export default function Seguimiento() {
                   </select>
                 </div>
               )}
+              {estNuevo === 'ejecucion' && (
+                <div className="modal-campo" style={{ gridColumn: '1/-1' }}>
+                  <label>Fecha de instalación *</label>
+                  <input type="date" value={estFechaInstalacion} onChange={e => setEstFechaInstalacion(e.target.value)} />
+                </div>
+              )}
               <div className="modal-campo" style={{ gridColumn: '1/-1' }}>
                 <label>Observación / Comentario</label>
                 <textarea value={estObs} onChange={e => setEstObs(e.target.value)}
@@ -811,30 +743,6 @@ export default function Seguimiento() {
             <div className="modal-btns">
               <button className="btn-cancelar-m" onClick={() => setModalEstado(null)}>Cancelar</button>
               <button className="btn-guardar" onClick={guardarEstado}>Guardar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DATOS DE PROGRAMACIÓN */}
-      {modalProgramacion && (
-        <div className="modal-bg open" onClick={e => { if (e.target === e.currentTarget) setModalProgramacion(null) }}>
-          <div className="modal-box" style={{ maxWidth: '440px' }}>
-            <div className="modal-title">Editar datos de programación</div>
-            <div className="modal-sub">Cliente: <strong>{modalProgramacion.nombreApellidos || '--'}</strong></div>
-            <div className="modal-grid">
-              <div className="modal-campo">
-                <label>SOT *</label>
-                <input value={progSot} onChange={e => setProgSot(e.target.value)} placeholder="Número de SOT" />
-              </div>
-              <div className="modal-campo">
-                <label>Fecha programada *</label>
-                <input type="date" value={progFecha} onChange={e => setProgFecha(e.target.value)} />
-              </div>
-            </div>
-            <div className="modal-btns">
-              <button className="btn-cancelar-m" onClick={() => setModalProgramacion(null)}>Cancelar</button>
-              <button className="btn-guardar" onClick={guardarProgramacion}>Guardar</button>
             </div>
           </div>
         </div>
@@ -903,28 +811,6 @@ export default function Seguimiento() {
             <div className="modal-btns">
               <button className="btn-cancelar-m" onClick={() => setModalAgenda(null)}>Cancelar</button>
               <button className="btn-guardar" onClick={guardarAgenda}>Agendar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL SOT */}
-      {sotModal && (
-        <div className="modal-bg open" onClick={e => { if (e.target === e.currentTarget && !sotModal.guardando) setSotModal(null) }}>
-          <div className="modal-box" style={{ maxWidth: '380px' }}>
-            <div className="modal-title">Editar SOT</div>
-            <div className="modal-grid">
-              <div className="modal-campo">
-                <label>Número de SOT *</label>
-                <input autoFocus value={sotModal.valor} maxLength={100}
-                  onChange={e => setSotModal(p => ({ ...p, valor: e.target.value }))}
-                  onKeyDown={e => { if (e.key === 'Enter') guardarSot(); if (e.key === 'Escape' && !sotModal.guardando) setSotModal(null) }}
-                  placeholder="Número de SOT" />
-              </div>
-            </div>
-            <div className="modal-btns">
-              <button className="btn-cancelar-m" onClick={() => setSotModal(null)} disabled={sotModal.guardando}>Cancelar</button>
-              <button className="btn-guardar" onClick={guardarSot} disabled={sotModal.guardando}>{sotModal.guardando ? 'Guardando...' : 'Guardar'}</button>
             </div>
           </div>
         </div>

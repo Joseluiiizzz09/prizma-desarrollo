@@ -37,7 +37,7 @@ const filePath = path.resolve(args[fileArg + 1]);
 const CARGOS_VALIDOS = new Set([
   'backoffice', 'jefatura', 'grabaciones',
   'backreclutamiento', 'asesorreclutamiento', 'seguimiento',
-  'validacion', 'programacion', 'usuarios', 'supervisor', 'asesor',
+  'validacion', 'usuarios', 'supervisor', 'asesor',
 ]);
 const SALAS_VALIDAS = new Set(['SALA 1', 'SALA 2']);
 const TOTAL_ESPERADO = 127;
