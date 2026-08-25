@@ -699,7 +699,7 @@ body {
 
 .tabla-usuarios-pro {
   width: 100%;
-  min-width: 1560px;
+  min-width: 1165px;
   table-layout: fixed;
 }
 
@@ -711,16 +711,16 @@ body {
 
 .tabla-usuarios-pro th:nth-child(1),
 .tabla-usuarios-pro td:nth-child(1) {
-  width: 300px;
-  min-width: 300px;
-  max-width: 300px;
+  width: 230px;
+  min-width: 230px;
+  max-width: 230px;
 }
 
 .tabla-usuarios-pro th:nth-child(2),
 .tabla-usuarios-pro td:nth-child(2) {
-  width: 380px;
-  min-width: 380px;
-  max-width: 380px;
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: clip;
 }
@@ -732,10 +732,17 @@ body {
 
 .tabla-usuarios-pro th:nth-child(7),
 .tabla-usuarios-pro td:nth-child(7) {
-  width: 300px;
-  min-width: 300px;
-  max-width: 300px;
+  width: 330px;
+  min-width: 330px;
+  max-width: 330px;
   overflow: visible;
+}
+
+.tabla-usuarios-pro td:nth-child(7) .acc-cell {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 /* ===== AJUSTE LOGO / MARCA JEFATURA =====

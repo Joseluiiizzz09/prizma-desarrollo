@@ -1562,13 +1562,13 @@ export default function Jefatura() {
               </div>
               <table className="tabla tabla-usuarios-pro">
                 <colgroup>
-                  <col style={{width:'300px'}} />
-                  <col style={{width:'380px'}} />
-                  <col style={{width:'140px'}} />
-                  <col style={{width:'150px'}} />
-                  <col style={{width:'150px'}} />
-                  <col style={{width:'140px'}} />
-                  <col style={{width:'300px'}} />
+                  <col style={{width:'230px'}} />
+                  <col style={{width:'220px'}} />
+                  <col style={{width:'85px'}} />
+                  <col style={{width:'105px'}} />
+                  <col style={{width:'105px'}} />
+                  <col style={{width:'90px'}} />
+                  <col style={{width:'330px'}} />
                 </colgroup>
                 <thead><tr><th>Usuario</th><th>Cargo</th><th>Sala</th><th>Login</th><th>Creado</th><th>Estado</th><th>Acciones</th></tr></thead>
                 <tbody>
