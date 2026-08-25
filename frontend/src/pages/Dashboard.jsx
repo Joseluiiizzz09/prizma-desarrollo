@@ -1632,20 +1632,26 @@ export default function Dashboard() {
                 </div>
                 <div className="nv-field nv-full">
                   <label className="nv-label">Adicionales <small>(opcional)</small></label>
-                  <div className={`nv-adicionales${nvForm.hogar ? '' : ' is-disabled'}`}>
-                    {!nvForm.hogar ? (
-                      <div className="nv-adicionales-empty">Primero selecciona Lima o Provincia.</div>
-                    ) : ADICIONALES_POR_REGION[nvForm.hogar].map(item => (
-                      <label className={`nv-adicional${nvForm.adicionales.includes(item.id) ? ' is-selected' : ''}`} key={item.id}>
-                        <input
-                          type="checkbox"
-                          checked={nvForm.adicionales.includes(item.id)}
-                          onChange={() => nvToggleAdicional(item.id)}
-                        />
-                        <span><strong>{item.id}</strong><small>{item.detalle}</small></span>
-                      </label>
-                    ))}
-                  </div>
+                  <details className="nv-adicionales-dropdown">
+                    <summary>
+                      <span>{nvForm.adicionales.length ? `${nvForm.adicionales.length} adicional${nvForm.adicionales.length === 1 ? '' : 'es'} seleccionado${nvForm.adicionales.length === 1 ? '' : 's'}` : 'Seleccionar adicionales'}</span>
+                      <span className="nv-adicionales-chevron">⌄</span>
+                    </summary>
+                    <div className={`nv-adicionales${nvForm.hogar ? '' : ' is-disabled'}`}>
+                      {!nvForm.hogar ? (
+                        <div className="nv-adicionales-empty">Primero selecciona Lima o Provincia.</div>
+                      ) : ADICIONALES_POR_REGION[nvForm.hogar].map(item => (
+                        <label className={`nv-adicional${nvForm.adicionales.includes(item.id) ? ' is-selected' : ''}`} key={item.id}>
+                          <input
+                            type="checkbox"
+                            checked={nvForm.adicionales.includes(item.id)}
+                            onChange={() => nvToggleAdicional(item.id)}
+                          />
+                          <span><strong>{item.id}</strong><small>{item.detalle}</small></span>
+                        </label>
+                      ))}
+                    </div>
+                  </details>
                 </div>
                 <div className="nv-field">
                   <label className="nv-label">Estado Venta</label>
