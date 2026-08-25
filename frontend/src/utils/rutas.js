@@ -15,7 +15,6 @@ export const RUTAS = {
   cobranzas:      '/cobranzas',
   calidad:        '/calidad',
   supcalidad:     '/sup-calidad',
-  supgrabaciones: '/sup-grabaciones',
   backreclutamiento:   '/backdata-reclutamiento',
   asesorreclutamiento: '/reclutamiento',
 }
@@ -33,7 +32,6 @@ export const CARGO_LABELS = {
   cobranzas: 'Cobranzas',
   calidad: 'Calidad',
   supcalidad: 'Super de Calidad',
-  supgrabaciones: 'Sup. Grabaciones',
   backreclutamiento: 'Back Data Reclutaminto',
   asesorreclutamiento: 'Asesor de Reclutamiento',
 }

@@ -18,7 +18,6 @@ const CARGO_CLASE = {
   cobranzas:     'bc-cobranzas',
   calidad:       'bc-calidad',
   supcalidad:    'bc-calidad',
-  supgrabaciones:'bc-supgrabaciones',
   usuarios:      'bc-usuarios',
   backreclutamiento:   'bc-backreclutamiento',
   asesorreclutamiento: 'bc-asesorreclutamiento',
@@ -37,7 +36,6 @@ const CARGOS = [
   { value: 'cobranzas',      label: 'Cobranzas'        },
   { value: 'calidad',        label: 'Calidad'          },
   { value: 'supcalidad',     label: 'Super de Calidad' },
-  { value: 'supgrabaciones', label: 'Sup. Grabaciones' },
   { value: 'backreclutamiento',   label: 'Back Data Reclutaminto'  },
   { value: 'asesorreclutamiento', label: 'Asesor de Reclutamiento' },
 ]

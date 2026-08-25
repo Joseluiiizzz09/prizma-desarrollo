@@ -104,7 +104,6 @@ function etiquetaCargo(cargo) {
     backoffice: 'Back Data',
     validacion: 'Validación',
     grabaciones: 'Grabaciones',
-    supgrabaciones: 'Supervisión de grabaciones',
     supcalidad: 'Supervisión de calidad',
     programacion: 'Programación',
     seguimiento: 'Seguimiento',

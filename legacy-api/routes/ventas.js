@@ -1801,12 +1801,6 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
     if (estado_supgrab !== undefined && !ESTADOS_SUPGRAB_OK.includes(String(estado_supgrab).toLowerCase()))
       return res.status(400).json({ ok: false, mensaje: 'estado_supgrab inválido' });
 
-    if (estado_grab !== undefined
-        && String(estado_grab).toLowerCase() === 'grabado'
-        && !String(rows[0].audio_path || '').trim()) {
-      return res.status(400).json({ ok: false, mensaje: 'Debes subir un archivo MP3 antes de marcar la venta como GRABADO' });
-    }
-
     if (tramo_seguimiento !== undefined && tramo_seguimiento !== '' && !TRAMOS_SEGUIMIENTO_OK.includes(tramo_seguimiento))
       return res.status(400).json({ ok: false, mensaje: 'tramo_seguimiento inválido' });
 

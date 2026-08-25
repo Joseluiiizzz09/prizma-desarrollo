@@ -11,7 +11,6 @@ const Supervisor = lazy(() => import('./pages/Supervisor'))
 const Validacion = lazy(() => import('./pages/Validacion'))
 const Seguimiento = lazy(() => import('./pages/Seguimiento'))
 const Grabaciones = lazy(() => import('./pages/Grabaciones'))
-const SupGrabaciones = lazy(() => import('./pages/SupGrabaciones'))
 const Programacion = lazy(() => import('./pages/Programacion'))
 const Cobranzas = lazy(() => import('./pages/Cobranzas'))
 const Calidad = lazy(() => import('./pages/Calidad'))
@@ -64,7 +63,6 @@ export default function App() {
       <Route path="/validacion"    element={<PrivateRoute cargo="validacion"><Validacion /></PrivateRoute>} />
       <Route path="/seguimiento"   element={<PrivateRoute cargo="seguimiento"><Seguimiento /></PrivateRoute>} />
       <Route path="/grabaciones"   element={<PrivateRoute cargo="grabaciones"><Grabaciones /></PrivateRoute>} />
-      <Route path="/sup-grabaciones" element={<PrivateRoute cargo="supgrabaciones"><SupGrabaciones /></PrivateRoute>} />
       <Route path="/programacion"  element={<PrivateRoute cargo="programacion"><Programacion /></PrivateRoute>} />
       <Route path="/cobranzas"     element={<PrivateRoute cargo="cobranzas"><Cobranzas /></PrivateRoute>} />
       <Route path="/calidad"       element={<PrivateRoute cargo="calidad"><Calidad /></PrivateRoute>} />

@@ -280,10 +280,9 @@ export default function Grabaciones() {
       try {
         const res  = await fetch(`${API}/ventas/${v.id}`, {
           method:'PATCH', headers:ncHeaders(),
-          // No se toca `estado` (campo de Validación) — solo el campo
-          // independiente de Grabaciones. Super de Grabaciones lee su cola
-          // desde estado_grab, no desde estado.
-          body: JSON.stringify({ estado_grab:'grabado', estado_supgrab:'sin_revisar' }),
+          // No se toca `estado` de Validación. Al marcar GRABADO se registra
+          // el ingreso directo a Seguimiento, sin revisión intermedia.
+          body: JSON.stringify({ estado_grab:'grabado', estado_supgrab:'conforme' }),
         })
         const data = await res.json()
         if (!res.ok || !data.ok) { mostrarToast('Error: ' + (data.mensaje||'no se pudo guardar')); return }
@@ -599,10 +598,8 @@ export default function Grabaciones() {
           <div className="tabla-scroll">
             <table className="tabla grabaciones-ventas-tabla">
               <colgroup>
-                <col style={{width:330}} />
+                <col style={{width:230}} />
                 <col style={{width:150}} />
-                <col style={{width:130}} />
-                <col style={{width:90}} />
                 <col style={{width:120}} />
                 <col style={{width:250}} />
                 <col style={{width:120}} />
@@ -612,16 +609,12 @@ export default function Grabaciones() {
                 <col style={{width:110}} />
                 <col style={{width:210}} />
                 <col style={{width:180}} />
-                <col style={{width:160}} />
-                <col style={{width:230}} />
                 <col style={{width:220}} />
               </colgroup>
               <thead>
                 <tr>
-                  <th style={{width:330,minWidth:330}}>ACCIONES</th>
+                  <th style={{width:230,minWidth:230}}>ACCIONES</th>
                   <th style={{width:110}}>ESTADO GRAB.</th>
-                  <th style={{width:130}}>RESULTADO SUP.</th>
-                  <th style={{width:90}}>HORA</th>
                   <th style={{width:120}}>FECHA</th>
                   <th style={{width:160}}>NOMBRE Y APELLIDOS</th>
                   <th style={{width:90}}>DNI / DOC.</th>
@@ -631,17 +624,14 @@ export default function Grabaciones() {
                   <th style={{width:110}}>SALA</th>
                   <th style={{width:210}}>EMAIL</th>
                   <th style={{width:130}}>VENDEDOR</th>
-                  <th style={{width:120}}>SUPERVISOR</th>
-                  <th style={{width:160}}>ARCHIVO AUDIO</th>
                   <th style={{width:180}}>ÚLTIMA OBS.</th>
                 </tr>
               </thead>
               <tbody>
                 {paginaVentas.length === 0
-                  ? <tr><td colSpan={16} className="tabla-empty">{tabActiva==='hoy'?'No hay ventas validadas para hoy.':'No hay ventas pendientes.'}</td></tr>
+                  ? <tr><td colSpan={12} className="tabla-empty">{tabActiva==='hoy'?'No hay ventas validadas para hoy.':'No hay ventas pendientes.'}</td></tr>
                   : paginaVentas.map(v => {
                       const esAnterior = v._fechaGrab < hoy
-                      const tieneAudio = !!v._grabAudio
                       const eg         = estadoGrab(v._estadoGrab)
                       const ultimaObs  = v._grabObs ? v._grabObs.split('\n').filter(Boolean).slice(-1)[0]?.substring(0,50) || '—' : '—'
                       return (
@@ -650,23 +640,11 @@ export default function Grabaciones() {
                             <div className="acciones-cell">
 
                               <button className="btn-acc btn-acc-obs"    onClick={()=>abrirModalObs(v.id)}    title="Observación">Obs.</button>
-                              <button className="btn-acc btn-acc-subir"  onClick={()=>abrirModalSubir(v.id)}  title="Subir grabación">Subir</button>
-                              <button className="btn-acc btn-acc-eliminar-audio" onClick={()=>eliminarAudio(v.id)} disabled={!tieneAudio} title={tieneAudio?'Eliminar grabación':'No hay grabación para eliminar'} aria-label="Eliminar grabación">🗑</button>
                               <button className="btn-acc btn-acc-estado" onClick={()=>abrirModalEstado(v.id)} title="Cambiar estado">Estado</button>
                               <button className="btn-fotos btn-archivos" onClick={()=>setMediaVenta(v)} title="Ver fotos y documentos">Archivos</button>
                             </div>
                           </td>
                           <td><span className={`badge-grab ${eg.cls}`}>{eg.id==='grabando' && v.grabando_por_nombre ? `GRABANDO ${primerNombre(v.grabando_por_nombre).toUpperCase()}` : eg.label}</span></td>
-                          <td>
-                            {v._estadoSupGrab === 'observado'
-                              ? <span className="badge-grab bg-observado">OBSERVADO</span>
-                              : v._estadoSupGrab === 'no_conforme'
-                                ? <span className="badge-grab" style={{background:'#fff7ed',color:'#c2410c',border:'1px solid #fdba74'}}>NO CONFORME</span>
-                                : <span style={{color:'#9ca3af'}}>—</span>}
-                          </td>
-                          <td style={{fontFamily:'monospace',fontSize:11,fontWeight:700,color:'#ea580c'}}>
-                            {['no_conforme','observado'].includes(v._estadoSupGrab) ? formatHora(v._horaSupResultado) : '—'}
-                          </td>
                           <td>
                             <span style={{color:'#185FA5',fontWeight:700,fontSize:11}}>{formatF(v.fechaIngreso)}</span>
                             {esAnterior && <span className="badge-anterior">ANTERIOR</span>}
@@ -679,12 +657,6 @@ export default function Grabaciones() {
                           <td style={{fontWeight:600}}>{v.sala||'—'}</td>
                           <td style={{maxWidth:210,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={v.email||''}>{v.email||'—'}</td>
                           <td style={{fontWeight:600,color:'#7C3AED'}}>{v.vendedor||'—'}</td>
-                          <td style={{fontSize:11}}>{v.supervisor||'—'}</td>
-                          <td>
-                            {tieneAudio
-                              ? <span style={{color:'#16a34a',fontWeight:600,fontSize:11}}>{v._grabNombre||'Archivo subido'}</span>
-                              : <span style={{color:'#9ca3af',fontSize:11,fontStyle:'italic'}}>Sin grabación</span>}
-                          </td>
                           <td style={{fontSize:10,color:'#6b7280'}}>{ultimaObs}</td>
                         </tr>
                       )
@@ -715,8 +687,6 @@ export default function Grabaciones() {
         ventaId={mediaVenta?.id}
         title={`Archivos de ${mediaVenta?.nombreApellidos || 'la venta'}`}
         subtitle={`DNI: ${mediaVenta?.dni || '—'} · Tel: ${mediaVenta?.telefonoContacto || '—'}`}
-        audioPath={mediaVenta?._grabAudio}
-        audioName={mediaVenta?._grabNombre}
       />
 
       {/* ══ MODAL ESTADO ═════════════════════════════════════════════════════ */}
@@ -740,7 +710,7 @@ export default function Grabaciones() {
       )}
 
       {/* ══ MODAL SUBIR ══════════════════════════════════════════════════════ */}
-      {modalSubir.open && (
+      {false && modalSubir.open && (
         <div className="modal-bg open" onClick={e=>{ if(e.target===e.currentTarget) setModalSubir({open:false,id:null}) }}>
           <div className="modal-box" style={{maxWidth:440}}>
             <div className="modal-title">Subir grabación</div>
@@ -778,7 +748,7 @@ export default function Grabaciones() {
       )}
 
       {/* ══ MODAL AUDIO ══════════════════════════════════════════════════════ */}
-      {modalAudio.open && (
+      {false && modalAudio.open && (
         <div className="modal-bg open" onClick={e=>{ if(e.target===e.currentTarget) cerrarModalAudio() }}>
           <div className="modal-box" style={{maxWidth:460}}>
             <div className="modal-title">Grabación</div>
