@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { API, NC_API, ncHeaders, ncHeadersFile } from '../services/api'
 import { responseChanged, setVisibleInterval, clearVisibleInterval } from '../utils/polling'
+import { adicionalesTexto, parsearAdicionales } from '../utils/ventaServicio'
 import { UBIGEO } from '../services/ubigeo'
 import ObsSeguimientoCell from '../components/ObsSeguimientoCell'
 import ProgramacionInfoCell from '../components/ProgramacionInfoCell'
@@ -887,7 +888,7 @@ export default function Dashboard() {
       full:     v.full_claro  || '',
       decos:    String(v.cant_decos || '0'),
       mesh:     String(v.cant_mesh  || '0'),
-      adicionales: (() => { try { return JSON.parse(v.adicionales || '[]') } catch { return [] } })(),
+      adicionales: parsearAdicionales(v.adicionales),
       plano:    v.plano       || '',
       estado:   (v.estado||'VENTA').toUpperCase() === 'PROGRAMADO' ? 'PROGRAMADO' : 'VENTA',
       obs:      v.observacion || '',
@@ -1309,18 +1310,15 @@ export default function Dashboard() {
                 <th>Estado</th><th>Obs. Seguimiento</th><th>Fecha Programada</th><th>Fecha</th><th>Nombre y Apellidos</th>
                 <th>Tipo Doc.</th><th>DNI</th><th>Tel. Contacto</th><th>Tel. Referencia</th>
                 <th>Departamento</th><th>Provincia</th><th>Distrito</th>
-                <th>Dirección</th><th>Coordenadas</th>
-                <th>F. Nacimiento</th><th>Lugar Nac.</th><th>Padre</th><th>Madre</th>
-                <th>Cuota Inst.</th><th>Región</th><th>Tecnología</th>
-                <th>Paquete</th><th>Full Claro</th>
-                <th>Winbox</th><th>Mesh</th><th>Plano</th>
+                <th>Dirección</th><th>Coordenadas</th><th>Región</th><th>Paquete</th>
+                <th>Winbox</th><th>Mesh</th><th>Adicionales</th>
                 <th>Vendedor</th><th>Supervisor</th><th>Observación</th>
                 <th style={{minWidth:'130px'}}>Acción</th>
               </tr>
             </thead>
             <tbody>
               {ventasMostradas.length === 0 ? (
-                <tr className="vs-empty"><td colSpan={30}>Sin registros. Usa los filtros para buscar.</td></tr>
+                <tr className="vs-empty"><td colSpan={23}>Sin registros. Usa los filtros para buscar.</td></tr>
               ) : ventasMostradas.map((v, i) => (
                 <tr key={v.id || i}>
                   <td><BadgeVS e={v.estado} sup={v.estado_supgrab || v.estado_grab} estadoGrab={v.estado_grab} grabandoPorNombre={v.grabando_por_nombre} /></td>
@@ -1342,18 +1340,11 @@ export default function Dashboard() {
                   <td style={{fontSize:'11px'}}>{v.distrito||'-'}</td>
                   <td style={{fontSize:'11px',minWidth:'140px'}}>{v.direccion||'-'}</td>
                   <td style={{fontSize:'10px',color:'#9ca3af'}}>{v.coordenadas||'-'}</td>
-                  <td style={{fontSize:'11px'}}>{v.fecha_nac||'-'}</td>
-                  <td style={{fontSize:'11px'}}>{v.lugar_nac||'-'}</td>
-                  <td style={{fontSize:'11px'}}>{v.padre||'-'}</td>
-                  <td style={{fontSize:'11px'}}>{v.madre||'-'}</td>
-                  <td style={{fontSize:'11px'}}>{v.cuota_inst||'-'}</td>
                   <td style={{fontSize:'11px'}}>{v.claro_hogar||'-'}</td>
-                  <td style={{fontSize:'11px'}}>{v.tecnologia||'-'}</td>
                   <td style={{fontSize:'11px',minWidth:'180px'}}>{v.paquete||'-'}</td>
-                  <td style={{fontSize:'11px'}}>{v.full_claro||'-'}</td>
                   <td style={{textAlign:'center'}}>{v.cant_decos||'0'}</td>
                   <td style={{textAlign:'center'}}>{v.cant_mesh||'0'}</td>
-                  <td style={{fontSize:'11px'}}>{v.plano||'-'}</td>
+                  <td style={{fontSize:'11px',minWidth:'180px'}} title={adicionalesTexto(v.adicionales)}>{adicionalesTexto(v.adicionales)}</td>
                   <td style={{fontWeight:600,color:'#7C3AED',fontSize:'11px'}}>{v.asesor_nombre||'-'}</td>
                   <td style={{fontSize:'11px'}}>{v.supervisor||'-'}</td>
                   <td style={{fontSize:'11px',color:'#6b7280',minWidth:'140px'}}>{v.observacion||'-'}</td>

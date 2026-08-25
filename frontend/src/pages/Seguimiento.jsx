@@ -8,6 +8,7 @@ import ProgramacionInfoCell from '../components/ProgramacionInfoCell'
 import WhatsappSeguimientoBoton from '../components/WhatsappSeguimientoBoton'
 import { API, ncHeaders } from '../services/api'
 import { responseChanged, setVisibleInterval, clearVisibleInterval } from '../utils/polling'
+import { adicionalesTexto } from '../utils/ventaServicio'
 import '../styles/seguimiento.css'
 
 const ESTADOS = [
@@ -676,16 +677,18 @@ export default function Seguimiento() {
                   <th className="th-coord">COORDENADAS</th>
                   <th className="th-vend">VENDEDOR</th>
                   <th>SALA</th>
-                  <th className="th-hogar">CLARO HOGAR</th>
-                  <th className="th-olt">OLT</th>
+                  <th className="th-hogar">REGIÓN</th>
                   <th className="th-plan">PLAN</th>
+                  <th>WINBOX</th>
+                  <th>MESH</th>
+                  <th className="th-plan">ADICIONALES</th>
                   <th className="th-codigo">TEL. CONT.</th>
                   <th className="th-motivo">MOTIVO</th>
                 </tr>
               </thead>
               <tbody>
                 {ventasPag.length === 0 ? (
-                  <tr><td colSpan="19" style={{ textAlign: 'center', color: '#9ca3af', padding: '36px', fontSize: '13px' }}>Sin registros.</td></tr>
+                  <tr><td colSpan="21" style={{ textAlign: 'center', color: '#9ca3af', padding: '36px', fontSize: '13px' }}>Sin registros.</td></tr>
                 ) : ventasPag.map(v => {
                   const est     = estadoObj(v._estadoSeg)
                   const motCls  = motivoBadgeCls(v._motivoRech)
@@ -741,8 +744,10 @@ export default function Seguimiento() {
                       <td style={{ fontWeight: 600, color: '#7C3AED', fontSize: '10px' }}>{v.asesor_nombre || v.vendedor || '--'}</td>
                       <td style={{ fontWeight: 600, fontSize: '10px' }}>{v.sala || '--'}</td>
                       <td style={{ fontSize: '10px' }}>{v.claro_hogar || '--'}</td>
-                      <td style={{ fontSize: '10px' }}>{v.tecnologia || '--'}</td>
                       <td className="td-wrap" style={{ fontSize: '10px' }}>{v.paquete || '--'}</td>
+                      <td style={{ textAlign:'center', fontSize:'10px' }}>{v.cant_decos ?? '--'}</td>
+                      <td style={{ textAlign:'center', fontSize:'10px' }}>{v.cant_mesh ?? '--'}</td>
+                      <td className="td-wrap" style={{ fontSize:'10px' }} title={adicionalesTexto(v.adicionales)}>{adicionalesTexto(v.adicionales)}</td>
                       <td style={{ fontFamily: 'monospace', fontSize: '10px' }}>{v.telefonoContacto || '--'}</td>
                       <td>
                         {motCls

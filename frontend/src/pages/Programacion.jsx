@@ -5,6 +5,7 @@ import JefaturaViewControls from '../components/JefaturaViewControls'
 import CambiarAreaMenu from '../components/CambiarAreaMenu'
 import { API, ncHeaders } from '../services/api'
 import { responseChanged, setVisibleInterval, clearVisibleInterval } from '../utils/polling'
+import { adicionalesTexto } from '../utils/ventaServicio'
 import '../styles/programacion.css'
 
 const BADGE_CLS = {
@@ -424,14 +425,11 @@ export default function Programacion() {
 
               <DetSeccion titulo="Datos del servicio" />
               <div className="det-grid">
-                <DetCampo label="Cuota Inst."  val={modalDet.cuota_inst} />
-                <DetCampo label="Claro Hogar"  val={modalDet.claro_hogar} />
-                <DetCampo label="Tecnología"   val={modalDet.tecnologia} />
-                <div className="det-campo det-full"><label>Paquete Real</label><span>{modalDet.paquete || '—'}</span></div>
-                <DetCampo label="Full Claro"   val={modalDet.full_claro} />
-                <DetCampo label="Decos"        val={modalDet.cant_decos} />
+                <DetCampo label="Región"       val={modalDet.claro_hogar} />
+                <div className="det-campo det-full"><label>Paquete</label><span>{modalDet.paquete || '—'}</span></div>
+                <DetCampo label="Winbox"       val={modalDet.cant_decos} />
                 <DetCampo label="Mesh"         val={modalDet.cant_mesh} />
-                <DetCampo label="Plano"        val={modalDet.plano} />
+                <div className="det-campo det-full"><label>Adicionales</label><span>{adicionalesTexto(modalDet.adicionales)}</span></div>
               </div>
 
               <DetSeccion titulo="Datos comerciales / operativos" />

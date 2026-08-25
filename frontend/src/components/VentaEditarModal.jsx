@@ -1,5 +1,11 @@
 import { useState } from 'react'
 import { API, ncHeaders } from '../services/api'
+import { parsearAdicionales } from '../utils/ventaServicio'
+
+const ADICIONALES_REGION = {
+  LIMA: ['FonoWin','WINTV Premium','WINTV L1Max','WINTV L1Max Premium','DGO Hogar','DGO Full','Win Box','Mesh adicional','KIT WIFI PRO'],
+  PROVINCIA: ['FonoWin','Win Box','Mesh adicional','DGO Hogar','DGO Full','WINTV Premium','WINTV L1Max','WINTV L1Max Premium'],
+}
 
 function campo(label, children) {
   return (
@@ -42,12 +48,14 @@ export function VentaEditarModal({ venta, onClose, onSuccess }) {
     madre:           venta?.madre           || '',
     cantDecos:       String(venta?.cant_decos ?? venta?.cantDecos ?? '0'),
     cantMesh:        String(venta?.cant_mesh  ?? venta?.cantMesh  ?? '0'),
+    adicionales:     parsearAdicionales(venta?.adicionales),
     observacion:     venta?.observacion     || '',
   })
   const [guardando, setGuardando] = useState(false)
   const [error, setError]         = useState('')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const cambiarRegion = hogar => setForm(f => ({ ...f, hogar, adicionales: [] }))
 
   async function guardar() {
     if (guardando) return
@@ -132,39 +140,32 @@ export function VentaEditarModal({ venta, onClose, onSuccess }) {
           {campo('Paquete',
             <input style={inputStyle} value={form.paquete} onChange={e => set('paquete', e.target.value)} />
           )}
-          {campo('Cuota instalación',
-            <input style={inputStyle} value={form.cuotaInstalacion} onChange={e => set('cuotaInstalacion', e.target.value)} />
+          {campo('Región del servicio',
+            <select style={{ ...inputStyle }} value={form.hogar} onChange={e => cambiarRegion(e.target.value)}>
+              <option value="">Seleccionar</option>
+              <option value="LIMA">Lima</option>
+              <option value="PROVINCIA">Provincia</option>
+            </select>
           )}
-          {campo('Claro Hogar',
-            <input style={inputStyle} value={form.hogar} onChange={e => set('hogar', e.target.value)} />
-          )}
-          {campo('Tecnología',
-            <input style={inputStyle} value={form.tec} onChange={e => set('tec', e.target.value)} />
-          )}
-          {campo('Full Claro',
-            <input style={inputStyle} value={form.full} onChange={e => set('full', e.target.value)} />
-          )}
-          {campo('Decos',
+          {campo('Winbox',
             <input style={inputStyle} type="number" min="0" value={form.cantDecos} onChange={e => set('cantDecos', e.target.value)} />
           )}
           {campo('Mesh',
             <input style={inputStyle} type="number" min="0" value={form.cantMesh} onChange={e => set('cantMesh', e.target.value)} />
           )}
-          {campo('Plano',
-            <input style={inputStyle} value={form.plano} onChange={e => set('plano', e.target.value)} />
-          )}
-          {campo('Fecha de nacimiento',
-            <input style={inputStyle} type="date" value={form.fechaNac} onChange={e => set('fechaNac', e.target.value)} />
-          )}
-          {campo('Lugar de nacimiento',
-            <input style={inputStyle} value={form.lugarNac} onChange={e => set('lugarNac', e.target.value)} />
-          )}
-          {campo('Nombre del padre',
-            <input style={inputStyle} value={form.padre} onChange={e => set('padre', e.target.value)} />
-          )}
-          {campo('Nombre de la madre',
-            <input style={inputStyle} value={form.madre} onChange={e => set('madre', e.target.value)} />
-          )}
+          <div style={{ gridColumn:'1/-1' }}>
+            {campo('Adicionales',
+              <select
+                multiple
+                style={{ ...inputStyle, height:'110px', padding:'6px 10px' }}
+                value={form.adicionales}
+                disabled={!ADICIONALES_REGION[form.hogar]}
+                onChange={e => set('adicionales', Array.from(e.target.selectedOptions, option => option.value))}
+              >
+                {(ADICIONALES_REGION[form.hogar] || []).map(item => <option key={item} value={item}>{item}</option>)}
+              </select>
+            )}
+          </div>
           <div style={{ gridColumn: '1/-1' }}>
             {campo('Observación general',
               <textarea

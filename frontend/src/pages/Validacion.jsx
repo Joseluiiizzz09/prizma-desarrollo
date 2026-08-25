@@ -5,6 +5,7 @@ import JefaturaViewControls from '../components/JefaturaViewControls'
 import MediaViewer from '../components/MediaViewer'
 import { API, ncHeaders } from '../services/api'
 import { responseChanged, setVisibleInterval, clearVisibleInterval } from '../utils/polling'
+import { adicionalesTexto } from '../utils/ventaServicio'
 import '../styles/validacion.css'
 
 // ── Constantes ────────────────────────────────────────────────────────────
@@ -469,14 +470,11 @@ export default function Validacion() {
                   <th className="th-dist">DISTRITO</th>
                   <th className="th-dir">DIRECCIÓN</th>
                   <th className="th-tel">EMAIL</th>
-                  <th className="th-cuota">CUOTA INST.</th>
-                  <th className="th-claro">CLARO HOGAR</th>
-                  <th className="th-tec">TECNOLOGÍA</th>
+                  <th className="th-claro">REGIÓN</th>
                   <th className="th-paquete">PAQUETE</th>
-                  <th className="th-full">FULL CLARO</th>
-                  <th className="th-num">DECOS</th>
+                  <th className="th-num">WINBOX</th>
                   <th className="th-num">MESH</th>
-                  <th className="th-plano">PLANO</th>
+                  <th className="th-paquete">ADICIONALES</th>
                   <th className="th-obs">OBSERVACIÓN</th>
                   <th className="th-vendedor">VENDEDOR</th>
                   <th>SALA</th>
@@ -484,7 +482,7 @@ export default function Validacion() {
               </thead>
               <tbody>
                 {paginaVentas.length === 0
-                  ? <tr className="tabla-empty"><td colSpan={23}>Sin registros.</td></tr>
+                  ? <tr className="tabla-empty"><td colSpan={20}>Sin registros.</td></tr>
                   : paginaVentas.map(v => {
                       const mostrar  = v.estadoVal
                       const eObj     = estadoObj(mostrar)
@@ -525,14 +523,11 @@ export default function Validacion() {
                           >
                             {v.correoElectronico||'—'}
                           </td>
-                          <td>{v.cuota_inst||'—'}</td>
                           <td className="td-wrap" style={{fontSize:10}}>{v.claro_hogar||'—'}</td>
-                          <td>{v.tecnologia||'—'}</td>
                           <td className="td-wrap" style={{fontSize:10}}>{v.paquete||'—'}</td>
-                          <td style={{textAlign:'center'}}>{v.full_claro||'—'}</td>
                           <td style={{textAlign:'center'}}>{v.cant_decos??'—'}</td>
                           <td style={{textAlign:'center'}}>{v.cant_mesh??'—'}</td>
-                          <td>{v.plano||'—'}</td>
+                          <td className="td-wrap" style={{fontSize:10}} title={adicionalesTexto(v.adicionales)}>{adicionalesTexto(v.adicionales)}</td>
                           <td
                             style={{fontSize:11,color:'#374151',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}
                             title={obsDisp}
