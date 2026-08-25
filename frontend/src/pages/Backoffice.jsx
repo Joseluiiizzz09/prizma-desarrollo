@@ -609,7 +609,7 @@ export default function Backoffice() {
   const distritos = (form.dpto && form.prov) ? (UBIGEO[form.dpto]?.[form.prov] || []) : []
 
   // ── Filtros base ──
-  const [filtros, setFiltros] = useState({ tipBack1:[], tipBack2:[], tipVend:[], asesor:[], campana:[], sala:[], numero:'', desde:'', hasta:'', global:false, verTipVend:true })
+  const [filtros, setFiltros] = useState({ tipBack1:[], tipBack2:[], tipVend:[], asesor:[], campana:[], sala:[], numero:'', desde:'', hasta:'', global:false, duplicados:false })
   const [tableSort, setTableSort] = useState({ col: null, dir: null })
   const [ordenDiarioActivo, setOrdenDiarioActivo] = useState(false)
   const [basePage, setBasePage] = useState(1)
@@ -2156,6 +2156,11 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
         .filter(([fecha]) => (!filtros.desde || fecha >= filtros.desde) && (!filtros.hasta || fecha <= filtros.hasta))
         .flatMap(([fecha, regs]) => (regs || []).map(r => ({ ...r, _fechaBase:fecha })))
     : registrosActivos.map(r => ({ ...r, _fechaBase:fechaActiva }))
+  const conteoDuplicadosAlcance = registrosBusquedaGlobal.reduce((conteo, reg) => {
+    const numero = normalizarNumero(reg.n1)
+    if (numero) conteo.set(numero, (conteo.get(numero) || 0) + 1)
+    return conteo
+  }, new Map())
   const gruposProtegidos = {
     sin_cobertura: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'SIN COBERTURA'),
     no_tocar: registrosBusquedaGlobal.filter(r => ['NO TOCAR','SH NO TOCAR','NO ROTAR','SH NO ROTAR'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())),
@@ -2213,7 +2218,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
     // Si abre un grupo protegido, los demás filtros también se respetan.
     const hayFiltroConsulta = Boolean(
       filtros.tipBack1.length || filtros.tipBack2.length || filtros.tipVend.length || filtros.asesor.length || filtros.campana.length || filtros.sala.length || filtros.numero ||
-      filtros.desde || filtros.hasta || filtros.global
+      filtros.desde || filtros.hasta || filtros.global || filtros.duplicados
     )
     const fuente = ordenDiarioActivo
       ? (filtros.tipVend.length ? registrosBusquedaGlobal : registrosOperativos)
@@ -2221,6 +2226,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
       ? (gruposProtegidos[grupoProtegidoVisible] || [])
       : (hayFiltroConsulta ? registrosBusquedaGlobal : registrosOperativos)
     const filtered = fuente.filter(r => {
+      if (filtros.duplicados && (conteoDuplicadosAlcance.get(normalizarNumero(r.n1)) || 0) < 2) return false
       if (filtros.tipBack1.length && !filtros.tipBack1.some(v=>v.toUpperCase()===String(r.tipifBack||'').trim().toUpperCase())) return false
       if (filtros.tipBack2.length && !filtros.tipBack2.some(v=>v.toUpperCase()===String(r.tipifBack2||'').trim().toUpperCase())) return false
       if (filtros.tipVend.length) {
@@ -2296,7 +2302,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
   const baseDesde = (basePageSafe - 1) * basePageSize
   const registrosPagina = registrosFiltrados.slice(baseDesde, baseDesde + basePageSize)
 
-  useEffect(() => { setBasePage(1) }, [fechaActiva, filtros.tipBack1, filtros.tipBack2, filtros.tipVend, filtros.asesor, filtros.campana, filtros.sala, filtros.numero, filtros.desde, filtros.hasta, filtros.global, tableSort.col, tableSort.dir, basePageSize, grupoProtegidoVisible, ordenDiarioActivo])
+  useEffect(() => { setBasePage(1) }, [fechaActiva, filtros.tipBack1, filtros.tipBack2, filtros.tipVend, filtros.asesor, filtros.campana, filtros.sala, filtros.numero, filtros.desde, filtros.hasta, filtros.global, filtros.duplicados, tableSort.col, tableSort.dir, basePageSize, grupoProtegidoVisible, ordenDiarioActivo])
 
   // VENTA CAIDA no participa del conteo del KPI, igual que ya no aparece en
   // la base operativa principal.
@@ -2663,8 +2669,8 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                 <div className="bo-input-group base-filtro-fecha"><label>Desde</label><input type="date" className="form-control" value={filtros.desde} max={filtros.hasta||undefined} onChange={e=>setFiltros(p=>({...p,desde:e.target.value,global:true}))} /></div>
                 <div className="bo-input-group base-filtro-fecha"><label>Hasta</label><input type="date" className="form-control" value={filtros.hasta} min={filtros.desde||undefined} onChange={e=>setFiltros(p=>({...p,hasta:e.target.value,global:true}))} /></div>
                 <label className="toggle-col base-filtro-toggle base-filtro-global"><input type="checkbox" checked={filtros.global} onChange={e=>setFiltros(p=>({...p,global:e.target.checked}))} /><span>Buscar global</span></label>
-                <label className="toggle-col base-filtro-toggle"><input type="checkbox" checked={filtros.verTipVend} onChange={e=>setFiltros(p=>({...p,verTipVend:e.target.checked}))} /><span>Ver tipif. vendedor</span></label>
-                <button className="bo-btn-limpiar btn btn-sm base-filtro-limpiar" onClick={()=>setFiltros({tipBack1:[],tipBack2:[],tipVend:[],asesor:[],campana:[],sala:[],numero:'',desde:'',hasta:'',global:false,verTipVend:true})}>Limpiar filtros</button>
+                <label className="toggle-col base-filtro-toggle"><input type="checkbox" checked={filtros.duplicados} onChange={e=>setFiltros(p=>({...p,duplicados:e.target.checked}))} /><span>Números duplicados</span></label>
+                <button className="bo-btn-limpiar btn btn-sm base-filtro-limpiar" onClick={()=>setFiltros({tipBack1:[],tipBack2:[],tipVend:[],asesor:[],campana:[],sala:[],numero:'',desde:'',hasta:'',global:false,duplicados:false})}>Limpiar filtros</button>
               </div>
               <button type="button"
                 className="base-orden-btn"
@@ -2674,7 +2680,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                   setTableSort({col:null,dir:null})
                   setGrupoProtegidoVisible('')
                   setBasePage(1)
-                  if (activar) setFiltros({tipBack1:[],tipBack2:[],tipVend:[],asesor:[],campana:[],sala:[],numero:'',desde:'',hasta:'',global:false,verTipVend:true})
+                  if (activar) setFiltros({tipBack1:[],tipBack2:[],tipVend:[],asesor:[],campana:[],sala:[],numero:'',desde:'',hasta:'',global:false,duplicados:false})
                 }}
                 style={{background:ordenDiarioActivo?'#16a34a':'linear-gradient(135deg,#fb923c,#ea580c)'}}>
                 {ordenDiarioActivo?'✓ Orden diario activo':'Ordenar base del día'}
