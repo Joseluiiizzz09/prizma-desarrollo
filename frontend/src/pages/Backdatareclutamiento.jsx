@@ -89,7 +89,7 @@ function AsesorBuscador({ value, asesores, disabled, onChange, title, className,
 // ── Utilities ────────────────────────────────────────────────────────────
 const COLORES_AV = ['#3b82f6','#8b5cf6','#22c55e','#f97316','#f97316','#06b6d4','#ec4899']
 const DOT_COLORS  = ['#185FA5','#0F6E56','#854F0B','#7C3AED','#ea580c']
-const BO_SECCIONES = ['base', 'reclutados', 'carga-masiva', 'rendimiento', 'avance']
+const BO_SECCIONES = ['base', 'reclutados', 'carga-masiva', 'rendimiento', 'avance', 'entrevistas', 'capacitacion']
 
 const PERU_TIME_ZONE = 'America/Lima'
 const PERU_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
@@ -155,6 +155,10 @@ const TIPIF_VEND_OPCIONES = [
   { value:'NO TOCAR',      label:'No cumple perfil' },
   { value:'FRAUDE',        label:'Provincia' },
 ]
+function labelTipifVend(valor) {
+  const texto = String(valor || '').trim().toUpperCase()
+  return TIPIF_VEND_OPCIONES.find(t => t.value === texto)?.label || valor || ''
+}
 const TIPIF_PROHIBIDAS_ROTACION = new Set(['NO TOCAR','FRAUDE'])
 const LIMA_DISTRITOS = [
   'Ancón','Ate','Barranco','Breña','Carabayllo','Cercado de Lima','Chaclacayo','Chorrillos',
@@ -192,6 +196,53 @@ function TipifVendBadge({ tipif, hora }) {
       {hora && <span style={{fontSize:9,color:'#9ca3af'}}>vendedor · {hora}</span>}
     </div>
   )
+}
+
+// Colores fuertes para el selector de Tipif. Vendedor (texto legible encima),
+// mismo patrón usado en Backoffice para estiloTipifVend().
+const TIPIF_VEND_FUERTE = {
+  'VENTA CERRADA':   ['#dcfce7','#166534','#86efac'],
+  'BUZON DE VOZ':    ['#f3e8d4','#78350f','#d6a96c'],
+  'NO TOCAR':        ['#fee2e2','#980000','#fca5a5'],
+  'CORTA LLAMADA':   ['#ffedd5','#c2410c','#fdba74'],
+  'GESTION WSP':     ['#fef9c3','#854d0e','#fde047'],
+  'NO CONTESTA':     ['#fef9c3','#854d0e','#fde047'],
+  'NO INTERESADO':   ['#ffedd5','#9a3412','#fdba74'],
+  'NO ROTAR':        ['#fee2e2','#980000','#fca5a5'],
+  'VOLVER A LLAMAR': ['#dbeafe','#1d4ed8','#93c5fd'],
+  'FRAUDE':          ['#fee2e2','#991b1b','#fca5a5'],
+}
+function estiloTipifVend(v) {
+  const paleta = TIPIF_VEND_FUERTE[v]
+  return {
+    fontSize:10, padding:'3px 6px', borderRadius:6, fontFamily:'inherit', maxWidth:155, cursor:'pointer',
+    border:`1px solid ${paleta?paleta[2]:'#e5e7eb'}`,
+    color:paleta?paleta[1]:'inherit',
+    fontWeight:paleta?800:'inherit',
+    background:paleta?paleta[0]:'#fff',
+  }
+}
+
+// Tipificación del resultado de la entrevista (colores enviados por el usuario)
+const TIPIF_ENTREVISTA_OPCIONES = ['NO CONTESTA','DESISTE','REPROGRAMA','CORTA LLAMADA','ASISTE','EN CAMINO','FALTA']
+const TIPIF_ENTREVISTA_COLORES = {
+  'NO CONTESTA':   ['#fef9c3','#854d0e','#fde047'],
+  'DESISTE':       ['#f1f5f9','#334155','#cbd5e1'],
+  'REPROGRAMA':    ['#dbeafe','#1d4ed8','#93c5fd'],
+  'CORTA LLAMADA': ['#ffedd5','#c2410c','#fdba74'],
+  'ASISTE':        ['#dcfce7','#166534','#86efac'],
+  'EN CAMINO':     ['#fef3c7','#92400e','#fcd34d'],
+  'FALTA':         ['#fee2e2','#991b1b','#fca5a5'],
+}
+function estiloTipifEntrevista(v) {
+  const paleta = TIPIF_ENTREVISTA_COLORES[v]
+  return {
+    fontSize:10, padding:'3px 6px', borderRadius:6, fontFamily:'inherit', maxWidth:145, cursor:'pointer',
+    border:`1px solid ${paleta?paleta[2]:'#e5e7eb'}`,
+    color:paleta?paleta[1]:'#9ca3af',
+    fontWeight:paleta?800:'inherit',
+    background:paleta?paleta[0]:'#fff',
+  }
 }
 
 function BlBadge({ tipif }) {
@@ -278,6 +329,14 @@ export default function Backdatareclutamiento() {
 
   // ── Modal rotación manual ──
   const [modalRotar,    setModalRotar]    = useState({ open:false, regId:null, desc:'', asesorActual:'' })
+  const [entrevistas, setEntrevistas] = useState([])
+  const [cargandoEntrevistas, setCargandoEntrevistas] = useState(false)
+  const [filtrosEntrevistas, setFiltrosEntrevistas] = useState({ turno:'', desde:'', hasta:'', busqueda:'' })
+  const [modalEntrevista, setModalEntrevista] = useState({ open:false, regId:null, nombrePostulante:'', numero:'', numeroRef:'', turno:'', fechaAgendamiento:'', observacion:'', guardando:false, error:'' })
+  const [capacitaciones, setCapacitaciones] = useState([])
+  const [cargandoCapacitaciones, setCargandoCapacitaciones] = useState(false)
+  const [filtrosCapacitacion, setFiltrosCapacitacion] = useState({ busqueda:'', desde:'', hasta:'' })
+  const [modalCapacitacion, setModalCapacitacion] = useState({ open:false, entrevistaId:null, nombrePostulante:'', numero:'', fechaInicio:'', guardando:false, error:'' })
   const [rotModalAsesor,setRotModalAsesor]= useState('')
   const [rotBusqueda,   setRotBusqueda]   = useState('')
   const [rotModalMotivo,setRotModalMotivo]= useState('')
@@ -474,6 +533,7 @@ export default function Backdatareclutamiento() {
           rotaciones: l.rotaciones || 0,
           _tipifVend: l.tipif_vend || '',
           _tipifHora: l.tipif_hora || '',
+          entrevistaTipif: l.entrevista_tipificacion || '',
           historial:  Array.isArray(l.historial) ? l.historial : [],
         }
         // Reconciliar con cambios locales recientes (evita parpadeo al valor viejo)
@@ -529,6 +589,125 @@ export default function Backdatareclutamiento() {
     }
   }, [])
 
+  const cargarEntrevistas = useCallback(async () => {
+    setCargandoEntrevistas(true)
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/entrevistas`, { headers: ncHeaders() })
+      const data = await res.json()
+      setEntrevistas(data.ok ? data.data : [])
+    } catch (e) {
+      console.error('Error cargando entrevistas:', e)
+      setEntrevistas([])
+    } finally {
+      setCargandoEntrevistas(false)
+    }
+  }, [])
+
+  const cargarCapacitaciones = useCallback(async () => {
+    setCargandoCapacitaciones(true)
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/capacitaciones`, { headers: ncHeaders() })
+      const data = await res.json()
+      setCapacitaciones(data.ok ? data.data : [])
+    } catch(e) {
+      console.error('Error cargando capacitaciones:', e)
+      setCapacitaciones([])
+    } finally {
+      setCargandoCapacitaciones(false)
+    }
+  }, [])
+
+  function actualizarEntrevistaLocal(id, cambios) {
+    setEntrevistas(prev => prev.map(en => en.id === id ? { ...en, ...cambios } : en))
+  }
+
+  async function guardarTipifEntrevista(id, valor) {
+    const anterior = entrevistas.find(en => en.id === id)?.tipificacion || ''
+    actualizarEntrevistaLocal(id, { tipificacion: valor })
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/entrevistas/${id}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ tipificacion: valor }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar la tipificación')
+      if (valor === 'ASISTE') abrirModalCapacitacion(id)
+    } catch(e) {
+      actualizarEntrevistaLocal(id, { tipificacion: anterior })
+      mostrarToast(e.message || 'No se pudo guardar la tipificación')
+    }
+  }
+
+  // ── Modal registrar capacitación (al tipificar ASISTE) ────────────────────
+  function abrirModalCapacitacion(entrevistaId) {
+    const en = entrevistas.find(e => e.id === entrevistaId)
+    if (!en) return
+    setModalCapacitacion({ open:true, entrevistaId, nombrePostulante:en.nombre_postulante||'', numero:en.numero||'', fechaInicio:'', guardando:false, error:'' })
+  }
+
+  async function guardarCapacitacion() {
+    const nombrePostulante = modalCapacitacion.nombrePostulante.trim()
+    const numero = modalCapacitacion.numero.trim()
+    const fechaInicio = modalCapacitacion.fechaInicio
+    if (!nombrePostulante) { setModalCapacitacion(p=>({...p, error:'Ingresa el nombre del postulante'})); return }
+    if (!numero) { setModalCapacitacion(p=>({...p, error:'Ingresa un número de contacto'})); return }
+    if (!fechaInicio) { setModalCapacitacion(p=>({...p, error:'Selecciona la fecha de inicio de capacitación'})); return }
+    setModalCapacitacion(p=>({...p, guardando:true, error:''}))
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/entrevistas/${modalCapacitacion.entrevistaId}/capacitacion`, { method:'POST', headers:ncHeaders(), body:JSON.stringify({
+        nombre_postulante:nombrePostulante, numero, fecha_inicio_capacitacion:fechaInicio,
+      }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo registrar la capacitación')
+      setModalCapacitacion({ open:false, entrevistaId:null, nombrePostulante:'', numero:'', fechaInicio:'', guardando:false, error:'' })
+      mostrarToast('Capacitación registrada')
+      if (seccion === 'capacitacion') cargarCapacitaciones()
+    } catch (e) {
+      setModalCapacitacion(p=>({...p, guardando:false, error:e.message || 'No se pudo registrar la capacitación'}))
+    }
+  }
+
+  function actualizarCapacitacionLocal(id, cambios) {
+    setCapacitaciones(prev => prev.map(c => c.id === id ? { ...c, ...cambios } : c))
+  }
+
+  async function guardarCampoCapacitacion(id, campo, valorAnterior, valorNuevo) {
+    if (valorNuevo === (valorAnterior||'')) return
+    if (!valorNuevo) { mostrarToast('Este campo no puede quedar vacío'); return }
+    actualizarCapacitacionLocal(id, { [campo]: valorNuevo })
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/capacitaciones/${id}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ [campo]: valorNuevo }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar')
+    } catch(e) {
+      actualizarCapacitacionLocal(id, { [campo]: valorAnterior||'' })
+      mostrarToast(e.message || 'No se pudo guardar')
+    }
+  }
+
+  async function guardarObservacionEntrevista(id, valorAnterior, valorNuevo) {
+    if (valorNuevo === (valorAnterior||'')) return
+    actualizarEntrevistaLocal(id, { observacion: valorNuevo })
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/entrevistas/${id}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ observacion: valorNuevo }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar la observación')
+    } catch(e) {
+      actualizarEntrevistaLocal(id, { observacion: valorAnterior||'' })
+      mostrarToast(e.message || 'No se pudo guardar la observación')
+    }
+  }
+
+  async function guardarFechaEntrevista(id, valorAnterior, valorNuevo) {
+    if (valorNuevo === (valorAnterior||'')) return
+    actualizarEntrevistaLocal(id, { fecha_entrevista: valorNuevo })
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/entrevistas/${id}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ fecha_entrevista: valorNuevo||null }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar la fecha de entrevista')
+    } catch(e) {
+      actualizarEntrevistaLocal(id, { fecha_entrevista: valorAnterior||'' })
+      mostrarToast(e.message || 'No se pudo guardar la fecha de entrevista')
+    }
+  }
+
   useEffect(() => {
     cargarAsesores()
     cargarLeads()
@@ -556,6 +735,8 @@ export default function Backdatareclutamiento() {
     setSeccion(id)
     if (id === 'carga-masiva') setLegacyFecha(fechaActiva)
     if (id === 'reclutados') cargarReclutados()
+    if (id === 'entrevistas') cargarEntrevistas()
+    if (id === 'capacitacion') cargarCapacitaciones()
   }
 
   // ── Date navigation ──────────────────────────────────────────────────────
@@ -696,6 +877,8 @@ export default function Backdatareclutamiento() {
         const res = await fetch(`${API}/leads-reclutamiento/${reg._backendId}/tipif`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ tipif_vend:valor }) })
         const data = await res.json().catch(() => ({}))
         if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar la tipificación')
+        if (Array.isArray(data.historial)) updateReg(id, { historial:data.historial })
+        if (valor === 'VENTA CERRADA') abrirModalEntrevista(id)
       } catch (e) {
         updateReg(id, { _tipifVend:reg._tipifVend, _tipifHora:reg._tipifHora })
         mostrarToast(e.message || 'No se pudo guardar la tipificación')
@@ -703,15 +886,34 @@ export default function Backdatareclutamiento() {
     }
   }
 
+  function abrirModalEntrevista(id) {
+    const found = findReg(id)
+    if (!found) return
+    const { reg } = found
+    setModalEntrevista({ open:true, regId:id, nombrePostulante:'', numero:reg.n1||'', numeroRef:reg.n2||'', turno:'', fechaAgendamiento:'', observacion:'', guardando:false, error:'' })
+  }
+
+  async function guardarEntrevista() {
+    const found = findReg(modalEntrevista.regId)
+    if (!found?.reg?._backendId) return
+    const nombre = modalEntrevista.nombrePostulante.trim()
+    if (!nombre || !modalEntrevista.numero.trim() || !modalEntrevista.turno || !modalEntrevista.fechaAgendamiento) { setModalEntrevista(p=>({...p,error:'Completa nombre, número, turno y fecha'})); return }
+    setModalEntrevista(p=>({...p,guardando:true,error:''}))
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/${found.reg._backendId}/entrevista`, {method:'POST',headers:ncHeaders(),body:JSON.stringify({nombre_postulante:nombre,numero:modalEntrevista.numero.trim(),numero_ref:modalEntrevista.numeroRef.trim(),turno:modalEntrevista.turno,fecha_agendamiento:modalEntrevista.fechaAgendamiento,observacion:modalEntrevista.observacion.trim()})})
+      const data = await res.json().catch(()=>({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje||'No se pudo agendar')
+      setModalEntrevista(p=>({...p,open:false,guardando:false}))
+      mostrarToast('Entrevista agendada')
+      cargarEntrevistas()
+    } catch(e) { setModalEntrevista(p=>({...p,guardando:false,error:e.message})) }
+  }
+
   // ── Modal rotación manual ─────────────────────────────────────────────────
   function abrirModalRotar(id) {
     const found = findReg(id)
     if (!found) return
     const { reg } = found
-    if (esLeadProhibido(reg)) {
-      mostrarToast(`N1 ${reg.n1} no se puede rotar: ${reg._tipifVend}`)
-      return
-    }
     setModalRotar({ open:true, regId:id, desc:`N1: ${reg.n1} — Asesor actual: ${reg.asesor||'Sin asignar'}`, asesorActual:reg.asesor })
     setRotModalAsesor('')
     setRotBusqueda('')
@@ -723,14 +925,9 @@ export default function Backdatareclutamiento() {
     const found = findReg(modalRotar.regId)
     if (!found) return
     const { reg } = found
-    if (esLeadProhibido(reg)) {
-      mostrarToast(`Rotación bloqueada: ${reg._tipifVend}`)
-      setModalRotar({ open:false, regId:null, desc:'', asesorActual:'' })
-      return
-    }
     const hora    = horaAhora()
     const motivo  = rotModalMotivo.trim() || 'Rotacion manual'
-    const newHist = [...reg.historial, { asesor:rotModalAsesor, hora, fecha:fechaHoy(), motivo }]
+    const newHist = [...reg.historial, { tipo:'ROTACION', asesor:rotModalAsesor, hora, fecha:fechaHoy(), motivo, rotadoPor:sesion?.nombre||'Usuario', tipifVendAntes:reg._tipifVend||'' }]
     updateReg(modalRotar.regId, { asesor:rotModalAsesor, horaAsig:hora, sinAsignar:false, rotaciones:reg.rotaciones+1, historial:newHist })
     try {
       if (reg._backendId) {
@@ -1146,6 +1343,8 @@ export default function Backdatareclutamiento() {
           <button className={`bo-nav${seccion==='base'?' active':''}`} onClick={()=>irSeccion('base')}><BoNavIcon tipo="base" /> <span>Base</span></button>
           <button className={`bo-nav${seccion==='reclutados'?' active':''}`} onClick={()=>irSeccion('reclutados')}><BoNavIcon tipo="avance" /> <span>Reclutados</span></button>
           <button className={`bo-nav${seccion==='carga-masiva'?' active':''}`} onClick={()=>irSeccion('carga-masiva')}><BoNavIcon tipo="carga" /> <span>Carga Masiva</span></button>
+          <button className={`bo-nav${seccion==='entrevistas'?' active':''}`} onClick={()=>irSeccion('entrevistas')}><BoNavIcon tipo="avance" /> <span>Entrevistas</span></button>
+          <button className={`bo-nav${seccion==='capacitacion'?' active':''}`} onClick={()=>irSeccion('capacitacion')}><BoNavIcon tipo="avance" /> <span>Capacitación</span></button>
         </aside>
 
         <main className="bo-main">
@@ -1365,7 +1564,7 @@ export default function Backdatareclutamiento() {
                   {registrosFiltrados.length === 0
                     ? <tr><td colSpan={filtros.verTipVend?11:10} className="bo-empty">Sin registros en {formatFecha(fechaActiva)}.</td></tr>
                     : registrosFiltrados.map((r,i) => {
-                        const esExclusiva = r._tipifVend==='NO TOCAR'||r._tipifVend==='FRAUDE'
+                        const esExclusiva = esLeadProhibido(r)
                         return [
                           <tr key={r.id} id={`fila-${r.id}`}>
                             <td style={{color:'#9ca3af',fontSize:10}}>{i+1}</td>
@@ -1427,12 +1626,23 @@ export default function Backdatareclutamiento() {
                                     const asignadoPor = h.tipo==='ROTACION'
                                       ? (h.rotadoPor || '—')
                                       : (h.reasignadoPor || h.motivo || '—')
+                                    const nombreAsesor = String(h.asesor||'').trim().toUpperCase()
+                                    const tipsAsesor = hist
+                                      .filter(t => t?.tipo==='TIPIF_VEND' && String(t.asesor||'').trim().toUpperCase()===nombreAsesor)
+                                      .sort((a,b)=>(a.ts||0)-(b.ts||0))
                                     return (
                                       <div key={ci} className="hist-item" style={{alignItems:'flex-start'}}>
                                         <div className="hist-dot" style={{background:DOT_COLORS[ci%DOT_COLORS.length],marginTop:4}} />
                                         <div style={{lineHeight:1.5}}>
                                           <div><strong>{h.asesor||'—'}</strong> <span className="hora-cell">{h.hora||'—'}</span> <span style={{color:'#9ca3af'}}>{h.fecha||''}</span></div>
-                                          <div style={{fontSize:11}}>Tipificación: <strong style={{color:'#065f46'}}>{tipif || '—'}</strong></div>
+                                          <div style={{display:'flex',flexWrap:'wrap',gap:'4px 14px',margin:'2px 0'}}>
+                                            {tipsAsesor.length ? tipsAsesor.map((t,ti)=>(
+                                              <span key={ti} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:11,whiteSpace:'nowrap'}}>
+                                                <span style={{color:'#9ca3af',fontFamily:'monospace'}}>{t.hora||'—'}{t.fecha?` · ${t.fecha}`:''}</span>
+                                                <strong style={{color:'#065f46'}}>{labelTipifVend(t.tipif)||'—'}</strong>
+                                              </span>
+                                            )) : <span style={{fontSize:11}}>Tipificación: <strong style={{color:'#065f46'}}>{labelTipifVend(tipif)||'—'}</strong></span>}
+                                          </div>
                                           <div style={{fontSize:11,color:'#6b7280'}}>Asignado por: {asignadoPor}</div>
                                         </div>
                                       </div>
@@ -1739,8 +1949,30 @@ export default function Backdatareclutamiento() {
           </section>
 
 
+          <section className={`bo-seccion${seccion==='entrevistas'?'':' hidden'}`}>
+            <div className="bo-seccion-header"><div><h2>Entrevistas</h2><p className="bo-sub">Seguimiento de postulantes agendados.</p></div><button type="button" className="reclutados-refresh" onClick={cargarEntrevistas}>↻ Actualizar</button></div>
+            <div className="filtros-grid" style={{marginBottom:14}}><div className="bo-input-group"><label>Buscar</label><input className="form-control" value={filtrosEntrevistas.busqueda} onChange={e=>setFiltrosEntrevistas(p=>({...p,busqueda:e.target.value}))} placeholder="Postulante, número o campaña…" /></div><div className="bo-input-group"><label>Turno</label><select className="form-select" value={filtrosEntrevistas.turno} onChange={e=>setFiltrosEntrevistas(p=>({...p,turno:e.target.value}))}><option value="">Todos</option><option value="TURNO 1">TURNO 1</option><option value="TURNO 2">TURNO 2</option></select></div></div>
+            <div className="base-tabla-wrap reclutados-tabla-wrap"><table className="base-tabla reclutados-tabla"><thead><tr><th>Registro</th><th>Campaña</th><th>Postulante</th><th>Número</th><th>Turno</th><th>Tipificación</th><th>Observación</th><th>Entrevista</th></tr></thead><tbody>
+              {cargandoEntrevistas ? <tr><td colSpan="8" className="reclutados-empty">Cargando…</td></tr> : entrevistas.filter(en=>{const q=filtrosEntrevistas.busqueda.toLowerCase();return (!filtrosEntrevistas.turno||en.turno===filtrosEntrevistas.turno)&&(!q||`${en.nombre_postulante} ${en.numero} ${en.campana}`.toLowerCase().includes(q))}).map(en=><tr key={en.id}><td>{formatFecha(normalizarFecha(en.created_at))}</td><td>{en.campana||'—'}</td><td>{en.nombre_postulante}</td><td>{en.numero}</td><td>{en.turno}</td><td><select value={en.tipificacion||''} onChange={e=>guardarTipifEntrevista(en.id,e.target.value)} style={estiloTipifEntrevista(en.tipificacion)}><option value="">— Pendiente —</option>{TIPIF_ENTREVISTA_OPCIONES.map(t=><option key={t} value={t}>{t}</option>)}</select></td><td><input className="form-control" defaultValue={en.observacion||''} onBlur={e=>guardarObservacionEntrevista(en.id,en.observacion||'',e.target.value.trim())}/></td><td><input type="date" className="form-control" defaultValue={String(en.fecha_entrevista||'').slice(0,10)} onBlur={e=>guardarFechaEntrevista(en.id,String(en.fecha_entrevista||'').slice(0,10),e.target.value)}/></td></tr>)}
+            </tbody></table></div>
+          </section>
+
+          <section className={`bo-seccion${seccion==='capacitacion'?'':' hidden'}`}>
+            <div className="bo-seccion-header"><div><h2>Capacitación</h2><p className="bo-sub">Postulantes que asistieron y empiezan capacitación.</p></div><button type="button" className="reclutados-refresh" onClick={cargarCapacitaciones}>↻ Actualizar</button></div>
+            <div className="base-tabla-wrap reclutados-tabla-wrap"><table className="base-tabla reclutados-tabla"><thead><tr><th>Postulante</th><th>Número</th><th>Campaña</th><th>Inicio</th><th>Estado</th><th>Observación</th></tr></thead><tbody>{cargandoCapacitaciones?<tr><td colSpan="6" className="reclutados-empty">Cargando…</td></tr>:capacitaciones.map(c=><tr key={c.id}><td>{c.nombre_postulante}</td><td>{c.numero}</td><td>{c.campana||'—'}</td><td><input type="date" className="form-control" defaultValue={String(c.fecha_inicio_capacitacion||'').slice(0,10)} onBlur={e=>guardarCampoCapacitacion(c.id,'fecha_inicio_capacitacion',String(c.fecha_inicio_capacitacion||'').slice(0,10),e.target.value)}/></td><td><input className="form-control" defaultValue={c.estado||''} onBlur={e=>guardarCampoCapacitacion(c.id,'estado',c.estado||'',e.target.value.trim())}/></td><td><input className="form-control" defaultValue={c.observacion||''} onBlur={e=>guardarCampoCapacitacion(c.id,'observacion',c.observacion||'',e.target.value.trim())}/></td></tr>)}</tbody></table></div>
+          </section>
         </main>
       </div>
+
+      {modalEntrevista.open && <div className="modal-overlay open"><div className="modal-box"><h3>Agendar entrevista</h3>
+        <div className="bo-input-group"><label>Postulante</label><input className="form-control" value={modalEntrevista.nombrePostulante} onChange={e=>setModalEntrevista(p=>({...p,nombrePostulante:e.target.value}))}/></div>
+        <div className="bo-input-group"><label>Número</label><input className="form-control" value={modalEntrevista.numero} onChange={e=>setModalEntrevista(p=>({...p,numero:e.target.value}))}/></div>
+        <div className="bo-input-group"><label>Número de referencia</label><input className="form-control" value={modalEntrevista.numeroRef} onChange={e=>setModalEntrevista(p=>({...p,numeroRef:e.target.value}))}/></div>
+        <div className="bo-input-group"><label>Turno</label><select className="form-select" value={modalEntrevista.turno} onChange={e=>setModalEntrevista(p=>({...p,turno:e.target.value}))}><option value="">Selecciona</option><option value="TURNO 1">TURNO 1</option><option value="TURNO 2">TURNO 2</option></select></div>
+        <div className="bo-input-group"><label>Fecha</label><input type="date" className="form-control" value={modalEntrevista.fechaAgendamiento} onChange={e=>setModalEntrevista(p=>({...p,fechaAgendamiento:e.target.value}))}/></div>
+        <div className="bo-input-group"><label>Observación</label><textarea className="form-control" value={modalEntrevista.observacion} onChange={e=>setModalEntrevista(p=>({...p,observacion:e.target.value}))}/></div>
+        {modalEntrevista.error&&<p style={{color:'#dc2626'}}>{modalEntrevista.error}</p>}<div className="modal-btns"><button className="btn-cancelar-modal" onClick={()=>setModalEntrevista(p=>({...p,open:false}))}>Cancelar</button><button className="btn-confirmar-modal" onClick={guardarEntrevista} disabled={modalEntrevista.guardando}>{modalEntrevista.guardando?'Guardando…':'Agendar'}</button></div>
+      </div></div>}
 
       {/* ══ MODAL ROTACIÓN MANUAL ════════════════════════════════════════════ */}
       {modalRotar.open && (
@@ -1775,6 +2007,40 @@ export default function Backdatareclutamiento() {
             <div className="modal-btns">
               <button className="btn-cancelar-modal" onClick={()=>setModalRotar(p=>({...p,open:false}))}>Cancelar</button>
               <button className="btn-confirmar-modal" onClick={confirmarRotacion} disabled={!rotModalAsesor}>Rotar ahora</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL REGISTRAR CAPACITACIÓN ═════════════════════════════════════ */}
+      {modalCapacitacion.open && (
+        <div className="modal-overlay open" onClick={e=>{ if(e.target===e.currentTarget && !modalCapacitacion.guardando) setModalCapacitacion(p=>({...p,open:false})) }}>
+          <div className="modal-box">
+            <h3>Registrar en capacitación</h3>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Nombre del postulante</label><input className="form-control" value={modalCapacitacion.nombrePostulante} onChange={e=>setModalCapacitacion(p=>({...p,nombrePostulante:e.target.value}))} placeholder="Nombre y apellidos" /></div>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Número (el del lead, o cambia por uno de referencia)</label><input className="form-control" value={modalCapacitacion.numero} onChange={e=>setModalCapacitacion(p=>({...p,numero:e.target.value}))} placeholder="Número de contacto" style={{fontFamily:'monospace'}} /></div>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Fecha de inicio de capacitación</label><input type="date" className="form-control" value={modalCapacitacion.fechaInicio} onChange={e=>setModalCapacitacion(p=>({...p,fechaInicio:e.target.value}))} /></div>
+            {modalCapacitacion.error && <p style={{color:'#dc2626',fontSize:12,margin:'0 0 10px'}}>{modalCapacitacion.error}</p>}
+            <div className="modal-btns">
+              <button className="btn-cancelar-modal" onClick={()=>setModalCapacitacion(p=>({...p,open:false}))} disabled={modalCapacitacion.guardando}>Cancelar</button>
+              <button className="btn-confirmar-modal" onClick={guardarCapacitacion} disabled={modalCapacitacion.guardando}>{modalCapacitacion.guardando?'Guardando…':'Registrar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL REGISTRAR CAPACITACIÓN ═════════════════════════════════════ */}
+      {modalCapacitacion.open && (
+        <div className="modal-overlay open" onClick={e=>{ if(e.target===e.currentTarget && !modalCapacitacion.guardando) setModalCapacitacion(p=>({...p,open:false})) }}>
+          <div className="modal-box">
+            <h3>Registrar en capacitación</h3>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Nombre del postulante</label><input className="form-control" value={modalCapacitacion.nombrePostulante} onChange={e=>setModalCapacitacion(p=>({...p,nombrePostulante:e.target.value}))} placeholder="Nombre y apellidos" /></div>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Número (el del lead, o cambia por uno de referencia)</label><input className="form-control" value={modalCapacitacion.numero} onChange={e=>setModalCapacitacion(p=>({...p,numero:e.target.value}))} placeholder="Número de contacto" style={{fontFamily:'monospace'}} /></div>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Fecha de inicio de capacitación</label><input type="date" className="form-control" value={modalCapacitacion.fechaInicio} onChange={e=>setModalCapacitacion(p=>({...p,fechaInicio:e.target.value}))} /></div>
+            {modalCapacitacion.error && <p style={{color:'#dc2626',fontSize:12,margin:'0 0 10px'}}>{modalCapacitacion.error}</p>}
+            <div className="modal-btns">
+              <button className="btn-cancelar-modal" onClick={()=>setModalCapacitacion(p=>({...p,open:false}))} disabled={modalCapacitacion.guardando}>Cancelar</button>
+              <button className="btn-confirmar-modal" onClick={guardarCapacitacion} disabled={modalCapacitacion.guardando}>{modalCapacitacion.guardando?'Guardando…':'Registrar'}</button>
             </div>
           </div>
         </div>

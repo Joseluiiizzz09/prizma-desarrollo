@@ -14,29 +14,65 @@ const ROLES_BACK = ['backreclutamiento', 'jefatura', 'usuarios'];
 const ROLES_ALL  = ['backreclutamiento', 'jefatura', 'usuarios', 'asesorreclutamiento'];
 const ROLES_ENTREVISTAS = ['entrevistas', 'backreclutamiento', 'jefatura', 'usuarios'];
 const TURNOS_ENTREVISTA = ['TURNO 1', 'TURNO 2'];
+const TIPIFICACIONES_ENTREVISTA = ['NO CONTESTA', 'DESISTE', 'REPROGRAMA', 'CORTA LLAMADA', 'ASISTE', 'EN CAMINO', 'FALTA'];
 
 let promesaTablaEntrevistas;
 function asegurarTablaEntrevistas() {
   if (!promesaTablaEntrevistas) {
-    promesaTablaEntrevistas = db.query(`
-      CREATE TABLE IF NOT EXISTS reclutamiento_entrevistas (
+    promesaTablaEntrevistas = (async () => {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS reclutamiento_entrevistas (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          lead_id INT NOT NULL,
+          nombre_postulante VARCHAR(150) NOT NULL,
+          numero VARCHAR(30) NOT NULL,
+          numero_ref VARCHAR(30) NULL,
+          turno VARCHAR(20) NOT NULL,
+          fecha_agendamiento DATE NOT NULL,
+          observacion VARCHAR(2000) NULL,
+          creado_por_id INT NULL,
+          creado_por_nombre VARCHAR(150) NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_entrevistas_lead (lead_id),
+          INDEX idx_entrevistas_fecha (fecha_agendamiento)
+        )
+      `);
+      const [columnas] = await db.query('SHOW COLUMNS FROM reclutamiento_entrevistas');
+      const existentes = new Set(columnas.map(c => c.Field));
+      if (!existentes.has('tipificacion')) {
+        await db.query(`ALTER TABLE reclutamiento_entrevistas ADD COLUMN tipificacion VARCHAR(30) NULL`);
+      }
+      // Fecha real en la que el postulante se acerca (distinta de fecha_agendamiento,
+      // que es la fecha solicitada en el formulario original).
+      if (!existentes.has('fecha_entrevista')) {
+        await db.query(`ALTER TABLE reclutamiento_entrevistas ADD COLUMN fecha_entrevista DATE NULL`);
+      }
+    })().catch(error => { promesaTablaEntrevistas = null; throw error; });
+  }
+  return promesaTablaEntrevistas;
+}
+
+// Apartado de Capacitación: se llena al tipificar una entrevista como ASISTE.
+let promesaTablaCapacitaciones;
+function asegurarTablaCapacitaciones() {
+  if (!promesaTablaCapacitaciones) {
+    promesaTablaCapacitaciones = db.query(`
+      CREATE TABLE IF NOT EXISTS reclutamiento_capacitaciones (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        lead_id INT NOT NULL,
+        entrevista_id INT NULL,
+        lead_id INT NULL,
         nombre_postulante VARCHAR(150) NOT NULL,
         numero VARCHAR(30) NOT NULL,
-        numero_ref VARCHAR(30) NULL,
-        turno VARCHAR(20) NOT NULL,
-        fecha_agendamiento DATE NOT NULL,
-        observacion VARCHAR(2000) NULL,
+        fecha_inicio_capacitacion DATE NOT NULL,
         creado_por_id INT NULL,
         creado_por_nombre VARCHAR(150) NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_entrevistas_lead (lead_id),
-        INDEX idx_entrevistas_fecha (fecha_agendamiento)
+        INDEX idx_capacitaciones_lead (lead_id),
+        INDEX idx_capacitaciones_entrevista (entrevista_id)
       )
-    `).catch(error => { promesaTablaEntrevistas = null; throw error; });
+    `).catch(error => { promesaTablaCapacitaciones = null; throw error; });
   }
-  return promesaTablaEntrevistas;
+  return promesaTablaCapacitaciones;
 }
 
 function normalizarN1(valor) {
@@ -45,6 +81,20 @@ function normalizarN1(valor) {
 
 function normalizarUsuarioWhatsapp(valor) {
   return String(valor || '').trim().replace(/^@+/, '').substring(0, 100);
+}
+
+// Deja constancia en el historial de cada tipificación (mismo patrón que
+// registrarTipifEvent en routes/leads.js), para que el historial de
+// asignaciones quede relacionado con las tipificaciones que se fueron
+// registrando mientras cada asesor tuvo el número asignado.
+function registrarTipifEvent(historial, asesor, tipif) {
+  const eventos = historial.filter(h => h?.tipo === 'TIPIF_VEND');
+  const ultimo = eventos[eventos.length - 1];
+  if (ultimo && (ultimo.asesor || '') === (asesor || '') && (ultimo.tipif || '') === (tipif || '')) {
+    return historial;
+  }
+  historial.push({ tipo:'TIPIF_VEND', asesor: asesor || '', tipif: tipif || '', ts: Date.now(), hora: horaPeruAhora(), fecha: fechaPeruHoy() });
+  return historial;
 }
 
 function fechaPeruHoy() {
@@ -75,7 +125,21 @@ router.get('/', auth(ROLES_ALL), async (req, res) => {
     const errGet = validar([errorFecha(fecha, 'fecha')]);
     if (errGet) return res.status(400).json({ ok: false, mensaje: errGet[0] });
 
-    let sql = `SELECT l.*, ub.nombre AS creado_por_nombre FROM leads_reclutamiento l LEFT JOIN usuarios ub ON ub.id = l.usuario_back_id WHERE 1=1`;
+    await asegurarTablaEntrevistas();
+    // Última tipificación de entrevista por lead — señal para permitir la
+    // rotación manual aunque el tipif_vend siga en "Acepta propuesta"
+    // (postulante que no continuó y vuelve a escribir).
+    let sql = `
+      SELECT l.*, ub.nombre AS creado_por_nombre, ent.tipificacion AS entrevista_tipificacion
+        FROM leads_reclutamiento l
+        LEFT JOIN usuarios ub ON ub.id = l.usuario_back_id
+        LEFT JOIN (
+          SELECT e1.lead_id, e1.tipificacion
+            FROM reclutamiento_entrevistas e1
+            INNER JOIN (SELECT lead_id, MAX(id) AS max_id FROM reclutamiento_entrevistas GROUP BY lead_id) u
+              ON u.lead_id = e1.lead_id AND u.max_id = e1.id
+        ) ent ON ent.lead_id = l.id
+       WHERE 1=1`;
     const params = [];
 
     if (req.user.cargo === 'asesorreclutamiento') {
@@ -216,12 +280,15 @@ router.patch('/:id/tipif', auth(ROLES_ALL), async (req, res) => {
     const { tipif_vend } = req.body;
     if (tipif_vend && String(tipif_vend).length > 200)
       return res.status(400).json({ ok: false, mensaje: 'tipif_vend no puede superar 200 caracteres' });
-    const [rows] = await db.query(`SELECT id, asesor_id FROM leads_reclutamiento WHERE id = ?`, [req.params.id]);
+    const [rows] = await db.query(`SELECT id, asesor_id, asesor_nombre, historial FROM leads_reclutamiento WHERE id = ?`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Candidato no encontrado' });
     if (req.user.cargo === 'asesorreclutamiento' && rows[0].asesor_id !== req.user.id)
       return res.status(403).json({ ok: false, mensaje: 'No puedes tipificar candidatos de otros asesores' });
-    await db.query(`UPDATE leads_reclutamiento SET tipif_vend=?, tipif_hora=? WHERE id=?`, [tipif_vend||'', horaPeruAhora(), req.params.id]);
-    res.json({ ok: true, mensaje: 'Tipificación guardada' });
+    let historial = [];
+    try { historial = JSON.parse(rows[0].historial || '[]'); } catch { historial = []; }
+    registrarTipifEvent(historial, rows[0].asesor_nombre || '', String(tipif_vend||'').trim().toUpperCase());
+    await db.query(`UPDATE leads_reclutamiento SET tipif_vend=?, tipif_hora=?, historial=? WHERE id=?`, [tipif_vend||'', horaPeruAhora(), JSON.stringify(historial), req.params.id]);
+    res.json({ ok: true, mensaje: 'Tipificación guardada', historial });
   } catch(e) {
     console.error(e);
     res.status(500).json({ ok: false, mensaje: 'Error al guardar tipificación' });
@@ -343,12 +410,15 @@ router.post('/:id/entrevista', auth(ROLES_ALL), async (req, res) => {
 router.get('/entrevistas', auth(ROLES_ENTREVISTAS), async (req, res) => {
   try {
     await asegurarTablaEntrevistas();
+    // LEFT JOIN a propósito: si el lead de origen se elimina de la Base, la
+    // entrevista ya agendada debe seguir apareciendo en este listado (solo se
+    // pierde el dato de campaña/N1/N2 del lead, no el registro de la entrevista).
     const [data] = await db.query(`
-      SELECT e.id, e.nombre_postulante, e.numero, e.numero_ref, e.turno, e.fecha_agendamiento,
-             e.observacion, e.creado_por_nombre, e.created_at,
+      SELECT e.id, e.nombre_postulante, e.numero, e.numero_ref, e.turno, e.fecha_agendamiento, e.fecha_entrevista,
+             e.observacion, e.tipificacion, e.creado_por_nombre, e.created_at,
              l.campana, l.n1 AS lead_n1, l.n2 AS lead_n2
         FROM reclutamiento_entrevistas e
-        JOIN leads_reclutamiento l ON l.id = e.lead_id
+        LEFT JOIN leads_reclutamiento l ON l.id = e.lead_id
        ORDER BY e.fecha_agendamiento DESC, e.id DESC
     `);
     res.json({ ok: true, data });
@@ -358,5 +428,108 @@ router.get('/entrevistas', auth(ROLES_ENTREVISTAS), async (req, res) => {
   }
 });
 
-module.exports = router;
+// PATCH /api/leads-reclutamiento/entrevistas/:entrevistaId — tipificar el
+// resultado de la entrevista y/o actualizar la observación.
+router.patch('/entrevistas/:entrevistaId', auth(ROLES_ENTREVISTAS), async (req, res) => {
+  try {
+    await asegurarTablaEntrevistas();
+    const { tipificacion, observacion, fecha_entrevista } = req.body;
+    const errores = validar([
+      errorEnum(tipificacion, 'tipificacion', TIPIFICACIONES_ENTREVISTA),
+      errorTexto(observacion, 'observacion', { max: 2000 }),
+      errorFecha(fecha_entrevista, 'fecha_entrevista'),
+    ]);
+    if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
+    const [rows] = await db.query(`SELECT id FROM reclutamiento_entrevistas WHERE id = ?`, [req.params.entrevistaId]);
+    if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Entrevista no encontrada' });
+    const campos = [];
+    const valores = [];
+    if (tipificacion !== undefined) { campos.push('tipificacion = ?'); valores.push(tipificacion || null); }
+    if (observacion !== undefined) { campos.push('observacion = ?'); valores.push((observacion||'').trim() || null); }
+    if (fecha_entrevista !== undefined) { campos.push('fecha_entrevista = ?'); valores.push(fecha_entrevista || null); }
+    if (!campos.length) return res.status(400).json({ ok: false, mensaje: 'Nada que actualizar' });
+    valores.push(req.params.entrevistaId);
+    await db.query(`UPDATE reclutamiento_entrevistas SET ${campos.join(', ')} WHERE id = ?`, valores);
+    res.json({ ok: true, mensaje: 'Entrevista actualizada' });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ ok: false, mensaje: 'Error al actualizar la entrevista' });
+  }
+});
 
+// POST /api/leads-reclutamiento/entrevistas/:entrevistaId/capacitacion — se
+// crea al tipificar la entrevista como ASISTE.
+router.post('/entrevistas/:entrevistaId/capacitacion', auth(ROLES_ENTREVISTAS), async (req, res) => {
+  try {
+    await asegurarTablaCapacitaciones();
+    const { nombre_postulante, numero, fecha_inicio_capacitacion } = req.body;
+    const errores = validar([
+      errorTexto(nombre_postulante, 'nombre_postulante', { requerido: true, max: 150 }),
+      errorTexto(numero, 'numero', { requerido: true, max: 30 }),
+      errorFecha(fecha_inicio_capacitacion, 'fecha_inicio_capacitacion'),
+    ]);
+    if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
+    if (!fecha_inicio_capacitacion) return res.status(400).json({ ok: false, mensaje: 'fecha_inicio_capacitacion es obligatoria' });
+    const [rows] = await db.query(`SELECT id, lead_id FROM reclutamiento_entrevistas WHERE id = ?`, [req.params.entrevistaId]);
+    if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Entrevista no encontrada' });
+    await db.query(`
+      INSERT INTO reclutamiento_capacitaciones
+        (entrevista_id, lead_id, nombre_postulante, numero, fecha_inicio_capacitacion, creado_por_id, creado_por_nombre)
+      VALUES (?,?,?,?,?,?,?)
+    `, [req.params.entrevistaId, rows[0].lead_id, nombre_postulante.trim(), numero.trim(), fecha_inicio_capacitacion,
+        req.user.id, req.user.nombre || req.user.usuario || 'Back Data']);
+    res.json({ ok: true, mensaje: 'Capacitación registrada' });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ ok: false, mensaje: 'Error al registrar la capacitación' });
+  }
+});
+
+// GET /api/leads-reclutamiento/capacitaciones — listado para el apartado de Capacitación
+router.get('/capacitaciones', auth(ROLES_ENTREVISTAS), async (req, res) => {
+  try {
+    await asegurarTablaCapacitaciones();
+    const [data] = await db.query(`
+      SELECT c.id, c.nombre_postulante, c.numero, c.fecha_inicio_capacitacion, c.creado_por_nombre, c.created_at,
+             l.campana
+        FROM reclutamiento_capacitaciones c
+        LEFT JOIN leads_reclutamiento l ON l.id = c.lead_id
+       ORDER BY c.fecha_inicio_capacitacion DESC, c.id DESC
+    `);
+    res.json({ ok: true, data });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ ok: false, mensaje: 'Error al obtener capacitaciones' });
+  }
+});
+
+// PATCH /api/leads-reclutamiento/capacitaciones/:capacitacionId — editar
+// nombre/número/fecha de inicio ya registrados.
+router.patch('/capacitaciones/:capacitacionId', auth(ROLES_ENTREVISTAS), async (req, res) => {
+  try {
+    await asegurarTablaCapacitaciones();
+    const { nombre_postulante, numero, fecha_inicio_capacitacion } = req.body;
+    const errores = validar([
+      errorTexto(nombre_postulante, 'nombre_postulante', { max: 150 }),
+      errorTexto(numero, 'numero', { max: 30 }),
+      errorFecha(fecha_inicio_capacitacion, 'fecha_inicio_capacitacion'),
+    ]);
+    if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
+    const [rows] = await db.query(`SELECT id FROM reclutamiento_capacitaciones WHERE id = ?`, [req.params.capacitacionId]);
+    if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Capacitación no encontrada' });
+    const campos = [];
+    const valores = [];
+    if (nombre_postulante !== undefined && nombre_postulante.trim()) { campos.push('nombre_postulante = ?'); valores.push(nombre_postulante.trim()); }
+    if (numero !== undefined && numero.trim()) { campos.push('numero = ?'); valores.push(numero.trim()); }
+    if (fecha_inicio_capacitacion !== undefined && fecha_inicio_capacitacion) { campos.push('fecha_inicio_capacitacion = ?'); valores.push(fecha_inicio_capacitacion); }
+    if (!campos.length) return res.status(400).json({ ok: false, mensaje: 'Nada que actualizar' });
+    valores.push(req.params.capacitacionId);
+    await db.query(`UPDATE reclutamiento_capacitaciones SET ${campos.join(', ')} WHERE id = ?`, valores);
+    res.json({ ok: true, mensaje: 'Capacitación actualizada' });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ ok: false, mensaje: 'Error al actualizar la capacitación' });
+  }
+});
+
+module.exports = router;
