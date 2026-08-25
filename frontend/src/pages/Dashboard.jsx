@@ -903,19 +903,10 @@ export default function Dashboard() {
     const reNombre = /^[a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s'\-]+$/
     if (!reNombre.test(nvForm.nombre.trim()))
       return mostrarToast('El nombre solo puede contener letras, tildes, espacios y guiones')
-    if (nvForm.padre.trim() && !reNombre.test(nvForm.padre.trim()))
-      return mostrarToast('El nombre del padre solo puede contener letras, tildes, espacios y guiones')
-    if (nvForm.madre.trim() && !reNombre.test(nvForm.madre.trim()))
-      return mostrarToast('El nombre de la madre solo puede contener letras, tildes, espacios y guiones')
-    if (nvForm.lugarNac.trim() && !reNombre.test(nvForm.lugarNac.trim()))
-      return mostrarToast('El lugar de nacimiento solo puede contener letras, tildes, espacios y guiones')
     const requeridos = [
-      ['Fecha de nacimiento', nvForm.fechaNac], ['Lugar de nacimiento', nvForm.lugarNac],
-      ['Nombre del padre', nvForm.padre], ['Nombre de la madre', nvForm.madre],
       ['Departamento', nvForm.dpto], ['Provincia', nvForm.prov], ['Distrito', nvForm.dist],
-      ['Coordenadas', nvForm.coord], ['Dirección', nvForm.dir], ['Cuota de instalación', nvForm.cuota],
-      ['Claro Hogar', nvForm.hogar], ['Tecnología', nvForm.tec], ['Paquete Real', nvForm.paquete],
-      ['Full Claro', nvForm.full], ['Plano', nvForm.plano], ['Observación', nvForm.obs],
+      ['Coordenadas', nvForm.coord], ['Dirección', nvForm.dir],
+      ['Claro Hogar', nvForm.hogar], ['Paquete Real', nvForm.paquete], ['Observación', nvForm.obs],
     ]
     const faltante = requeridos.find(([,valor]) => !String(valor || '').trim())
     if (faltante) return mostrarToast(`${faltante[0]} es obligatorio para cerrar la venta`)
@@ -1442,7 +1433,7 @@ export default function Dashboard() {
                     value={nvForm.nombre} onChange={e => nvSet('nombre', e.target.value)} />
                 </div>
               </div>
-              <div className="nv-grid nv-grid-3" style={{marginTop:'12px'}}>
+              <div className="nv-grid nv-grid-2" style={{marginTop:'12px'}}>
                 <div className="nv-field">
                   <label className="nv-label">Tipo de Documento</label>
                   <select className="nv-select" value={nvForm.tipoDoc} onChange={e => nvSet('tipoDoc', e.target.value)}>
@@ -1457,22 +1448,6 @@ export default function Dashboard() {
                   </label>
                   <input className="nv-input" placeholder="Número de documento" maxLength={{DNI:8,CE:9,RUC:11}[nvForm.tipoDoc]||15} inputMode="numeric" pattern="[0-9]*" style={{fontFamily:'monospace'}}
                     value={nvForm.dni} onChange={e => nvSet('dni', e.target.value.replace(/\D/g, ''))} />
-                </div>
-                <div className="nv-field">
-                  <label className="nv-label">Fecha de Nacimiento</label>
-                  <input className="nv-input" type="date" value={nvForm.fechaNac} onChange={e => nvSet('fechaNac', e.target.value)} />
-                </div>
-                <div className="nv-field">
-                  <label className="nv-label">Lugar de Nacimiento</label>
-                  <input className="nv-input" placeholder="Ciudad / Región" value={nvForm.lugarNac} onChange={e => nvSet('lugarNac', e.target.value)} />
-                </div>
-                <div className="nv-field">
-                  <label className="nv-label">Nombres del Padre</label>
-                  <input className="nv-input" placeholder="Nombres del padre" value={nvForm.padre} onChange={e => nvSet('padre', e.target.value)} />
-                </div>
-                <div className="nv-field">
-                  <label className="nv-label">Nombres de la Madre</label>
-                  <input className="nv-input" placeholder="Nombres de la madre" value={nvForm.madre} onChange={e => nvSet('madre', e.target.value)} />
                 </div>
               </div>
             </div>
@@ -1578,26 +1553,10 @@ export default function Dashboard() {
               <div className="nv-section-title">Datos del Servicio</div>
               <div className="nv-grid nv-grid-3">
                 <div className="nv-field">
-                  <label className="nv-label">Cuota Instalación</label>
-                  <select className="nv-select" value={nvForm.cuota} onChange={e => nvSet('cuota', e.target.value)}>
-                    <option value="">Seleccionar</option>
-                    <option>S/. 0 SOLES</option>
-                    <option>S/. 120 SOLES</option>
-                  </select>
-                </div>
-                <div className="nv-field">
                   <label className="nv-label">Claro Hogar</label>
                   <select className="nv-select" value={nvForm.hogar} onChange={e => nvOnHogar(e.target.value)}>
                     <option value="">Seleccionar</option>
                     {Object.keys(PAQUETES_POR_PLAN).map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
-                </div>
-                <div className="nv-field">
-                  <label className="nv-label">Tecnología</label>
-                  <select className="nv-select" value={nvForm.tec} onChange={e => nvSet('tec', e.target.value)}>
-                    <option value="">Seleccionar</option>
-                    <option>FTTH</option>
-                    <option>HFC</option>
                   </select>
                 </div>
                 <div className="nv-field nv-full">
@@ -1605,14 +1564,6 @@ export default function Dashboard() {
                   <select className="nv-select" value={nvForm.paquete} onChange={e => nvSet('paquete', e.target.value)}>
                     <option value="">Seleccionar</option>
                     {nvPaquetes.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div className="nv-field">
-                  <label className="nv-label">Full Claro</label>
-                  <select className="nv-select" value={nvForm.full} onChange={e => nvSet('full', e.target.value)}>
-                    <option value="">Seleccionar</option>
-                    <option>Si</option>
-                    <option>No</option>
                   </select>
                 </div>
                 <div className="nv-field">
@@ -1626,11 +1577,6 @@ export default function Dashboard() {
                   <select className="nv-select" value={nvForm.mesh} onChange={e => nvSet('mesh', e.target.value)}>
                     {[0,1,2,3,4,5].map(n => <option key={n} value={String(n)}>{n}</option>)}
                   </select>
-                </div>
-                <div className="nv-field">
-                  <label className="nv-label">Plano</label>
-                  <input className="nv-input" placeholder="Código de plano"
-                    value={nvForm.plano} onChange={e => nvSet('plano', e.target.value)} />
                 </div>
                 <div className="nv-field">
                   <label className="nv-label">Estado Venta</label>
