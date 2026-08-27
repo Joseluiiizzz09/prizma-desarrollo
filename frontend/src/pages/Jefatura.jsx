@@ -35,7 +35,7 @@ const CARGOS = [
   { id:'asesorreclutamiento', label:'Asesor de Reclutamiento', cls:'bc-asesorreclutamiento' },
 ]
 const SALAS = ['SALA 1','SALA 2']
-const CARGOS_CON_SALA = ['asesor','supervisor']
+const CARGOS_CON_SALA = ['asesor','supervisor','validacion']
 
 function usuarioRequiereSala(cargo, cargo2) {
   return CARGOS_CON_SALA.includes(cargo) || CARGOS_CON_SALA.includes(cargo2)

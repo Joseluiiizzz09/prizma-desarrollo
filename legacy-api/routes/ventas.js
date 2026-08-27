@@ -1126,9 +1126,22 @@ router.get('/calidad-rendimiento', auth(['supcalidad','jefatura']), async (req, 
 // Programación, Seguimiento, WhatsApp y Grabaciones que esta pantalla no usa.
 router.get('/validacion-listado', auth(['validacion','jefatura']), async (req, res) => {
   try {
+    const actor = await obtenerActor(db, req.user.id);
+    if (!actor || !actor.activo) {
+      return res.status(403).json({ ok: false, mensaje: 'Usuario de Validación no disponible.' });
+    }
+
+    const esJefatura = String(actor.cargo || '').toLowerCase() === 'jefatura';
+    const salaActor = salaNormalizada(actor.sala);
+    if (!esJefatura && !salaActor) {
+      return res.status(403).json({ ok: false, mensaje: 'Tu usuario de Validación no tiene una sala asignada.' });
+    }
+
     // Resolver el último estado en bloque. La subconsulta correlacionada anterior
     // recorría venta_historial una vez por cada venta y terminaba bloqueando el
     // endpoint cuando crecía el historial.
+    const filtroSala = esJefatura ? '' : `WHERE UPPER(TRIM(COALESCE(u.sala, ''))) = ?`;
+    const params = esJefatura ? [] : [salaActor];
     const [data] = await db.query(`
       SELECT v.*, COALESCE(u.nombre, v.asesor_nombre) AS asesor_nombre, u.sala,
              COALESCE(LOWER(cv.valor_nuevo), 'venta') AS estado_validacion
@@ -1145,8 +1158,9 @@ router.get('/validacion-listado', auth(['validacion','jefatura']), async (req, r
                GROUP BY venta_id
             ) ult ON ult.ultimo_id = vh.id
         ) cv ON cv.venta_id = v.id
+       ${filtroSala}
        ORDER BY v.created_at DESC
-    `);
+    `, params);
     res.json({ ok: true, data });
   } catch (e) {
     console.error('[GET /ventas/validacion-listado]', e.message || e);
@@ -1598,15 +1612,22 @@ router.patch('/:id/tipificar-validacion', auth(['validacion','jefatura']), async
   try {
     await conn.beginTransaction();
 
-    const [rows] = await conn.query(
-      `SELECT id, estado, obs_validacion FROM ventas WHERE id = ? FOR UPDATE`,
-      [ventaId]
-    );
-    if (!rows.length) {
+    const venta = await obtenerVentaConAsesor(conn, ventaId, true);
+    if (!venta) {
       await conn.rollback();
       return res.status(404).json({ ok: false, mensaje: 'Venta no encontrada.' });
     }
-    const venta = rows[0];
+
+    const actor = await obtenerActor(conn, req.user.id);
+    if (!actor || !actor.activo) {
+      await conn.rollback();
+      return res.status(403).json({ ok: false, mensaje: 'Usuario de Validación no disponible.' });
+    }
+    const esJefatura = String(actor.cargo || '').toLowerCase() === 'jefatura';
+    if (!esJefatura && !supervisorPuedeGestionar(actor, venta)) {
+      await conn.rollback();
+      return res.status(403).json({ ok: false, mensaje: 'Solo puedes validar ventas asignadas a tu sala.' });
+    }
 
     // Guardia: VENTA solo puede aplicarse desde estados propios de Validación
     if (tipificacion === 'venta') {
@@ -1661,9 +1682,6 @@ router.patch('/:id/tipificar-validacion', auth(['validacion','jefatura']), async
         [nuevoHistorialTexto, ventaId]
       );
     }
-
-    const actor = await obtenerActor(conn, req.user.id);
-    if (!actor) throw new Error('No se encontró el actor autenticado.');
 
     if (nuevoEstado) {
       await registrarHistorial(conn, ventaId, actor, {

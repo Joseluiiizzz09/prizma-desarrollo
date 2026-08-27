@@ -12,7 +12,7 @@ const { desbloquearLogin } = require('../security/loginRateLimit');
 const ROLES = ['jefatura','usuarios'];
 const CARGOS_VALIDOS = ['jefatura','usuarios','supervisor','backoffice','asesor','validacion','grabaciones','seguimiento','cobranzas','calidad','supcalidad','backreclutamiento','asesorreclutamiento','entrevistas'];
 const SALAS_VALIDAS = ['SALA 1', 'SALA 2'];
-const CARGOS_CON_SALA = ['asesor', 'supervisor'];
+const CARGOS_CON_SALA = ['asesor', 'supervisor', 'validacion'];
 
 function requiereSala(cargo, permisos = []) {
   const cargos = [cargo, ...(Array.isArray(permisos) ? permisos : [])];

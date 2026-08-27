@@ -39,7 +39,7 @@ const CARGOS = [
 ]
 
 const SALAS_VALIDAS = ['SALA 1', 'SALA 2']
-const CARGOS_CON_SALA = ['asesor', 'supervisor']
+const CARGOS_CON_SALA = ['asesor', 'supervisor', 'validacion']
 const FORM_VACIO = { nombre: '', usuario: '', pass: '', pass2: '', cargo: '', cargo2: '', sala: '', genero: 'M', activo: true }
 
 function usuarioRequiereSala(cargo, cargo2) {
