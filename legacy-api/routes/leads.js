@@ -1202,11 +1202,22 @@ router.post('/:id/rotar', auth(ROLES_BO), async (req, res) => {
     // Control optimista dentro del mismo bloqueo de fila: si otro Back Office
     // rotó este lead después de que el cliente lo seleccionó, la segunda
     // operación se rechaza en vez de volver a asignar información obsoleta.
+    // El contador que ve el frontend es el máximo entre todas las filas del
+    // mismo número+día (mismo criterio que GET /api/leads, ver
+    // resumenNumeroDia): un cliente reingresado varias veces en el día
+    // comparte un solo cupo de rotaciones. Comparar contra la columna cruda
+    // de esta sola fila podía no coincidir nunca si otra fila del mismo
+    // grupo acumuló más rotaciones, dejando la rotación bloqueada para
+    // siempre aunque se reintentara.
     const envioVersion = Object.prototype.hasOwnProperty.call(req.body, 'rotaciones_esperadas');
     const esperadoId = asesor_id_esperado == null || asesor_id_esperado === '' ? null : Number(asesor_id_esperado);
     const actualId = lead.asesor_id == null ? null : Number(lead.asesor_id);
     const esperadas = Number(rotaciones_esperadas);
-    const actuales = Number(lead.rotaciones || 0);
+    const [filasGrupoRotacion] = await conn.query(
+      `SELECT historial FROM leads WHERE n1 = ? AND fecha = ?`,
+      [lead.n1, lead.fecha]
+    );
+    const actuales = filasGrupoRotacion.reduce((max, fila) => Math.max(max, contarRotacionesHistorial(fila.historial)), 0);
     if (envioVersion && (esperadoId !== actualId || !Number.isInteger(esperadas) || esperadas !== actuales)) {
       await conn.rollback();
       return res.status(409).json({
