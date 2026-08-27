@@ -342,6 +342,7 @@ body{
 .bs-rech{background:#fff7ed;color:#c2410c;}
 .bs-tecnico{background:#f5f3ff;color:#5b21b6;}
 .bs-rechazo-mesa{background:#eef2ff;color:#4338ca;}
+.bs-desaprobado{background:#fee2e2;color:#b91c1c;}
 .bc-asesor{background:#eff6ff;color:#1e40af;}
 .bc-supervisor{background:#f5f3ff;color:#5b21b6;}
 .bc-backoffice{background:#f8fafc;color:var(--ink-2);}

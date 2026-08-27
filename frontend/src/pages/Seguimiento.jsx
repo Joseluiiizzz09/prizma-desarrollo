@@ -11,20 +11,15 @@ import { adicionalesTexto } from '../utils/ventaServicio'
 import '../styles/seguimiento.css'
 
 const ESTADOS = [
-  { id: 'grabado',   label: 'GRABADO',          cls: 'bs-grabado', fila: 'fila-grabado' },
-  { id: 'ejecucion', label: 'EN EJECUCION',    cls: 'bs-ejec',    fila: 'fila-ejec'    },
-  { id: 'instalado', label: 'INSTALADO',        cls: 'bs-inst',    fila: 'fila-inst'    },
-  { id: 'caida',     label: 'CAIDA',            cls: 'bs-caida',   fila: 'fila-caida'   },
-  { id: 'rechazo',   label: 'RECHAZO EN CAMPO', cls: 'bs-rech',    fila: 'fila-rech'    },
-  { id: 'tecnico',   label: 'TECNICOS EN CASA', cls: 'bs-tecnico', fila: 'fila-tecnico' },
-  { id: 'levantar_sot', label: 'LEVANTAR SOT', cls: 'bs-rech', fila: 'fila-rech' },
-  { id: 'tecnicos_camino', label: 'TECNICOS EN CAMINO', cls: 'bs-tecnico', fila: 'fila-tecnico' },
-  { id: 'instalado_no_validado', label: 'INSTALADO NO VALIDADO', cls: 'bs-inst', fila: 'fila-inst' },
-  { id: 'reasignacion', label: 'REASIGNACION', cls: 'bs-ejec', fila: 'fila-ejec' },
-  { id: 'derivado_planta_externa', label: 'DERIVADO A PLANTA EXTERNA', cls: 'bs-rech', fila: 'fila-rech' },
-  { id: 'servicio_activo', label: 'SERVICIO ACTIVO', cls: 'bs-inst', fila: 'fila-inst' },
-  { id: 'rechazo_programacion', label: 'RECHAZO', cls: 'bs-rech', fila: 'fila-rech' },
-  { id: 'rechazo_mesa', label: 'RECHAZO EN MESA', cls: 'bs-rechazo-mesa', fila: 'fila-rech' },
+  { id: 'caida',        label: 'CAIDA',            cls: 'bs-caida',       fila: 'fila-caida'   },
+  { id: 'rechazo',      label: 'RECHAZO EN CAMPO', cls: 'bs-rech',        fila: 'fila-rech'    },
+  { id: 'tecnico',      label: 'TECNICOS EN CASA', cls: 'bs-tecnico',     fila: 'fila-tecnico' },
+  { id: 'en_progreso',  label: 'EN PROGRESO',      cls: 'bs-ejec',        fila: 'fila-ejec'    },
+  { id: 'programada',   label: 'PROGRAMADA',       cls: 'bs-inst',        fila: 'fila-inst'    },
+  { id: 'reprogramado', label: 'REPROGRAMADO',     cls: 'bs-grabado',     fila: 'fila-grabado' },
+  { id: 'sin_ingreso',  label: 'SIN INGRESO',      cls: 'bs-noval',       fila: 'fila-noval'   },
+  { id: 'desaprobado',  label: 'DESAPROBADO',      cls: 'bs-desaprobado', fila: 'fila-caida'   },
+  { id: 'rechazo_mesa', label: 'RECHAZO EN MESA',  cls: 'bs-rechazo-mesa', fila: 'fila-rech'   },
 ]
 
 const MOTIVOS_CAIDA = ['FRAUDE','EXCESO DE ACOMETIDA','INFRAESTRUCTURA','RED SATURADA','EDIFICIO NO LIBERADO','SERVICIO ACTIVO','RECHAZO POR AUDIO']
@@ -33,24 +28,19 @@ const TRAMOS        = ['AM','PM','PM 3']
 const RESULTADOS    = ['Contactado -- conforme','Contactado -- con problema','No contesta','Buzon de voz','Numero equivocado','Solicita rellamada','SE LEVANTO','MASIVO ENVIADO','DERIVADO A GRABAR','DERIVADO A AGILIZAR','En Agenda']
 
 const ESTADO_BD_MAP = {
-  grabado: 'grabado',
-  ejecucion: 'en_ejecucion',
-  instalado: 'instalado',
-  caida:     'caida',
-  rechazo:   'rechazo_campo',
-  tecnico:   'tecnico_casa',
-  levantar_sot: 'levantar_sot',
-  tecnicos_camino: 'tecnicos_camino',
-  instalado_no_validado: 'instalado_no_validado',
-  reasignacion: 'reasignacion',
-  derivado_planta_externa: 'derivado_planta_externa',
-  servicio_activo: 'servicio_activo',
-  rechazo_programacion: 'pendiente',
+  caida:        'caida',
+  rechazo:      'rechazo_campo',
+  tecnico:      'tecnico_casa',
+  en_progreso:  'en_progreso',
+  programada:   'programada',
+  reprogramado: 'reprogramado',
+  sin_ingreso:  'sin_ingreso',
+  desaprobado:  'desaprobado',
   rechazo_mesa: 'rechazo_mesa',
 }
 
 const SEG_FILTRO_KEY = 'nc_seguimiento_filtro'
-const ORD_EST = { caida:0, rechazo:1, rechazo_mesa:1, levantar_sot:2, derivado_planta_externa:3, tecnico:4, tecnicos_camino:5, reasignacion:6, ejecucion:7, instalado_no_validado:8, servicio_activo:9, instalado:10 }
+const ORD_EST = { caida:0, rechazo:1, rechazo_mesa:1, desaprobado:2, sin_ingreso:3, reprogramado:4, tecnico:5, en_progreso:6, programada:7 }
 
 function fechaHoy() {
   const a = new Date(), u = a.getTime() + a.getTimezoneOffset() * 60000
@@ -75,23 +65,26 @@ function motivoBadgeCls(motivo) {
 
 function mapearEstado(e) {
   const est = (e || '').toLowerCase()
-  const nuevos = {
-    levantar_sot:'levantar_sot', tecnicos_camino:'tecnicos_camino',
-    instalado_no_validado:'instalado_no_validado', reasignacion:'reasignacion',
-    derivado_planta_externa:'derivado_planta_externa', servicio_activo:'servicio_activo',
-    rechazo_mesa:'rechazo_mesa',
+  // Estados vigentes (coinciden 1 a 1 con ESTADOS/ESTADO_BD_MAP).
+  const vigentes = {
+    caida:'caida', rechazo_campo:'rechazo', tecnico_casa:'tecnico',
+    en_progreso:'en_progreso', programada:'programada', reprogramado:'reprogramado',
+    sin_ingreso:'sin_ingreso', desaprobado:'desaprobado', rechazo_mesa:'rechazo_mesa',
   }
-  if (nuevos[est]) return nuevos[est]
-  if (est.includes('tecnico'))   return 'tecnico'
-  if (est.includes('rechazo'))   return 'rechazo'
-  if (est.includes('ejecucion')) return 'ejecucion'
-  const m = {
-    grabado: 'grabado', validado: 'grabado',
-    aprobado: 'ejecucion', en_ejecucion: 'ejecucion',
-    instalado: 'instalado', caida: 'caida',
-    observado: 'ejecucion', rechazo_campo: 'rechazo', tecnico_casa: 'tecnico',
+  if (vigentes[est]) return vigentes[est]
+  if (est.includes('tecnico')) return 'tecnico'
+  if (est.includes('rechazo')) return 'rechazo'
+  // Estados retirados (ya no seleccionables) — se reubican en el estado
+  // vigente más parecido solo para que registros antiguos se sigan viendo
+  // con una etiqueta razonable; no cambia el valor guardado en la venta.
+  const retirados = {
+    grabado:'en_progreso', validado:'sin_ingreso', aprobado:'en_progreso',
+    en_ejecucion:'en_progreso', observado:'en_progreso',
+    instalado:'programada', instalado_no_validado:'programada', servicio_activo:'programada',
+    levantar_sot:'reprogramado', derivado_planta_externa:'reprogramado',
+    reasignacion:'reprogramado', tecnicos_camino:'reprogramado',
   }
-  return m[est] || 'grabado'
+  return retirados[est] || 'sin_ingreso'
 }
 
 function Paginacion({ total, pagina, porPagina, onChange }) {
@@ -314,13 +307,13 @@ export default function Seguimiento() {
   }, [ventasEnRango, filtrarVenta])
 
   const kpis = useMemo(() => ({
-    total:     ventasEnRango.length,
-    grabado:   ventasEnRango.filter(v => v._estadoSeg === 'grabado').length,
-    ejecucion: ventasEnRango.filter(v => v._estadoSeg === 'ejecucion').length,
-    instalado: ventasEnRango.filter(v => v._estadoSeg === 'instalado').length,
-    rechazo:   ventasEnRango.filter(v => v._estadoSeg === 'rechazo').length,
-    caida:     ventasEnRango.filter(v => v._estadoSeg === 'caida').length,
-    tecnico:   ventasEnRango.filter(v => v._estadoSeg === 'tecnico').length,
+    total:        ventasEnRango.length,
+    caida:        ventasEnRango.filter(v => v._estadoSeg === 'caida').length,
+    rechazo:      ventasEnRango.filter(v => v._estadoSeg === 'rechazo').length,
+    tecnico:      ventasEnRango.filter(v => v._estadoSeg === 'tecnico').length,
+    en_progreso:  ventasEnRango.filter(v => v._estadoSeg === 'en_progreso').length,
+    programada:   ventasEnRango.filter(v => v._estadoSeg === 'programada').length,
+    reprogramado: ventasEnRango.filter(v => v._estadoSeg === 'reprogramado').length,
     adicionales: ESTADOS.slice(6).reduce((acc, e) => ({
       ...acc,
       [e.id]: ventasEnRango.filter(v => v._estadoSeg === e.id).length,
@@ -354,11 +347,10 @@ export default function Seguimiento() {
     const comentario = estObs.trim() || modalEstado._comentario
     const motivoAplica = estNuevo === 'caida' || estNuevo === 'rechazo'
     const body = { estado: estadoBD, obs_seguimiento: comentario, tramo_seguimiento: estTramo }
-    if (estNuevo === 'ejecucion') {
+    if (estNuevo === 'programada') {
       if (!estFechaInstalacion) { mostrarToast('Ingresa la fecha de instalación'); return }
       body.fecha_programada = estFechaInstalacion
     }
-    if (estNuevo === 'rechazo_programacion') body.estado_supgrab = 'aprobado'
     if (motivoAplica) body.motivo_seguimiento = estMotivo
     try {
       const res  = await fetch(`${API}/ventas/${modalEstado.id}`, {
@@ -373,7 +365,7 @@ export default function Seguimiento() {
     } catch (e) { console.error(e); mostrarToast('No se pudo guardar el estado'); return }
     setVentas(list => list.map(x =>
       x.id === modalEstado.id
-        ? { ...x, _estadoSeg: estNuevo, _tramo: estTramo, _comentario: comentario, fecha_programada: estNuevo === 'ejecucion' ? estFechaInstalacion : x.fecha_programada, _motivoRech: motivoAplica ? estMotivo : x._motivoRech }
+        ? { ...x, _estadoSeg: estNuevo, _tramo: estTramo, _comentario: comentario, fecha_programada: estNuevo === 'programada' ? estFechaInstalacion : x.fecha_programada, _motivoRech: motivoAplica ? estMotivo : x._motivoRech }
         : x
     ))
     setModalEstado(null)
@@ -494,13 +486,13 @@ export default function Seguimiento() {
         {/* LEYENDA */}
         <div className="leyenda">
           {[
-            { id: '',          label: 'Todos',            cnt: kpis.total,     cls: 'l-todos'   },
-            { id: 'grabado',   label: 'GRABADO',          cnt: kpis.grabado,   cls: 'l-grabado' },
-            { id: 'ejecucion', label: 'EN EJECUCIÓN',     cnt: kpis.ejecucion, cls: 'l-ejec'    },
-            { id: 'instalado', label: 'INSTALADO',        cnt: kpis.instalado, cls: 'l-inst'    },
-            { id: 'rechazo',   label: 'RECHAZO EN CAMPO', cnt: kpis.rechazo,   cls: 'l-rech'    },
-            { id: 'caida',     label: 'CAÍDA',            cnt: kpis.caida,     cls: 'l-caida'   },
-            { id: 'tecnico',   label: 'TÉCNICOS EN CASA', cnt: kpis.tecnico,   cls: 'l-tecnico' },
+            { id: '',             label: 'Todos',            cnt: kpis.total,        cls: 'l-todos'   },
+            { id: 'caida',        label: 'CAÍDA',            cnt: kpis.caida,        cls: 'l-caida'   },
+            { id: 'rechazo',      label: 'RECHAZO EN CAMPO', cnt: kpis.rechazo,      cls: 'l-rech'    },
+            { id: 'tecnico',      label: 'TÉCNICOS EN CASA', cnt: kpis.tecnico,      cls: 'l-tecnico' },
+            { id: 'en_progreso',  label: 'EN PROGRESO',      cnt: kpis.en_progreso,  cls: 'l-ejec'    },
+            { id: 'programada',   label: 'PROGRAMADA',       cnt: kpis.programada,   cls: 'l-inst'    },
+            { id: 'reprogramado', label: 'REPROGRAMADO',     cnt: kpis.reprogramado, cls: 'l-grabado' },
             ...ESTADOS.slice(6).map(e => ({ id:e.id, label:e.label, cnt:kpis.adicionales[e.id] || 0, cls:'l-ejec' })),
           ].map(item => (
             <div
@@ -728,7 +720,7 @@ export default function Seguimiento() {
                   </select>
                 </div>
               )}
-              {estNuevo === 'ejecucion' && (
+              {estNuevo === 'programada' && (
                 <div className="modal-campo" style={{ gridColumn: '1/-1' }}>
                   <label>Fecha de instalación *</label>
                   <input type="date" value={estFechaInstalacion} onChange={e => setEstFechaInstalacion(e.target.value)} />
