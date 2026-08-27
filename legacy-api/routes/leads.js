@@ -25,6 +25,17 @@ function cacheListadoSet(clave, payload) {
   cacheListados.set(clave, { payload, expira: Date.now() + CACHE_LISTADO_TTL });
 }
 
+// Cualquier escritura (rotar, reasignar, tipificar, etc.) invalida el caché
+// completo de lecturas: sin esto, tras un conflicto de rotación (409) el
+// "vuelve a seleccionarlo" seguía trayendo la misma respuesta cacheada de
+// hasta 5s atrás, así que el reintento fallaba con el mismo conflicto en bucle.
+router.use((req, res, next) => {
+  if (req.method !== 'GET') {
+    res.on('finish', () => { if (res.statusCode < 400) cacheListados.clear(); });
+  }
+  next();
+});
+
 function tipificacionProhibida(valor) {
   return TIPIF_PROHIBIDAS_ASIGNACION.has(String(valor || '').trim().toUpperCase());
 }
