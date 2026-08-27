@@ -505,6 +505,11 @@ async function initDB() {
       await conn.query(`ALTER TABLE ventas ADD COLUMN ${columna} ${definicion}`)
         .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
     }
+
+    // Tipo de vivienda del servicio (VERTICAL/HORIZONTAL), elegido junto con
+    // la región del servicio al registrar la venta.
+    await conn.query(`ALTER TABLE ventas ADD COLUMN tipo_vivienda VARCHAR(20) NULL`)
+      .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
     console.log('Indices de rendimiento verificados');
 
     // Repara ventas creadas desde la vista delegada de Jefatura/Backoffice.

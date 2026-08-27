@@ -83,7 +83,7 @@ const NV_DEFAULT = {
   nombre:'', tipoDoc:'DNI', dni:'', email:'', tel1:'', tel2:'',
   dpto:'', prov:'', dist:'', dir:'', coord:'',
   fechaNac:'', lugarNac:'', padre:'', madre:'',
-  cuota:'', hogar:'', tec:'', paquete:'',
+  cuota:'', hogar:'', tipoVivienda:'', tec:'', paquete:'',
   full:'', decos:'0', mesh:'0', plano:'', adicionales:[],
   estado:'VENTA', obs:'',
 }
@@ -915,7 +915,7 @@ export default function Dashboard() {
   }
 
   function nvOnRegion(region) {
-    setNvForm(p => ({ ...p, hogar:region, paquete:'', adicionales:[] }))
+    setNvForm(p => ({ ...p, hogar:region, tipoVivienda:'', paquete:'', adicionales:[] }))
     setNvPaquetes(PAQUETES_POR_REGION[region] || [])
   }
 
@@ -957,7 +957,8 @@ export default function Dashboard() {
     const requeridos = [
       ['Departamento', nvForm.dpto], ['Provincia', nvForm.prov], ['Distrito', nvForm.dist],
       ['Coordenadas', nvForm.coord], ['Dirección', nvForm.dir],
-      ['Región del servicio', nvForm.hogar], ['Paquete', nvForm.paquete], ['Observación', nvForm.obs],
+      ['Región del servicio', nvForm.hogar], ['Tipo de vivienda', nvForm.tipoVivienda],
+      ['Paquete', nvForm.paquete], ['Observación', nvForm.obs],
     ]
     const faltante = requeridos.find(([,valor]) => !String(valor || '').trim())
     if (faltante) return mostrarToast(`${faltante[0]} es obligatorio para cerrar la venta`)
@@ -970,7 +971,7 @@ export default function Dashboard() {
       direccion:nvForm.dir.trim(), coordenadas:nvForm.coord.trim(),
       fechaNac:nvForm.fechaNac, lugarNac:nvForm.lugarNac.trim(),
       padre:nvForm.padre.trim(), madre:nvForm.madre.trim(),
-      cuotaInstalacion:nvForm.cuota, hogar:nvForm.hogar,
+      cuotaInstalacion:nvForm.cuota, hogar:nvForm.hogar, tipoVivienda:nvForm.tipoVivienda,
       tec:nvForm.tec, paquete:nvForm.paquete,
       full:nvForm.full, cantDecos:nvForm.decos, cantMesh:nvForm.mesh,
       adicionales:nvForm.adicionales,
@@ -1600,6 +1601,14 @@ export default function Dashboard() {
                     <option value="">Seleccionar</option>
                     <option value="LIMA">Lima</option>
                     <option value="PROVINCIA">Provincia</option>
+                  </select>
+                </div>
+                <div className="nv-field">
+                  <label className="nv-label">Tipo de vivienda</label>
+                  <select className="nv-select" value={nvForm.tipoVivienda} onChange={e => nvSet('tipoVivienda', e.target.value)} disabled={!nvForm.hogar}>
+                    <option value="">{nvForm.hogar ? 'Seleccionar' : 'Primero selecciona la región'}</option>
+                    <option value="VERTICAL">Vertical</option>
+                    <option value="HORIZONTAL">Horizontal</option>
                   </select>
                 </div>
                 <div className="nv-field nv-full">

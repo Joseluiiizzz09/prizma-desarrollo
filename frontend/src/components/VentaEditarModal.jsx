@@ -39,6 +39,7 @@ export function VentaEditarModal({ venta, onClose, onSuccess }) {
     paquete:         venta?.paquete         || '',
     cuotaInstalacion:venta?.cuota_inst      || venta?.cuotaInstalacion || '',
     hogar:           venta?.claro_hogar     || venta?.hogar  || '',
+    tipoVivienda:    venta?.tipo_vivienda   || venta?.tipoVivienda || '',
     tec:             venta?.tecnologia      || venta?.tec    || '',
     full:            venta?.full_claro      || venta?.full   || '',
     plano:           venta?.plano           || '',
@@ -145,6 +146,13 @@ export function VentaEditarModal({ venta, onClose, onSuccess }) {
               <option value="">Seleccionar</option>
               <option value="LIMA">Lima</option>
               <option value="PROVINCIA">Provincia</option>
+            </select>
+          )}
+          {campo('Tipo de vivienda',
+            <select style={{ ...inputStyle }} value={form.tipoVivienda} onChange={e => set('tipoVivienda', e.target.value)}>
+              <option value="">Seleccionar</option>
+              <option value="VERTICAL">Vertical</option>
+              <option value="HORIZONTAL">Horizontal</option>
             </select>
           )}
           {campo('Winbox',

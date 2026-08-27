@@ -388,6 +388,8 @@ router.post('/', auth(['asesor','backoffice','jefatura','usuarios']), async (req
       errorTexto(v.coordenadas, 'coordenadas', { requerido: true, max: 255 }),
       errorTexto(v.hogar, 'regionServicio', { requerido: true, max: 20 }),
       errorEnum(v.hogar, 'regionServicio', ['LIMA', 'PROVINCIA']),
+      errorTexto(v.tipoVivienda, 'tipoVivienda', { requerido: true, max: 20 }),
+      errorEnum(v.tipoVivienda, 'tipoVivienda', ['VERTICAL', 'HORIZONTAL']),
       errorTexto(v.paquete, 'paquete', { requerido: true, max: 255 }),
       errorTexto(v.obs, 'observacion', { requerido: true, max: 1000 }),
       errorEnteroPositivo(v.cantDecos, 'cantWinbox', { max: 10 }),
@@ -496,17 +498,17 @@ router.post('/', auth(['asesor','backoffice','jefatura','usuarios']), async (req
         asesor_id, asesor_nombre, tipo_doc, dni, nombre, email,
         telefono1, telefono2, departamento, provincia, distrito,
         direccion, coordenadas, fecha_nac, lugar_nac, padre, madre,
-        cuota_inst, claro_hogar, tecnologia, paquete,
+        cuota_inst, claro_hogar, tipo_vivienda, tecnologia, paquete,
         full_claro, cant_decos, cant_mesh, adicionales, plano, estado, observacion,
         lead_id, lead_ciclo_id
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `, [
       asesorVentaId, nombreAsesor, v.tipoDoc||'DNI', v.dni||null, v.nombre||null, v.email||null,
       v.telefono1||null, v.telefono2||null, v.departamento||null,
       v.provincia||null, v.distrito||null, v.direccion||null,
       v.coordenadas||null, v.fechaNac||null, v.lugarNac||null,
       v.padre||null, v.madre||null,
-      v.cuotaInstalacion||null, v.hogar||null, v.tec||null,
+      v.cuotaInstalacion||null, v.hogar||null, v.tipoVivienda||null, v.tec||null,
       v.paquete||null, v.full||null,
       parseInt(v.cantDecos)||0, parseInt(v.cantMesh)||0, JSON.stringify(adicionales),
       v.plano||null, estadoFinal, v.obs||null,
@@ -1965,7 +1967,7 @@ router.patch('/:id/datos', auth(['supervisor','jefatura','seguimiento','usuarios
       nombre, tipoDoc, dni, email,
       telefono1, telefono2,
       departamento, provincia, distrito, direccion, coordenadas,
-      paquete, cuotaInstalacion, hogar, tec, full, plano,
+      paquete, cuotaInstalacion, hogar, tipoVivienda, tec, full, plano,
       fechaNac, lugarNac, padre, madre,
       cantDecos, cantMesh, adicionales,
       observacion,
@@ -1985,6 +1987,7 @@ router.patch('/:id/datos', auth(['supervisor','jefatura','seguimiento','usuarios
       errorTexto(paquete,        'paquete',        { max: 100 }),
       errorTexto(cuotaInstalacion,'cuotaInstalacion',{ max: 100}),
       errorTexto(hogar,          'hogar',          { max: 100 }),
+      tipoVivienda !== undefined && tipoVivienda !== '' ? errorEnum(tipoVivienda, 'tipoVivienda', ['VERTICAL', 'HORIZONTAL']) : null,
       errorTexto(tec,            'tec',            { max: 50  }),
       errorTexto(full,           'full',           { max: 50  }),
       errorTexto(plano,          'plano',          { max: 255 }),
@@ -2029,6 +2032,7 @@ router.patch('/:id/datos', auth(['supervisor','jefatura','seguimiento','usuarios
     agregar('paquete',     paquete);
     agregar('cuota_inst',  cuotaInstalacion);
     agregar('claro_hogar', hogar);
+    agregar('tipo_vivienda', tipoVivienda);
     agregar('tecnologia',  tec);
     agregar('full_claro',  full);
     agregar('plano',       plano);
