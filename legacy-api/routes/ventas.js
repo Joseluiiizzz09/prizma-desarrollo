@@ -33,7 +33,12 @@ router.use((req, res, next) => {
 });
 const ESTADOS_GRAB_OK    = ['pendiente','grabando','grabado','observado','revisado','corta_llamada','suplantacion','no_desea','no_contesta','buzon','buzon_voz','esperando_tercero','corregir_sec'];
 const ESTADOS_SUPGRAB_OK = ['sin_revisar','aprobado','rechazado','observado','programado','conforme','no_conforme','audio_subido'];
-const TRAMOS_SEGUIMIENTO_OK = ['AM','PM','PM 3'];
+const TRAMOS_SEGUIMIENTO_OK = ['AM','PM','PM 3','TRAMO 1','TRAMO 2','TRAMO 3'];
+const COBERTURA_OPCIONES = {
+  'INGRESADO':    ['FUTURA','IMPULSA','PROVINCIA','TELCOM'],
+  'NO INGRESADO': ['CTO','NO CALIFICA PLAN','DNI CON DEUDA','EQUIFAX','WINFORCE'],
+  'MANCHADO':     ['FUTURA','IMPULSA','PROVINCIA','TELCOM'],
+};
 const ESTADOS_VALIDOS_POST  = ['VENTA'];
 const ESTADOS_VALIDOS_PATCH = [
   'VENTA','GRABADO','APROBADO','VALIDADO','EN_EJECUCION',
@@ -1755,6 +1760,7 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
       obs_supgrab, estado_supgrab,
       estado_grab,
       obs_seguimiento, tramo_seguimiento, motivo_seguimiento,
+      cobertura_categoria, cobertura_opcion,
       // audio_path no se acepta aquí — solo se actualiza vía POST /:id/audio
     } = req.body;
 
@@ -1763,6 +1769,7 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
              obs_programacion, sot, fecha_programada, obs_validacion, obs_supgrab,
              estado_supgrab, estado_grab, audio_path, obs_seguimiento,
              tramo_seguimiento, motivo_seguimiento, seguimiento_ingresado_at,
+             cobertura_categoria, cobertura_opcion,
              EXISTS (
                SELECT 1 FROM venta_historial vh
                 WHERE vh.venta_id = ventas.id
@@ -1822,6 +1829,14 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
 
     if (tramo_seguimiento !== undefined && tramo_seguimiento !== '' && !TRAMOS_SEGUIMIENTO_OK.includes(tramo_seguimiento))
       return res.status(400).json({ ok: false, mensaje: 'tramo_seguimiento inválido' });
+
+    if (cobertura_categoria !== undefined && !Object.keys(COBERTURA_OPCIONES).includes(cobertura_categoria))
+      return res.status(400).json({ ok: false, mensaje: 'cobertura_categoria inválida' });
+    if (cobertura_opcion !== undefined) {
+      const categoriaParaOpcion = cobertura_categoria !== undefined ? cobertura_categoria : rows[0].cobertura_categoria;
+      if (!COBERTURA_OPCIONES[categoriaParaOpcion]?.includes(cobertura_opcion))
+        return res.status(400).json({ ok: false, mensaje: 'cobertura_opcion inválida para esa categoría' });
+    }
 
     const errObs = validar([
       errorTexto(obs_backoffice,   'obs_backoffice',   { max: 1000 }),
@@ -1903,6 +1918,14 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
     agregarCambio('obs_seguimiento', obs_seguimiento);
     agregarCambio('tramo_seguimiento', tramo_seguimiento);
     agregarCambio('motivo_seguimiento', motivo_seguimiento);
+    agregarCambio('cobertura_categoria', cobertura_categoria);
+    agregarCambio('cobertura_opcion', cobertura_opcion);
+    // Responsable de la cobertura: siempre server-side desde el usuario
+    // autenticado (mismo patrón que grabando_por_id/grabando_por_nombre).
+    if (cobertura_categoria !== undefined || cobertura_opcion !== undefined) {
+      campos.push('cobertura_por_id = ?'); vals.push(req.user.id);
+      campos.push('cobertura_por_nombre = ?'); vals.push(req.user.nombre || req.user.usuario || 'Grabaciones');
+    }
 
     if (estado !== undefined && String(estado).toUpperCase() === 'PROGRAMADO') {
       if (estado_supgrab === undefined) campos.push("estado_supgrab = 'programado'");

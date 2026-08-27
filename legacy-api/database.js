@@ -510,6 +510,20 @@ async function initDB() {
     // la región del servicio al registrar la venta.
     await conn.query(`ALTER TABLE ventas ADD COLUMN tipo_vivienda VARCHAR(20) NULL`)
       .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+
+    // Estado de cobertura técnica (Grabaciones): categoría (Ingresado / No
+    // ingresado / Manchado) + opción específica dentro de esa categoría, y
+    // quién la marcó — igual patrón que grabando_por_id/grabando_por_nombre.
+    const columnasCobertura = [
+      ['cobertura_categoria', 'VARCHAR(30) NULL'],
+      ['cobertura_opcion',    'VARCHAR(50) NULL'],
+      ['cobertura_por_id',    'INT NULL'],
+      ['cobertura_por_nombre','VARCHAR(150) NULL'],
+    ];
+    for (const [columna, definicion] of columnasCobertura) {
+      await conn.query(`ALTER TABLE ventas ADD COLUMN ${columna} ${definicion}`)
+        .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+    }
     console.log('Indices de rendimiento verificados');
 
     // Repara ventas creadas desde la vista delegada de Jefatura/Backoffice.

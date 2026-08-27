@@ -28,6 +28,11 @@ const ESTADOS_GRAB_BADGE = [
   ...ESTADOS_GRAB,
   { id:'observado', label:'OBSERVADO', cls:'bg-observado' },
 ]
+const COBERTURA_OPCIONES = {
+  'INGRESADO':    ['FUTURA','IMPULSA','PROVINCIA','TELCOM'],
+  'NO INGRESADO': ['CTO','NO CALIFICA PLAN','DNI CON DEUDA','EQUIFAX','WINFORCE'],
+  'MANCHADO':     ['FUTURA','IMPULSA','PROVINCIA','TELCOM'],
+}
 
 // ── Utilidades ────────────────────────────────────────────────────────────
 function fechaHoy() {
@@ -327,6 +332,27 @@ export default function Grabaciones() {
     setModalEstado({ open:false, id:null })
   }
 
+  // ── Cobertura técnica ───────────────────────────────────────────────────
+  async function guardarCobertura(id, valorCombinado) {
+    const v = ventas.find(x=>x.id===id); if (!v) return
+    if (!valorCombinado) return
+    const [categoria, opcion] = valorCombinado.split('|')
+    if (!COBERTURA_OPCIONES[categoria]?.includes(opcion)) return
+    try {
+      const res  = await fetch(`${API}/ventas/${v.id}`, {
+        method:'PATCH', headers:ncHeaders(),
+        body: JSON.stringify({ cobertura_categoria:categoria, cobertura_opcion:opcion }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) { mostrarToast('Error: ' + (data.mensaje||'no se pudo guardar')); return }
+      const responsable = sesion?.nombre || sesion?.usuario || 'Grabaciones'
+      setVentas(list => list.map(x => x.id===id
+        ? { ...x, cobertura_categoria:categoria, cobertura_opcion:opcion, cobertura_por_nombre:responsable }
+        : x
+      ))
+    } catch(e) { console.error('Error guardando cobertura:', e); mostrarToast('Error conectando al servidor') }
+  }
+
   // ── Modal Subir ───────────────────────────────────────────────────────────
   function abrirModalSubir(id) {
     const v = ventas.find(x=>x.id===id); if (!v) return
@@ -624,6 +650,7 @@ export default function Grabaciones() {
               <colgroup>
                 <col style={{width:330}} />
                 <col style={{width:150}} />
+                <col style={{width:170}} />
                 <col style={{width:120}} />
                 <col style={{width:250}} />
                 <col style={{width:120}} />
@@ -639,6 +666,7 @@ export default function Grabaciones() {
                 <tr>
                   <th style={{width:330,minWidth:330}}>ACCIONES</th>
                   <th style={{width:110}}>ESTADO GRAB.</th>
+                  <th style={{width:170}}>ESTADO</th>
                   <th style={{width:120}}>FECHA</th>
                   <th style={{width:160}}>NOMBRE Y APELLIDOS</th>
                   <th style={{width:90}}>DNI / DOC.</th>
@@ -653,7 +681,7 @@ export default function Grabaciones() {
               </thead>
               <tbody>
                 {paginaVentas.length === 0
-                  ? <tr><td colSpan={12} className="tabla-empty">{tabActiva==='hoy'?'No hay ventas validadas para hoy.':'No hay ventas pendientes.'}</td></tr>
+                  ? <tr><td colSpan={13} className="tabla-empty">{tabActiva==='hoy'?'No hay ventas validadas para hoy.':'No hay ventas pendientes.'}</td></tr>
                   : paginaVentas.map(v => {
                       const esAnterior = v._fechaGrab < hoy
                       const eg         = estadoGrab(v._estadoGrab)
@@ -670,6 +698,26 @@ export default function Grabaciones() {
                             </div>
                           </td>
                           <td><span className={`badge-grab ${eg.cls}`}>{eg.id==='grabando' && v.grabando_por_nombre ? `GRABANDO ${primerNombre(v.grabando_por_nombre).toUpperCase()}` : eg.label}</span></td>
+                          <td>
+                            <select
+                              className="select-cobertura"
+                              style={{fontSize:11,padding:'4px 6px',borderRadius:6,border:'1px solid #e5e7eb',width:'100%'}}
+                              value={v.cobertura_categoria && v.cobertura_opcion ? `${v.cobertura_categoria}|${v.cobertura_opcion}` : ''}
+                              onChange={e=>guardarCobertura(v.id, e.target.value)}
+                            >
+                              <option value="">— Sin marcar —</option>
+                              {Object.entries(COBERTURA_OPCIONES).map(([categoria, opciones]) => (
+                                <optgroup key={categoria} label={categoria}>
+                                  {opciones.map(opcion => (
+                                    <option key={opcion} value={`${categoria}|${opcion}`}>{opcion}</option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                            {v.cobertura_categoria === 'INGRESADO' && v.cobertura_por_nombre && (
+                              <div style={{fontSize:9,color:'#6b7280',marginTop:2}}>Por: {v.cobertura_por_nombre}</div>
+                            )}
+                          </td>
                           <td>
                             <span style={{color:'#185FA5',fontWeight:700,fontSize:11}}>{formatF(v.fechaIngreso)}</span>
                             {esAnterior && <span className="badge-anterior">ANTERIOR</span>}
