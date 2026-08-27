@@ -56,6 +56,15 @@ function fechaDesdeAudioPath(path) {
 }
 function estadoGrab(id) { return ESTADOS_GRAB_BADGE.find(e=>e.id===id)||ESTADOS_GRAB_BADGE[0] }
 function primerNombre(nombre) { return String(nombre || '').trim().split(/\s+/)[0] || '' }
+function mostrarAdicionales(valor) {
+  if (Array.isArray(valor)) return valor.length ? valor.join(', ') : 'Sin adicionales'
+  try {
+    const lista = JSON.parse(valor || '[]')
+    return Array.isArray(lista) && lista.length ? lista.join(', ') : 'Sin adicionales'
+  } catch {
+    return String(valor || '').trim() || 'Sin adicionales'
+  }
+}
 // Extrae la fecha (yyyy-mm-dd) de la última línea "[dd/mm/yyyy ... ] VALIDADO"
 // que Validación escribe en obs_validacion al tipificar. Esa línea es el único
 // registro real de "cuándo esta venta pasó Validación y entró a Grabaciones";
@@ -127,6 +136,16 @@ function Paginacion({ total, pagina, porPagina, onChange }) {
   )
 }
 
+function DetalleVenta({ label, valor, ancho=false }) {
+  const texto = valor === 0 ? '0' : String(valor || '').trim() || '—'
+  return (
+    <div className={`venta-detalle-campo${ancho ? ' ancho' : ''}`}>
+      <span>{label}</span>
+      <strong>{texto}</strong>
+    </div>
+  )
+}
+
 // ── Componente principal ──────────────────────────────────────────────────
 export default function Grabaciones() {
   const navigate  = useNavigate()
@@ -171,6 +190,7 @@ export default function Grabaciones() {
   // ── Modal obs ──
   const [modalObs, setModalObs] = useState({ open:false, id:null })
   const [mediaVenta, setMediaVenta] = useState(null)
+  const [ventaDetalle, setVentaDetalle] = useState(null)
   const [nuevaObs, setNuevaObs] = useState('')
 
   // ── Toast ──
@@ -298,7 +318,13 @@ export default function Grabaciones() {
       })
       const data = await res.json()
       if (!res.ok || !data.ok) { mostrarToast('Error: ' + (data.mensaje||'no se pudo guardar')); return }
-      setVentas(list => list.map(x => x.id===v.id ? { ...x, _estadoGrab:nuevoEstadoSel } : x))
+      const responsable = nuevoEstadoSel === 'grabando'
+        ? (sesion?.nombre || sesion?.usuario || 'Grabaciones')
+        : v.grabando_por_nombre
+      setVentas(list => list.map(x => x.id===v.id
+        ? { ...x, _estadoGrab:nuevoEstadoSel, grabando_por_nombre:responsable }
+        : x
+      ))
     } catch(e) { console.error('Error guardando estado:', e); mostrarToast('Error conectando al servidor'); return }
     setModalEstado({ open:false, id:null })
   }
@@ -598,7 +624,7 @@ export default function Grabaciones() {
           <div className="tabla-scroll">
             <table className="tabla grabaciones-ventas-tabla">
               <colgroup>
-                <col style={{width:230}} />
+                <col style={{width:330}} />
                 <col style={{width:150}} />
                 <col style={{width:120}} />
                 <col style={{width:250}} />
@@ -613,7 +639,7 @@ export default function Grabaciones() {
               </colgroup>
               <thead>
                 <tr>
-                  <th style={{width:230,minWidth:230}}>ACCIONES</th>
+                  <th style={{width:330,minWidth:330}}>ACCIONES</th>
                   <th style={{width:110}}>ESTADO GRAB.</th>
                   <th style={{width:120}}>FECHA</th>
                   <th style={{width:160}}>NOMBRE Y APELLIDOS</th>
@@ -642,6 +668,7 @@ export default function Grabaciones() {
                               <button className="btn-acc btn-acc-obs"    onClick={()=>abrirModalObs(v.id)}    title="Observación">Obs.</button>
                               <button className="btn-acc btn-acc-estado" onClick={()=>abrirModalEstado(v.id)} title="Cambiar estado">Estado</button>
                               <button className="btn-fotos btn-archivos" onClick={()=>setMediaVenta(v)} title="Ver fotos y documentos">Archivos</button>
+                              <button className="btn-fotos btn-venta" onClick={()=>setVentaDetalle(v)} title="Ver todos los datos de la venta">Venta</button>
                             </div>
                           </td>
                           <td><span className={`badge-grab ${eg.cls}`}>{eg.id==='grabando' && v.grabando_por_nombre ? `GRABANDO ${primerNombre(v.grabando_por_nombre).toUpperCase()}` : eg.label}</span></td>
@@ -688,6 +715,69 @@ export default function Grabaciones() {
         title={`Archivos de ${mediaVenta?.nombreApellidos || 'la venta'}`}
         subtitle={`DNI: ${mediaVenta?.dni || '—'} · Tel: ${mediaVenta?.telefonoContacto || '—'}`}
       />
+
+      {ventaDetalle && (
+        <div className="modal-bg open" onClick={e=>{ if(e.target===e.currentTarget) setVentaDetalle(null) }}>
+          <div className="modal-box venta-detalle-modal">
+            <div className="venta-detalle-encabezado">
+              <div>
+                <div className="modal-title">Datos completos de la venta</div>
+                <div className="modal-sub">Información registrada por el asesor</div>
+              </div>
+              <button className="modal-x" onClick={()=>setVentaDetalle(null)} aria-label="Cerrar">×</button>
+            </div>
+
+            <section className="venta-detalle-seccion">
+              <h4>Cliente</h4>
+              <div className="venta-detalle-grid">
+                <DetalleVenta label="Nombres y apellidos" valor={ventaDetalle.nombreApellidos} ancho />
+                <DetalleVenta label="Tipo de documento" valor={ventaDetalle.tipo_doc} />
+                <DetalleVenta label="Número de documento" valor={ventaDetalle.dni} />
+                <DetalleVenta label="Correo electrónico" valor={ventaDetalle.email} />
+                <DetalleVenta label="Teléfono de contacto" valor={ventaDetalle.telefonoContacto} />
+                <DetalleVenta label="Teléfono de referencia" valor={ventaDetalle.telefono2} />
+              </div>
+            </section>
+
+            <section className="venta-detalle-seccion">
+              <h4>Ubicación</h4>
+              <div className="venta-detalle-grid">
+                <DetalleVenta label="Departamento" valor={ventaDetalle.departamento} />
+                <DetalleVenta label="Provincia" valor={ventaDetalle.provincia} />
+                <DetalleVenta label="Distrito" valor={ventaDetalle.distrito} />
+                <DetalleVenta label="Coordenadas" valor={ventaDetalle.coordenadas} />
+                <DetalleVenta label="Dirección" valor={ventaDetalle.direccion} ancho />
+              </div>
+            </section>
+
+            <section className="venta-detalle-seccion">
+              <h4>Servicio contratado</h4>
+              <div className="venta-detalle-grid">
+                <DetalleVenta label="Región" valor={ventaDetalle.claro_hogar} />
+                <DetalleVenta label="Paquete" valor={ventaDetalle.paquete} />
+                <DetalleVenta label="Cantidad de Winbox" valor={ventaDetalle.cant_decos} />
+                <DetalleVenta label="Cantidad de Mesh" valor={ventaDetalle.cant_mesh} />
+                <DetalleVenta label="Adicionales" valor={mostrarAdicionales(ventaDetalle.adicionales)} ancho />
+              </div>
+            </section>
+
+            <section className="venta-detalle-seccion">
+              <h4>Registro comercial</h4>
+              <div className="venta-detalle-grid">
+                <DetalleVenta label="Vendedor / asesor" valor={ventaDetalle.vendedor} />
+                <DetalleVenta label="Sala" valor={ventaDetalle.sala} />
+                <DetalleVenta label="Fecha de registro" valor={formatF(ventaDetalle.fechaIngreso)} />
+                <DetalleVenta label="Estado de grabación" valor={estadoGrab(ventaDetalle._estadoGrab).label} />
+                <DetalleVenta label="Observación" valor={ventaDetalle.observacion || ventaDetalle._grabObs} ancho />
+              </div>
+            </section>
+
+            <div className="modal-btns">
+              <button className="btn-guardar" onClick={()=>setVentaDetalle(null)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ MODAL ESTADO ═════════════════════════════════════════════════════ */}
       {modalEstado.open && (
