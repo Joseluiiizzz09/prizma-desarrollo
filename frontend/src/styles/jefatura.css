@@ -1309,7 +1309,9 @@ button.export-kpi-card:hover {
   text-overflow: clip;
 }
 .flujo-tabla .tabla th:nth-child(9),  .flujo-tabla .tabla td:nth-child(9)  { width: 100px; }
-.flujo-tabla .tabla th:nth-child(10), .flujo-tabla .tabla td:nth-child(10) { width: 138px; }
+.flujo-tabla .tabla th:nth-child(10), .flujo-tabla .tabla td:nth-child(10) {
+  width: 320px; overflow: visible; text-overflow: clip;
+}
 .flujo-tabla .tabla th:nth-child(11), .flujo-tabla .tabla td:nth-child(11) {
   width: 300px; overflow: visible; text-overflow: clip;
 }
