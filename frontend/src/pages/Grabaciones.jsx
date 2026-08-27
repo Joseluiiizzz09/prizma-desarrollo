@@ -332,25 +332,28 @@ export default function Grabaciones() {
     setModalEstado({ open:false, id:null })
   }
 
-  // ── Cobertura técnica ───────────────────────────────────────────────────
-  async function guardarCobertura(id, valorCombinado) {
+  // ── Cobertura técnica (mini formulario: categoría → opción) ─────────────
+  async function guardarCobertura(id, cambios) {
     const v = ventas.find(x=>x.id===id); if (!v) return
-    if (!valorCombinado) return
-    const [categoria, opcion] = valorCombinado.split('|')
-    if (!COBERTURA_OPCIONES[categoria]?.includes(opcion)) return
     try {
       const res  = await fetch(`${API}/ventas/${v.id}`, {
         method:'PATCH', headers:ncHeaders(),
-        body: JSON.stringify({ cobertura_categoria:categoria, cobertura_opcion:opcion }),
+        body: JSON.stringify(cambios),
       })
       const data = await res.json()
       if (!res.ok || !data.ok) { mostrarToast('Error: ' + (data.mensaje||'no se pudo guardar')); return }
       const responsable = sesion?.nombre || sesion?.usuario || 'Grabaciones'
       setVentas(list => list.map(x => x.id===id
-        ? { ...x, cobertura_categoria:categoria, cobertura_opcion:opcion, cobertura_por_nombre:responsable }
+        ? { ...x, ...cambios, cobertura_por_nombre:responsable }
         : x
       ))
     } catch(e) { console.error('Error guardando cobertura:', e); mostrarToast('Error conectando al servidor') }
+  }
+  function elegirCoberturaCategoria(id, categoria) {
+    guardarCobertura(id, { cobertura_categoria:categoria, cobertura_opcion:'' })
+  }
+  function elegirCoberturaOpcion(id, opcion) {
+    guardarCobertura(id, { cobertura_opcion:opcion })
   }
 
   // ── Modal Subir ───────────────────────────────────────────────────────────
@@ -702,18 +705,27 @@ export default function Grabaciones() {
                             <select
                               className="select-cobertura"
                               style={{fontSize:11,padding:'4px 6px',borderRadius:6,border:'1px solid #e5e7eb',width:'100%'}}
-                              value={v.cobertura_categoria && v.cobertura_opcion ? `${v.cobertura_categoria}|${v.cobertura_opcion}` : ''}
-                              onChange={e=>guardarCobertura(v.id, e.target.value)}
+                              value={v.cobertura_categoria || ''}
+                              onChange={e=>elegirCoberturaCategoria(v.id, e.target.value)}
                             >
                               <option value="">— Sin marcar —</option>
-                              {Object.entries(COBERTURA_OPCIONES).map(([categoria, opciones]) => (
-                                <optgroup key={categoria} label={categoria}>
-                                  {opciones.map(opcion => (
-                                    <option key={opcion} value={`${categoria}|${opcion}`}>{opcion}</option>
-                                  ))}
-                                </optgroup>
+                              {Object.keys(COBERTURA_OPCIONES).map(categoria => (
+                                <option key={categoria} value={categoria}>{categoria}</option>
                               ))}
                             </select>
+                            {v.cobertura_categoria && (
+                              <select
+                                className="select-cobertura"
+                                style={{fontSize:11,padding:'4px 6px',borderRadius:6,border:'1px solid #e5e7eb',width:'100%',marginTop:4}}
+                                value={v.cobertura_opcion || ''}
+                                onChange={e=>elegirCoberturaOpcion(v.id, e.target.value)}
+                              >
+                                <option value="">Seleccionar opción...</option>
+                                {COBERTURA_OPCIONES[v.cobertura_categoria].map(opcion => (
+                                  <option key={opcion} value={opcion}>{opcion}</option>
+                                ))}
+                              </select>
+                            )}
                             {v.cobertura_categoria === 'INGRESADO' && v.cobertura_por_nombre && (
                               <div style={{fontSize:9,color:'#6b7280',marginTop:2}}>Por: {v.cobertura_por_nombre}</div>
                             )}

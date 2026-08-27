@@ -1830,9 +1830,9 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
     if (tramo_seguimiento !== undefined && tramo_seguimiento !== '' && !TRAMOS_SEGUIMIENTO_OK.includes(tramo_seguimiento))
       return res.status(400).json({ ok: false, mensaje: 'tramo_seguimiento inválido' });
 
-    if (cobertura_categoria !== undefined && !Object.keys(COBERTURA_OPCIONES).includes(cobertura_categoria))
+    if (cobertura_categoria !== undefined && cobertura_categoria !== '' && !Object.keys(COBERTURA_OPCIONES).includes(cobertura_categoria))
       return res.status(400).json({ ok: false, mensaje: 'cobertura_categoria inválida' });
-    if (cobertura_opcion !== undefined) {
+    if (cobertura_opcion !== undefined && cobertura_opcion !== '') {
       const categoriaParaOpcion = cobertura_categoria !== undefined ? cobertura_categoria : rows[0].cobertura_categoria;
       if (!COBERTURA_OPCIONES[categoriaParaOpcion]?.includes(cobertura_opcion))
         return res.status(400).json({ ok: false, mensaje: 'cobertura_opcion inválida para esa categoría' });
