@@ -1477,22 +1477,16 @@ export default function Jefatura() {
                       <th>Sala</th>
                       <th>Validación</th>
                       <th>Grabación</th>
-                      <th>Programación</th>
                       <th>Seguimiento</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {ventasFlujoFiltradas.length === 0 ? (
-                      <tr><td colSpan="11" className="tabla-empty">No hay ventas registradas.</td></tr>
+                      <tr><td colSpan="10" className="tabla-empty">No hay ventas registradas.</td></tr>
                     ) : ventasFlujoPagina.map((v, i) => {
                       const estado = normEstado(v.estado || v.estado_venta)
                       const estadoSeg = estadoSeguimiento(v)
-                      const pInfo = estadoProg(v.estado_prog)
-                      const pSt   = PROG_STYLES[pInfo.key] || PROG_STYLES.PENDIENTE
-                      const fpParts = (v.fecha_prog || '').split(' ')
-                      const fpStr = fpParts[0] ? formatF(fpParts[0]) + (fpParts[1] ? ' ' + fpParts[1].slice(0,5) : '') : ''
-                      const pTip = [v.obs_programacion && `Obs: ${v.obs_programacion}`, fpStr && `Fecha: ${fpStr}`].filter(Boolean).join('\n') || undefined
                       return (
                         <tr key={v.id || `${v.dni || v.documento || 'venta'}-${i}`}>
                           <td>{(paginaFlujo - 1) * porPaginaFlujo + i + 1}</td>
@@ -1503,12 +1497,6 @@ export default function Jefatura() {
                           <td>{v.sala || '—'}</td>
                           <td><span className={flujoValidada(v) ? 'flujo-ok' : 'flujo-warn'}>{estadoValidacion(v)}</span></td>
                           <td><span className={flujoGrabada(v) ? 'flujo-ok' : 'flujo-warn'}>{estadoGrabacion(v)}</span></td>
-                          <td>
-                            <div title={pTip}>
-                              <span style={{display:'inline-block',padding:'2px 8px',borderRadius:'99px',fontSize:'10px',fontWeight:700,letterSpacing:'.3px',background:pSt.bg,color:pSt.color,border:`1px solid ${pSt.border}`,whiteSpace:'nowrap'}}>{pInfo.label}</span>
-                              {v.usuario_prog && <div style={{fontSize:'10px',color:'#6b7280',marginTop:'2px',whiteSpace:'nowrap'}}>Por: {v.usuario_prog.split(' ').slice(0,2).join(' ').toLocaleUpperCase('es-PE')}</div>}
-                            </div>
-                          </td>
                           <td>{estadoSeg ? <span className="flujo-info">{flujoLabelEstado(estadoSeg)}</span> : '—'}</td>
                           <td>
                             <div className="venta-actions">
