@@ -20,6 +20,7 @@ const ESTADOS = [
   { id: 'sin_ingreso',  label: 'SIN INGRESO',      cls: 'bs-noval',       fila: 'fila-noval'   },
   { id: 'desaprobado',  label: 'DESAPROBADO',      cls: 'bs-desaprobado', fila: 'fila-caida'   },
   { id: 'rechazo_mesa', label: 'RECHAZO EN MESA',  cls: 'bs-rechazo-mesa', fila: 'fila-rech'   },
+  { id: 'ejecutada',    label: 'EJECUTADA',        cls: 'bs-ejecutada',   fila: 'fila-ejecutada' },
 ]
 
 const MOTIVOS_CAIDA = ['FRAUDE','EXCESO DE ACOMETIDA','INFRAESTRUCTURA','RED SATURADA','EDIFICIO NO LIBERADO','SERVICIO ACTIVO','RECHAZO POR AUDIO']
@@ -37,10 +38,11 @@ const ESTADO_BD_MAP = {
   sin_ingreso:  'sin_ingreso',
   desaprobado:  'desaprobado',
   rechazo_mesa: 'rechazo_mesa',
+  ejecutada:    'ejecutada',
 }
 
 const SEG_FILTRO_KEY = 'nc_seguimiento_filtro'
-const ORD_EST = { caida:0, rechazo:1, rechazo_mesa:1, desaprobado:2, sin_ingreso:3, reprogramado:4, tecnico:5, en_progreso:6, programada:7 }
+const ORD_EST = { caida:0, rechazo:1, rechazo_mesa:1, desaprobado:2, sin_ingreso:3, reprogramado:4, tecnico:5, en_progreso:6, programada:7, ejecutada:8 }
 
 function fechaHoy() {
   const a = new Date(), u = a.getTime() + a.getTimezoneOffset() * 60000
@@ -70,6 +72,7 @@ function mapearEstado(e) {
     caida:'caida', rechazo_campo:'rechazo', tecnico_casa:'tecnico',
     en_progreso:'en_progreso', programada:'programada', reprogramado:'reprogramado',
     sin_ingreso:'sin_ingreso', desaprobado:'desaprobado', rechazo_mesa:'rechazo_mesa',
+    ejecutada:'ejecutada',
   }
   if (vigentes[est]) return vigentes[est]
   if (est.includes('tecnico')) return 'tecnico'
