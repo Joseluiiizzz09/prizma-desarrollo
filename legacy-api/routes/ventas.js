@@ -1880,6 +1880,12 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
     if (estado_supgrab !== undefined && ['conforme', 'rechazado'].includes(String(estado_supgrab).toLowerCase())) {
       campos.push('seguimiento_ingresado_at = COALESCE(seguimiento_ingresado_at, NOW())');
     }
+    // Super de Grabaciones ya no opera esa cola: al marcar GRABADO, la venta
+    // entra directo a Seguimiento (mismo mecanismo que usaba la aprobación
+    // de Super de Grabaciones, sin depender de que alguien la revise).
+    if (estado_grab !== undefined && String(estado_grab).toLowerCase() === 'grabado') {
+      campos.push('seguimiento_ingresado_at = COALESCE(seguimiento_ingresado_at, NOW())');
+    }
     agregarCambio('estado_grab', estado_grab);
     agregarCambio('obs_seguimiento', obs_seguimiento);
     agregarCambio('tramo_seguimiento', tramo_seguimiento);
