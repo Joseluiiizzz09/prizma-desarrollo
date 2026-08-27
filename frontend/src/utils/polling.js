@@ -1,6 +1,8 @@
-// Las tablas son grandes: consultar cada 1-2 segundos reconstruía cientos de
-// filas durante toda la sesión aunque no hubiera cambios.
-const MIN_POLL_DELAY = 30000
+// Cada pantalla pide su propio intervalo (setVisibleInterval(fn, delay)) según
+// qué tan crítico es ver cambios casi al instante (Grabaciones/Seguimiento: 1s;
+// Jefatura: 5s; etc). MIN_POLL_DELAY es solo un piso de seguridad ante un valor
+// mal pasado, no debe pisar el intervalo real que cada pantalla solicita.
+const MIN_POLL_DELAY = 500
 const MAX_POLL_DELAY = 120000
 const INTERACTION_GRACE = 5000
 

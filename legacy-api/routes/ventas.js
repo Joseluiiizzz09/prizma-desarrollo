@@ -8,7 +8,7 @@ const fs       = require('fs');
 const { validar, errorTexto, errorEmail, errorDni, errorFecha, errorEnteroPositivo, errorId, errorEnum, TIPO_DOC_OK } = require('../middleware/validar');
 
 const ROLES_VENTAS       = ['asesor','supervisor','backoffice','validacion','grabaciones','seguimiento','jefatura','usuarios','cobranzas','calidad','supcalidad'];
-const CACHE_VENTAS_TTL = 5000;
+const CACHE_VENTAS_TTL = 2000;
 const cacheVentas = new Map();
 
 function cacheVentasGet(clave) {
@@ -21,6 +21,16 @@ function cacheVentasSet(clave, payload) {
   if (cacheVentas.size >= 200) cacheVentas.delete(cacheVentas.keys().next().value);
   cacheVentas.set(clave, { payload, expira: Date.now() + CACHE_VENTAS_TTL });
 }
+
+// Cualquier escritura (tipificar, editar, reasignar, etc.) invalida el
+// caché completo de lecturas: sin esto, otro usuario podía seguir viendo
+// la respuesta cacheada hasta CACHE_VENTAS_TTL después del cambio.
+router.use((req, res, next) => {
+  if (req.method !== 'GET') {
+    res.on('finish', () => { if (res.statusCode < 400) cacheVentas.clear(); });
+  }
+  next();
+});
 const ESTADOS_GRAB_OK    = ['pendiente','grabando','grabado','observado','revisado','corta_llamada','suplantacion','no_desea','no_contesta','buzon','buzon_voz','esperando_tercero','corregir_sec'];
 const ESTADOS_SUPGRAB_OK = ['sin_revisar','aprobado','rechazado','observado','programado','conforme','no_conforme','audio_subido'];
 const TRAMOS_SEGUIMIENTO_OK = ['AM','PM','PM 3'];
