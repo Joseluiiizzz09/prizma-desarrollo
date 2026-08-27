@@ -223,12 +223,10 @@ export default function Grabaciones() {
         setVentas(data.data
           .filter(v => {
             const e  = (v.estado||'').toLowerCase()
-            const eg = (v.estado_grab||'').toLowerCase()
-            // Ya no depende de que `estado` cambie a 'grabado' (eso pisaría
-            // Validación). Una vez Back marca GRABADO, estado_grab='grabado'
-            // saca la venta de esta cola porque pasa a Super de Grabaciones;
-            // si Super la observa (estado_grab='observado') vuelve a aparecer.
-            return e==='validado' && eg!=='grabado'
+            // Super de Grabaciones ya no opera su cola: la venta se queda
+            // visible en Grabaciones sin importar la etiqueta que se le
+            // ponga (GRABADO incluido), solo cambia el badge mostrado.
+            return e==='validado'
           })
           .map(mapVenta)
         )
