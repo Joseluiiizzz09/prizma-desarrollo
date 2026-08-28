@@ -147,6 +147,8 @@ function mapearEstado(e, sup = '', eg = '', obsValidacion = '') {
   if(s==='zona_restringida')  return 'zona_restringida'
   if(['aprobado','en_ejecucion','en ejecucion'].includes(s)) return 'en_ejecucion'
   if(s==='instalado')     return 'instalado'
+  // EJECUTADA (Seguimiento) es el equivalente vigente del antiguo INSTALADO.
+  if(s==='ejecutada')     return 'instalado'
   if(s==='caida')         return 'caida'
   if(s==='rechazo_campo') return 'rechazo_campo'
   if(s==='rechazo_mesa') return 'rechazo_mesa'

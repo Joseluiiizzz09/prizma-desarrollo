@@ -219,7 +219,7 @@ function resaltadoPorVenta(venta) {
   const estadoGrab = String(venta.estado_grab || '').trim().toUpperCase()
   const estadoSupGrab = String(venta.estado_supgrab || '').trim().toUpperCase()
   if (estado === 'CAIDA')       return { clase:'num-estado-rojo', label:'CAÍDA en Seguimiento' }
-  if (estado === 'INSTALADO')   return { clase:'num-estado-celeste', label:'INSTALADO en Seguimiento' }
+  if (estado === 'INSTALADO' || estado === 'EJECUTADA') return { clase:'num-estado-celeste', label:'INSTALADO en Seguimiento' }
   if (estado === 'EN_EJECUCION') return { clase:'num-estado-verde', label:'EN EJECUCIÓN en Seguimiento' }
   if (['VENTA','VALIDADO','GRABADO','PROGRAMADO'].includes(estado)) {
     return { clase:'num-estado-azul', label:`${estado} en el flujo de ventas` }
