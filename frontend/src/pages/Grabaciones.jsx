@@ -180,6 +180,11 @@ export default function Grabaciones() {
   const [modalEstado,    setModalEstado]    = useState({ open:false, id:null })
   const [nuevoEstadoSel, setNuevoEstadoSel] = useState('pendiente')
 
+  // ── Modal cobertura (mini formulario: categoría → opción) ──
+  const [modalCobertura,   setModalCobertura]   = useState({ open:false, id:null })
+  const [coberturaCatSel,  setCoberturaCatSel]  = useState('')
+  const [coberturaOpcSel,  setCoberturaOpcSel]  = useState('')
+
   // ── Modal subir ──
   const [modalSubir,  setModalSubir]  = useState({ open:false, id:null })
   const [archivoSel,  setArchivoSel]  = useState(null)
@@ -332,28 +337,34 @@ export default function Grabaciones() {
     setModalEstado({ open:false, id:null })
   }
 
-  // ── Cobertura técnica (mini formulario: categoría → opción) ─────────────
-  async function guardarCobertura(id, cambios) {
+  // ── Modal cobertura (mini formulario: categoría → opción) ────────────────
+  function abrirModalCobertura(id) {
     const v = ventas.find(x=>x.id===id); if (!v) return
+    setModalCobertura({ open:true, id })
+    setCoberturaCatSel(v.cobertura_categoria || '')
+    setCoberturaOpcSel(v.cobertura_opcion || '')
+  }
+  function elegirCoberturaCategoria(categoria) {
+    setCoberturaCatSel(categoria)
+    setCoberturaOpcSel('')
+  }
+  async function guardarCobertura() {
+    const v = ventas.find(x=>x.id===modalCobertura.id); if (!v) return
+    if (!coberturaCatSel || !coberturaOpcSel) { mostrarToast('Elige categoría y opción'); return }
     try {
       const res  = await fetch(`${API}/ventas/${v.id}`, {
         method:'PATCH', headers:ncHeaders(),
-        body: JSON.stringify(cambios),
+        body: JSON.stringify({ cobertura_categoria:coberturaCatSel, cobertura_opcion:coberturaOpcSel }),
       })
       const data = await res.json()
       if (!res.ok || !data.ok) { mostrarToast('Error: ' + (data.mensaje||'no se pudo guardar')); return }
       const responsable = sesion?.nombre || sesion?.usuario || 'Grabaciones'
-      setVentas(list => list.map(x => x.id===id
-        ? { ...x, ...cambios, cobertura_por_nombre:responsable }
+      setVentas(list => list.map(x => x.id===v.id
+        ? { ...x, cobertura_categoria:coberturaCatSel, cobertura_opcion:coberturaOpcSel, cobertura_por_nombre:responsable }
         : x
       ))
-    } catch(e) { console.error('Error guardando cobertura:', e); mostrarToast('Error conectando al servidor') }
-  }
-  function elegirCoberturaCategoria(id, categoria) {
-    guardarCobertura(id, { cobertura_categoria:categoria, cobertura_opcion:'' })
-  }
-  function elegirCoberturaOpcion(id, opcion) {
-    guardarCobertura(id, { cobertura_opcion:opcion })
+    } catch(e) { console.error('Error guardando cobertura:', e); mostrarToast('Error conectando al servidor'); return }
+    setModalCobertura({ open:false, id:null })
   }
 
   // ── Modal Subir ───────────────────────────────────────────────────────────
@@ -530,9 +541,10 @@ export default function Grabaciones() {
   }
 
   // ── JSX ───────────────────────────────────────────────────────────────────
-  const vAudio  = ventas.find(x=>x.id===modalAudio.id)
-  const vSubir  = ventas.find(x=>x.id===modalSubir.id)
-  const vEstado = ventas.find(x=>x.id===modalEstado.id)
+  const vAudio     = ventas.find(x=>x.id===modalAudio.id)
+  const vSubir     = ventas.find(x=>x.id===modalSubir.id)
+  const vEstado    = ventas.find(x=>x.id===modalEstado.id)
+  const vCobertura = ventas.find(x=>x.id===modalCobertura.id)
   const vObs    = ventas.find(x=>x.id===modalObs.id)
 
   return (
@@ -651,9 +663,10 @@ export default function Grabaciones() {
           <div className="tabla-scroll">
             <table className="tabla grabaciones-ventas-tabla">
               <colgroup>
-                <col style={{width:330}} />
+                <col style={{width:400}} />
                 <col style={{width:150}} />
-                <col style={{width:170}} />
+                <col style={{width:130}} />
+                <col style={{width:150}} />
                 <col style={{width:120}} />
                 <col style={{width:250}} />
                 <col style={{width:120}} />
@@ -667,9 +680,10 @@ export default function Grabaciones() {
               </colgroup>
               <thead>
                 <tr>
-                  <th style={{width:330,minWidth:330}}>ACCIONES</th>
+                  <th style={{width:400,minWidth:400}}>ACCIONES</th>
                   <th style={{width:110}}>ESTADO GRAB.</th>
-                  <th style={{width:170}}>ESTADO</th>
+                  <th style={{width:130}}>USUARIO</th>
+                  <th style={{width:150}}>ESTADO</th>
                   <th style={{width:120}}>FECHA</th>
                   <th style={{width:160}}>NOMBRE Y APELLIDOS</th>
                   <th style={{width:90}}>DNI / DOC.</th>
@@ -684,7 +698,7 @@ export default function Grabaciones() {
               </thead>
               <tbody>
                 {paginaVentas.length === 0
-                  ? <tr><td colSpan={13} className="tabla-empty">{tabActiva==='hoy'?'No hay ventas validadas para hoy.':'No hay ventas pendientes.'}</td></tr>
+                  ? <tr><td colSpan={14} className="tabla-empty">{tabActiva==='hoy'?'No hay ventas validadas para hoy.':'No hay ventas pendientes.'}</td></tr>
                   : paginaVentas.map(v => {
                       const esAnterior = v._fechaGrab < hoy
                       const eg         = estadoGrab(v._estadoGrab)
@@ -696,36 +710,17 @@ export default function Grabaciones() {
 
                               <button className="btn-acc btn-acc-obs"    onClick={()=>abrirModalObs(v.id)}    title="Observación">Obs.</button>
                               <button className="btn-acc btn-acc-estado" onClick={()=>abrirModalEstado(v.id)} title="Cambiar estado">Estado</button>
+                              <button className="btn-acc btn-acc-estado" onClick={()=>abrirModalCobertura(v.id)} title="Cobertura técnica">Cobertura</button>
                               <button className="btn-fotos btn-archivos" onClick={()=>setMediaVenta(v)} title="Ver fotos y documentos">Archivos</button>
                               <button className="btn-fotos btn-venta" onClick={()=>setVentaDetalle(v)} title="Ver todos los datos de la venta">Venta</button>
                             </div>
                           </td>
                           <td><span className={`badge-grab ${eg.cls}`}>{eg.id==='grabando' && v.grabando_por_nombre ? `GRABANDO ${primerNombre(v.grabando_por_nombre).toUpperCase()}` : eg.label}</span></td>
+                          <td style={{fontSize:11,fontWeight:600,color:'#374151'}}>{v.grabando_por_nombre||'—'}</td>
                           <td>
-                            <select
-                              className="select-cobertura"
-                              style={{fontSize:11,padding:'4px 6px',borderRadius:6,border:'1px solid #e5e7eb',width:'100%'}}
-                              value={v.cobertura_categoria || ''}
-                              onChange={e=>elegirCoberturaCategoria(v.id, e.target.value)}
-                            >
-                              <option value="">— Sin marcar —</option>
-                              {Object.keys(COBERTURA_OPCIONES).map(categoria => (
-                                <option key={categoria} value={categoria}>{categoria}</option>
-                              ))}
-                            </select>
-                            {v.cobertura_categoria && (
-                              <select
-                                className="select-cobertura"
-                                style={{fontSize:11,padding:'4px 6px',borderRadius:6,border:'1px solid #e5e7eb',width:'100%',marginTop:4}}
-                                value={v.cobertura_opcion || ''}
-                                onChange={e=>elegirCoberturaOpcion(v.id, e.target.value)}
-                              >
-                                <option value="">Seleccionar opción...</option>
-                                {COBERTURA_OPCIONES[v.cobertura_categoria].map(opcion => (
-                                  <option key={opcion} value={opcion}>{opcion}</option>
-                                ))}
-                              </select>
-                            )}
+                            {v.cobertura_categoria && v.cobertura_opcion
+                              ? <span className="badge-grab bg-grabado">{v.cobertura_categoria} · {v.cobertura_opcion}</span>
+                              : <span style={{fontSize:11,color:'#9ca3af'}}>— Sin marcar —</span>}
                             {v.cobertura_categoria === 'INGRESADO' && v.cobertura_por_nombre && (
                               <div style={{fontSize:9,color:'#6b7280',marginTop:2}}>Por: {v.cobertura_por_nombre}</div>
                             )}
@@ -852,6 +847,40 @@ export default function Grabaciones() {
             <div className="modal-btns">
               <button className="btn-cancelar-m" onClick={()=>setModalEstado({open:false,id:null})}>Cancelar</button>
               <button className="btn-guardar"    onClick={guardarEstado}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL COBERTURA (mini formulario: categoría → opción) ═══════════ */}
+      {modalCobertura.open && (
+        <div className="modal-bg open" onClick={e=>{ if(e.target===e.currentTarget) setModalCobertura({open:false,id:null}) }}>
+          <div className="modal-box" style={{maxWidth:360}}>
+            <div className="modal-title">Cobertura técnica</div>
+            <div className="modal-sub">Cliente: <strong>{vCobertura?.nombreApellidos||'—'}</strong></div>
+            <div className="modal-campo">
+              <label>Categoría</label>
+              <select value={coberturaCatSel} onChange={e=>elegirCoberturaCategoria(e.target.value)}>
+                <option value="">— Sin marcar —</option>
+                {Object.keys(COBERTURA_OPCIONES).map(categoria => (
+                  <option key={categoria} value={categoria}>{categoria}</option>
+                ))}
+              </select>
+            </div>
+            {coberturaCatSel && (
+              <div className="modal-campo">
+                <label>Opción</label>
+                <select value={coberturaOpcSel} onChange={e=>setCoberturaOpcSel(e.target.value)}>
+                  <option value="">Seleccionar opción...</option>
+                  {COBERTURA_OPCIONES[coberturaCatSel].map(opcion => (
+                    <option key={opcion} value={opcion}>{opcion}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="modal-btns">
+              <button className="btn-cancelar-m" onClick={()=>setModalCobertura({open:false,id:null})}>Cancelar</button>
+              <button className="btn-guardar"    onClick={guardarCobertura}>Guardar</button>
             </div>
           </div>
         </div>

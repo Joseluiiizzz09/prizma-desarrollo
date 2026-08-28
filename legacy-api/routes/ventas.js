@@ -1950,7 +1950,9 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
       String(estado_supgrab).toLowerCase() === 'observado' ||
       (String(estado_supgrab).toLowerCase() === 'no_conforme' && String(rows[0].estado || '').toUpperCase() === 'PROGRAMADO')
     );
-    if (estado_grab !== undefined && String(estado_grab).toLowerCase() === 'grabando' && !esDevolucionSuper) {
+    // También se registra al marcar GRABADO directamente (sin pasar antes por
+    // GRABANDO), para que la columna de usuario siempre sepa quién grabó.
+    if (estado_grab !== undefined && ['grabando','grabado'].includes(String(estado_grab).toLowerCase()) && !esDevolucionSuper) {
       campos.push('grabando_por_id = ?'); vals.push(req.user.id);
       campos.push('grabando_por_nombre = ?'); vals.push(req.user.nombre || req.user.usuario || 'Grabaciones');
     }

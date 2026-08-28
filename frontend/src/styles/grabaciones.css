@@ -801,8 +801,8 @@ body{
 /* Posición de columnas de Ventas validadas: acciones en una sola fila,
    seguidas por estado, fecha y datos, como en la referencia. */
 .grabaciones-ventas-tabla {
-  width: 1900px !important;
-  min-width: 1900px !important;
+  width: 2080px !important;
+  min-width: 2080px !important;
   table-layout: fixed !important;
 }
 
@@ -814,9 +814,9 @@ body{
 
 .grabaciones-ventas-tabla th:first-child,
 .grabaciones-ventas-tabla td:first-child {
-  width: 330px !important;
-  min-width: 330px !important;
-  max-width: 330px !important;
+  width: 400px !important;
+  min-width: 400px !important;
+  max-width: 400px !important;
   overflow: visible !important;
   white-space: nowrap !important;
 }
