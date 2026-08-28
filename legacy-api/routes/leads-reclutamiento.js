@@ -180,6 +180,7 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
         errorTexto(l.n1, 'n1', { max: 30 }),
         errorTexto(usuarioWhatsapp, 'usuario_whatsapp', { max: 100 }),
         errorTexto(l.tipif_back, 'tipif_back', { max: 100 }),
+        errorTexto(l.tipif_vend, 'tipif_vend', { max: 100 }),
         errorTexto(l.obs_asesor, 'obs_asesor', { max: 2000 }),
       ]);
       if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
@@ -214,15 +215,23 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
             ? JSON.stringify([{ asesor: asesorNombre, hora: horaFinal, fecha: fechaHoy, motivo: 'Asignacion inicial' }])
             : '[]');
 
+      // tipif_vend/tipif_hora: solo se aceptan aquí en el alta cuando vienen
+      // explícitos (importación Legacy con la tipificación ya conocida del
+      // sistema anterior) — el alta normal desde el formulario deja esto
+      // vacío y el asesor lo completa después vía PATCH /:id/tipif.
+      const tipifVendInicial = String(l.tipif_vend || '').trim().toUpperCase();
+      const tipifHoraInicial = tipifVendInicial ? (l.tipif_hora || horaFinal || horaAhora) : '';
+
       const [result] = await db.query(`
         INSERT INTO leads_reclutamiento
           (campana, departamento, provincia, distrito, n1, n2, usuario_whatsapp, tipif_back, obs_asesor, asesor_id, asesor_nombre,
-           fecha, hora_asig, sin_asignar, historial, usuario_back_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           fecha, hora_asig, sin_asignar, historial, usuario_back_id, tipif_vend, tipif_hora)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `, [
         l.campana||'', l.departamento||'', l.provincia||'', l.distrito||'', l.n1||null, l.n2||null, usuarioWhatsapp||null,
         l.tipif_back||null, l.obs_asesor||null,
         asesorId, asesorNombre, fechaLead, horaFinal, asesorId?0:1, historial, req.user.id,
+        tipifVendInicial, tipifHoraInicial,
       ]);
       ids.push(result.insertId);
       creados++;
