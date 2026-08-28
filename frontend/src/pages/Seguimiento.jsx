@@ -216,7 +216,7 @@ export default function Seguimiento() {
     if (cargandoVentasRef.current) return  // evita polls solapados (respuestas fuera de orden que causan parpadeo)
     cargandoVentasRef.current = true
     try {
-      const res  = await fetch(`${API}/ventas`, { headers: ncHeaders() })
+      const res  = await fetch(`${API}/ventas?area=seguimiento`, { headers: ncHeaders() })
       const data = await res.json()
       if (data.ok && responseChanged(firmaVentasRef, data.data)) {
         setVentas(data.data
@@ -356,7 +356,7 @@ export default function Seguimiento() {
     }
     if (motivoAplica) body.motivo_seguimiento = estMotivo
     try {
-      const res  = await fetch(`${API}/ventas/${modalEstado.id}`, {
+      const res  = await fetch(`${API}/ventas/${modalEstado.id}?area=seguimiento`, {
         method: 'PATCH', headers: ncHeaders(),
         body: JSON.stringify(body),
       })
@@ -415,7 +415,7 @@ export default function Seguimiento() {
     const nuevoHistorial = [...(modalObs._historial || []), { fecha: fechaHoy(), hora: horaAhora(), user: usuarioActual, resultado, obs }]
     const comentario = obsComentario.trim() || modalObs._comentario
     try {
-      const res  = await fetch(`${API}/ventas/${modalObs.id}`, {
+      const res  = await fetch(`${API}/ventas/${modalObs.id}?area=seguimiento`, {
         method: 'PATCH', headers: ncHeaders(),
         body: JSON.stringify({ obs_seguimiento: comentario }),
       })
