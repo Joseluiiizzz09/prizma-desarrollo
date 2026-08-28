@@ -302,7 +302,7 @@ export default function Backdatareclutamiento() {
   const [fechaActiva,   setFechaActiva]   = useState(fechaHoy())
 
   // ── Form (agregar registro) ──
-  const [form,     setForm]     = useState({ campana:'', distrito:'', n1:'', n2:'', tipoContacto:'LLAMADA', direccion:'', coordenadas:'', obsBack:'', tipifBack:'', asesor:'' })
+  const [form,     setForm]     = useState({ campana:'', distrito:'', n1:'', n2:'', usuarioWhatsapp:'', tipoContacto:'LLAMADA', direccion:'', coordenadas:'', obsBack:'', tipifBack:'', asesor:'' })
   const [n1Error,  setN1Error]  = useState(false)
   const [calPicker,   setCalPicker]   = useState('')
   const [cmCalPicker, setCmCalPicker] = useState('')
@@ -311,7 +311,9 @@ export default function Backdatareclutamiento() {
   const distritos = LIMA_DISTRITOS
 
   // ── Filtros base ──
-  const [filtros, setFiltros] = useState({ tip:'', tipVend:'', asesor:'', numero:'', verTipVend:true })
+  const [filtros, setFiltros] = useState({ tip:'', tipVend:'', asesor:'', numero:'', verTipVend:true, global:false, duplicados:false, desde:'', hasta:'' })
+  const [baseSort, setBaseSort] = useState({ col:null, dir:'asc' })
+  const [modalEditarContacto, setModalEditarContacto] = useState({ open:false, regId:null, campana:'', n1:'', n2:'', usuarioWhatsapp:'', guardando:false })
 
   // ── Historial ──
   const [histOpen, setHistOpen] = useState({})
@@ -518,10 +520,13 @@ export default function Backdatareclutamiento() {
         const reg = {
           id:         idCntRef.current++,
           _backendId: l.id,
+          fecha,
           campana:    l.campana || '—',
           distrito:   l.distrito || '—',
           n1:         l.n1,
           n2:         l.n2 || '',
+          usuarioWhatsapp: l.usuario_whatsapp || '',
+          obsAsesor:  l.obs_asesor || '',
           tipo_contacto: l.tipo_contacto || 'LLAMADA',
           direccion:   l.direccion || '',
           coordenadas: l.coordenadas || '',
@@ -772,7 +777,8 @@ export default function Backdatareclutamiento() {
   // ── Form (agregar registro individual) ───────────────────────────────────
   async function agregarRegistro() {
     const n1 = form.n1.trim()
-    if (!n1) { setN1Error(true); mostrarToast('El campo N1 es obligatorio'); return }
+    const usuarioWhatsapp = form.usuarioWhatsapp.trim()
+    if (!n1 && !usuarioWhatsapp) { setN1Error(true); mostrarToast('Ingresa un N1 o un usuario de WhatsApp'); return }
     setN1Error(false)
     const campana  = form.campana.trim() || '—'
     const distrito = form.distrito || '—'
@@ -781,14 +787,14 @@ export default function Backdatareclutamiento() {
     const hora     = asesor ? horaAhora() : ''
     const fecha    = fechaActiva
     const reg = {
-      id:idCntRef.current++, _backendId:null, campana, distrito, n1, n2, asesor, horaAsig:hora,
+      id:idCntRef.current++, _backendId:null, fecha, campana, distrito, n1, n2, usuarioWhatsapp, obsAsesor:'', asesor, horaAsig:hora,
       sinAsignar:!asesor, rotaciones:0, _tipifVend:'', _tipifHora:'',
       historial: asesor ? [{asesor, hora, fecha, motivo:'Asignacion inicial'}] : [],
     }
     setBaseData(prev => ({ ...prev, [fecha]: [reg, ...(prev[fecha] || [])] }))
     setFechaPestanas(prev => prev.includes(fecha) ? prev : [...prev, fecha].sort().reverse())
     try {
-      const res  = await fetch(`${API}/leads-reclutamiento`, { method:'POST', headers:ncHeaders(), body:JSON.stringify({ campana, departamento:'Lima', provincia:'Lima', distrito, n1, n2, asesor_nombre:asesor, fecha, hora_asig:hora }) })
+      const res  = await fetch(`${API}/leads-reclutamiento`, { method:'POST', headers:ncHeaders(), body:JSON.stringify({ campana, departamento:'Lima', provincia:'Lima', distrito, n1, n2, usuario_whatsapp:usuarioWhatsapp, asesor_nombre:asesor, fecha, hora_asig:hora }) })
       const data = await res.json()
       const bid  = data.ids?.[0] || data.id
       if (bid) {
@@ -800,7 +806,7 @@ export default function Backdatareclutamiento() {
           return next
         })
       }
-      setForm({ campana:'', distrito:'', n1:'', n2:'', asesor:'' })
+      setForm({ campana:'', distrito:'', n1:'', n2:'', usuarioWhatsapp:'', asesor:'' })
     } catch(e) {
       setBaseData(prev => ({ ...prev, [fecha]:(prev[fecha] || []).filter(r => r.id !== reg.id) }))
       mostrarToast(e.message || 'No se pudo guardar el registro')
@@ -883,6 +889,55 @@ export default function Backdatareclutamiento() {
         updateReg(id, { _tipifVend:reg._tipifVend, _tipifHora:reg._tipifHora })
         mostrarToast(e.message || 'No se pudo guardar la tipificación')
       }
+    }
+  }
+
+  // ── Comentario (obs. del asesor) ────────────────────────────────────────
+  async function guardarComentario(id, valor) {
+    const found = findReg(id)
+    if (!found) return
+    const { reg } = found
+    updateReg(id, { obsAsesor:valor })
+    if (reg._backendId) {
+      try {
+        const res = await fetch(`${API}/leads-reclutamiento/${reg._backendId}/obs`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ obs:valor }) })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar el comentario')
+      } catch (e) {
+        updateReg(id, { obsAsesor:reg.obsAsesor })
+        mostrarToast(e.message || 'No se pudo guardar el comentario')
+      }
+    }
+  }
+
+  // ── Editar contacto (campaña / N1 / N2 / usuario WhatsApp) ─────────────
+  function abrirModalEditarContacto(id) {
+    const found = findReg(id)
+    if (!found) return
+    const { reg } = found
+    setModalEditarContacto({ open:true, regId:id, campana:reg.campana==='—'?'':reg.campana, n1:reg.n1||'', n2:reg.n2||'', usuarioWhatsapp:reg.usuarioWhatsapp||'', guardando:false })
+  }
+
+  async function guardarEdicionContacto() {
+    const { regId, campana, n1, n2, usuarioWhatsapp } = modalEditarContacto
+    const found = findReg(regId)
+    if (!found) return
+    const { reg } = found
+    if (!n1.trim() && !usuarioWhatsapp.trim()) { mostrarToast('Ingresa un N1 o un usuario de WhatsApp'); return }
+    setModalEditarContacto(p => ({ ...p, guardando:true }))
+    const anteriores = { campana:reg.campana, n1:reg.n1, n2:reg.n2, usuarioWhatsapp:reg.usuarioWhatsapp }
+    updateReg(regId, { campana:campana.trim()||'—', n1:n1.trim(), n2:n2.trim(), usuarioWhatsapp:usuarioWhatsapp.trim() })
+    try {
+      if (reg._backendId) {
+        const res  = await fetch(`${API}/leads-reclutamiento/${reg._backendId}/datos-back`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ campana:campana.trim(), n1:n1.trim(), n2:n2.trim(), usuario_whatsapp:usuarioWhatsapp.trim() }) })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo actualizar el contacto')
+      }
+      setModalEditarContacto({ open:false, regId:null, campana:'', n1:'', n2:'', usuarioWhatsapp:'', guardando:false })
+    } catch (e) {
+      updateReg(regId, anteriores)
+      setModalEditarContacto(p => ({ ...p, guardando:false }))
+      mostrarToast(e.message || 'No se pudo actualizar el contacto')
     }
   }
 
@@ -1203,14 +1258,62 @@ export default function Backdatareclutamiento() {
   }
 
   // ── Computed values ───────────────────────────────────────────────────────
-  const registrosActivos = baseData[fechaActiva] || []
-  const registrosFiltrados = registrosActivos.filter(r => {
+  const todosLosRegistros = useMemo(() => Object.values(baseData).flat(), [baseData])
+  const registrosActivos = filtros.global
+    ? todosLosRegistros
+    : (filtros.desde || filtros.hasta)
+      ? todosLosRegistros.filter(r => (!filtros.desde || r.fecha >= filtros.desde) && (!filtros.hasta || r.fecha <= filtros.hasta))
+      : (baseData[fechaActiva] || [])
+
+  const n1Duplicados = useMemo(() => {
+    const cont = {}
+    todosLosRegistros.forEach(r => { const k = (r.n1||'').trim(); if (k) cont[k] = (cont[k]||0) + 1 })
+    return new Set(Object.keys(cont).filter(k => cont[k] > 1))
+  }, [todosLosRegistros])
+
+  const registrosFiltrados0 = registrosActivos.filter(r => {
     if (filtros.tip    && !(r.tipifBack||'').toUpperCase().includes(filtros.tip.toUpperCase())) return false
     if (filtros.tipVend&& (r._tipifVend||'').toUpperCase() !== filtros.tipVend.toUpperCase())  return false
     if (filtros.asesor && !(r.asesor||'').toUpperCase().includes(filtros.asesor.toUpperCase())) return false
-    if (filtros.numero && !r.n1.includes(filtros.numero) && !(r.n2||'').includes(filtros.numero)) return false
+    if (filtros.numero && !r.n1.includes(filtros.numero) && !(r.n2||'').includes(filtros.numero) && !(r.usuarioWhatsapp||'').toUpperCase().includes(filtros.numero.toUpperCase())) return false
+    if (filtros.duplicados && !n1Duplicados.has((r.n1||'').trim())) return false
     return true
   })
+
+  function baseSortVal(r, col) {
+    switch (col) {
+      case 'campana': return r.campana || ''
+      case 'asesor':  return r.asesor || ''
+      case 'tipVend': return r._tipifVend || ''
+      case 'hora':    return `${r.fecha||''} ${r.horaAsig||''}`
+      case 'rotac':   return r.rotaciones || 0
+      default: return 0
+    }
+  }
+  const registrosFiltrados = baseSort.col
+    ? [...registrosFiltrados0].sort((a,b) => {
+        const va = baseSortVal(a, baseSort.col), vb = baseSortVal(b, baseSort.col)
+        const cmp = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'es', { numeric:true })
+        return baseSort.dir === 'desc' ? -cmp : cmp
+      })
+    : registrosFiltrados0
+  function toggleBaseSort(col) {
+    setBaseSort(prev => prev.col === col ? { col, dir: prev.dir==='asc'?'desc':'asc' } : { col, dir:'asc' })
+  }
+  function ordenarBaseDelDia() {
+    setBaseSort(prev => prev.col === 'hora' ? { col:'hora', dir: prev.dir==='asc'?'desc':'asc' } : { col:'hora', dir:'desc' })
+  }
+  function baseTh(col, label, thStyle) {
+    const activo = baseSort.col === col
+    return (
+      <th onClick={()=>toggleBaseSort(col)} style={{ cursor:'pointer', userSelect:'none', whiteSpace:'nowrap', ...thStyle }} title="Ordenar">
+        <span style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
+          {label}
+          <span style={{ fontSize:9, lineHeight:1, color: activo ? '#6d28d9' : '#cbd5e1' }}>{activo ? (baseSort.dir==='asc'?'▲':'▼') : '⇅'}</span>
+        </span>
+      </th>
+    )
+  }
 
   const statsBase = {
     total:      registrosActivos.length,
@@ -1507,13 +1610,28 @@ export default function Backdatareclutamiento() {
                   className="form-select" placeholderText="Todos" emptyLabel="Todos" />
               </div>
               <div className="bo-input-group base-filtro-numero"><label>Número</label>
-                <input className="form-control" value={filtros.numero} onChange={e=>setFiltros(p=>({...p,numero:e.target.value}))} placeholder="Buscar N1 o N2..." />
+                <input className="form-control" value={filtros.numero} onChange={e=>setFiltros(p=>({...p,numero:e.target.value}))} placeholder="Buscar N1, N2 o usuario WhatsApp..." />
               </div>
+              <div className="bo-input-group"><label>Desde</label>
+                <input type="date" className="form-control" value={filtros.desde} onChange={e=>setFiltros(p=>({...p,desde:e.target.value}))} />
+              </div>
+              <div className="bo-input-group"><label>Hasta</label>
+                <input type="date" className="form-control" value={filtros.hasta} onChange={e=>setFiltros(p=>({...p,hasta:e.target.value}))} />
+              </div>
+              <label className="toggle-col base-filtro-toggle">
+                <input type="checkbox" checked={filtros.global} onChange={e=>setFiltros(p=>({...p,global:e.target.checked}))} />
+                <span>Buscar global</span>
+              </label>
+              <label className="toggle-col base-filtro-toggle">
+                <input type="checkbox" checked={filtros.duplicados} onChange={e=>setFiltros(p=>({...p,duplicados:e.target.checked}))} />
+                <span>Números duplicados</span>
+              </label>
               <label className="toggle-col base-filtro-toggle">
                 <input type="checkbox" checked={filtros.verTipVend} onChange={e=>setFiltros(p=>({...p,verTipVend:e.target.checked}))} />
                 <span>Ver tipif. vendedor</span>
               </label>
-              <button className="bo-btn-limpiar btn btn-sm base-filtro-limpiar" onClick={()=>setFiltros({tip:'',tipVend:'',asesor:'',numero:'',verTipVend:true})}>Limpiar filtros</button>
+              <button className="bo-btn-limpiar btn btn-sm base-filtro-limpiar" onClick={()=>{ setFiltros({tip:'',tipVend:'',asesor:'',numero:'',verTipVend:true,global:false,duplicados:false,desde:'',hasta:''}); setBaseSort({col:null,dir:'asc'}) }}>Limpiar filtros</button>
+              <button className="btn-rotar-masivo" onClick={ordenarBaseDelDia} type="button">Ordenar base del día</button>
             </div>
 
             {/* FORMULARIO AGREGAR INDIVIDUAL */}
@@ -1524,14 +1642,15 @@ export default function Backdatareclutamiento() {
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10,marginBottom:10}}>
                 <div className="bo-input-group"><label>Campaña</label><CampanaSelect value={form.campana} onChange={v=>setForm(p=>({...p,campana:v}))} /></div>
+                <div className="bo-input-group"><label>N1</label><input className={`form-control${n1Error?' obligatorio-error':''}`} value={form.n1} onChange={e=>{ setN1Error(false); setForm(p=>({...p,n1:e.target.value})) }} placeholder="Número principal" style={{fontFamily:'monospace'}} /></div>
+                <div className="bo-input-group"><label>N2 (opcional)</label><input className="form-control" value={form.n2} onChange={e=>setForm(p=>({...p,n2:e.target.value}))} placeholder="Número secundario" style={{fontFamily:'monospace'}} /></div>
+                <div className="bo-input-group"><label>Usuario WhatsApp</label><input className={`form-control${n1Error?' obligatorio-error':''}`} value={form.usuarioWhatsapp} onChange={e=>{ setN1Error(false); setForm(p=>({...p,usuarioWhatsapp:e.target.value})) }} placeholder="Si no tiene N1, ej. usuario_clie" /></div>
                 <div className="bo-input-group"><label>Distrito</label>
                   <select className="form-select" value={form.distrito} onChange={e=>setForm(p=>({...p,distrito:e.target.value}))}>
                     <option value="">— Seleccionar —</option>
                     {distritos.map(d=><option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
-                <div className="bo-input-group"><label>N1 *</label><input className={`form-control${n1Error?' obligatorio-error':''}`} value={form.n1} onChange={e=>{ setN1Error(false); setForm(p=>({...p,n1:e.target.value})) }} placeholder="Número principal" style={{fontFamily:'monospace'}} /></div>
-                <div className="bo-input-group"><label>N2 (opcional)</label><input className="form-control" value={form.n2} onChange={e=>setForm(p=>({...p,n2:e.target.value}))} placeholder="Número secundario" style={{fontFamily:'monospace'}} /></div>
                 <div className="bo-input-group"><label>Asesor</label>
                   <AsesorBuscador value={form.asesor} asesores={asesores}
                     onChange={v=>setForm(p=>({...p,asesor:v}))}
@@ -1539,7 +1658,7 @@ export default function Backdatareclutamiento() {
                 </div>
               </div>
               <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-                <button className="bo-btn-limpiar btn btn-sm" onClick={()=>setForm({campana:'',distrito:'',n1:'',n2:'',asesor:''})}>Limpiar</button>
+                <button className="bo-btn-limpiar btn btn-sm" onClick={()=>setForm({campana:'',distrito:'',n1:'',n2:'',usuarioWhatsapp:'',asesor:''})}>Limpiar</button>
                 <button className="bo-btn-agregar" onClick={agregarRegistro}>+ Agregar registro</button>
               </div>
             </div>
@@ -1553,31 +1672,38 @@ export default function Backdatareclutamiento() {
               <table className="base-tabla table table-sm table-hover">
                 <thead>
                   <tr>
-                    <th>#</th><th>Campaña</th><th>Distrito</th>
+                    <th>#</th>{baseTh('campana','Campaña')}
                     <th>N1</th><th>N2</th>
-                    <th>Asesor asignado</th><th>Hora / Fecha asign.</th>
-                    {filtros.verTipVend && <th>Tipif. Vendedor</th>}
-                    <th>Sin asig.</th><th>Rotaciones</th><th>Acciones</th>
+                    {baseTh('asesor','Asesor asignado')}{baseTh('hora','Hora / Fecha asign.')}
+                    {filtros.verTipVend && baseTh('tipVend','Tipif. Vendedor')}
+                    <th>Comentario</th>{baseTh('rotac','Rotaciones')}<th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {registrosFiltrados.length === 0
-                    ? <tr><td colSpan={filtros.verTipVend?11:10} className="bo-empty">Sin registros en {formatFecha(fechaActiva)}.</td></tr>
+                    ? <tr><td colSpan={filtros.verTipVend?10:9} className="bo-empty">Sin registros en {formatFecha(fechaActiva)}.</td></tr>
                     : registrosFiltrados.map((r,i) => {
                         const esExclusiva = esLeadProhibido(r)
                         return [
                           <tr key={r.id} id={`fila-${r.id}`}>
                             <td style={{color:'#9ca3af',fontSize:10}}>{i+1}</td>
                             <td><strong>{r.campana}</strong></td>
-                            <td style={{fontSize:11}}>{r.distrito}</td>
-                            <td><div className="numero-copiar"><span>{r.n1}</span><button type="button" onClick={()=>copiarNumero(r.n1)} title="Copiar N1" aria-label={`Copiar ${r.n1}`}><CopyIcon /></button></div></td>
+                            <td>
+                              <div className="numero-copiar">
+                                <span>{r.n1 ? r.n1 : (r.usuarioWhatsapp ? `@${r.usuarioWhatsapp}` : '—')}</span>
+                                {(r.n1 || r.usuarioWhatsapp) && <button type="button" onClick={()=>copiarNumero(r.n1 || r.usuarioWhatsapp)} title="Copiar" aria-label="Copiar"><CopyIcon /></button>}
+                                <button type="button" onClick={()=>abrirModalEditarContacto(r.id)} title="Editar contacto" aria-label="Editar contacto" style={{border:'none',background:'transparent',cursor:'pointer',color:'#9ca3af',padding:0,marginLeft:2,display:'inline-flex'}}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                                </button>
+                              </div>
+                            </td>
                             <td>{r.n2 ? <div className="numero-copiar secundario"><span>{r.n2}</span><button type="button" onClick={()=>copiarNumero(r.n2)} title="Copiar N2" aria-label={`Copiar ${r.n2}`}><CopyIcon /></button></div> : <span style={{color:'#ccc'}}>—</span>}</td>
                             <td>
                               <AsesorBuscador value={r.asesor} asesores={asesores} disabled={esExclusiva}
                                 title={esExclusiva?`Número prohibido: ${r._tipifVend}`:''}
                                 onChange={v=>reasignarReg(r.id,v)} />
                             </td>
-                            <td>{r.horaAsig ? <><span className="hora-cell">{r.horaAsig}</span> <span className="hora-date">{formatFecha(fechaActiva)}</span></> : <span className="hora-empty">—</span>}</td>
+                            <td>{r.horaAsig ? <><span className="hora-cell">{r.horaAsig}</span> <span className="hora-date">{formatFecha(r.fecha||fechaActiva)}</span></> : <span className="hora-empty">—</span>}</td>
                             {filtros.verTipVend && (
                               <td>
                                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
@@ -1589,7 +1715,12 @@ export default function Backdatareclutamiento() {
                                 </div>
                               </td>
                             )}
-                            <td>{r.sinAsignar ? <span className="sin-asig-badge">Sin asig.</span> : <span style={{color:'#d1d5db',fontSize:10}}>—</span>}</td>
+                            <td>
+                              <input type="text" defaultValue={r.obsAsesor} placeholder="Comentario..."
+                                onBlur={e=>{ if(e.target.value !== r.obsAsesor) guardarComentario(r.id, e.target.value) }}
+                                onKeyDown={e=>{ if(e.key==='Enter') e.target.blur() }}
+                                style={{fontSize:11,padding:'4px 7px',border:'1px solid #e5e7eb',borderRadius:6,fontFamily:'inherit',width:140}} />
+                            </td>
                             <td style={{textAlign:'center'}}>
                               {r.rotaciones > 0
                                 ? <span style={{background:'#EDE9FE',color:'#4C1D95',fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:99,display:'inline-block'}}>{r.rotaciones}x</span>
@@ -1612,7 +1743,7 @@ export default function Backdatareclutamiento() {
                             </td>
                           </tr>,
                           <tr key={`hist-${r.id}`} className={`historial-row${histOpen[r.id]?' open':''}`}>
-                            <td colSpan={filtros.verTipVend?11:10}>
+                            <td colSpan={filtros.verTipVend?10:9}>
                               <div className="historial-inner">
                                 <div className="hist-label">Historial de asignaciones — N1: {r.n1}</div>
                                 {(() => {
@@ -2007,6 +2138,33 @@ export default function Backdatareclutamiento() {
             <div className="modal-btns">
               <button className="btn-cancelar-modal" onClick={()=>setModalRotar(p=>({...p,open:false}))}>Cancelar</button>
               <button className="btn-confirmar-modal" onClick={confirmarRotacion} disabled={!rotModalAsesor}>Rotar ahora</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL EDITAR CONTACTO (campaña / N1 / N2 / usuario WhatsApp) ═════ */}
+      {modalEditarContacto.open && (
+        <div className="modal-overlay open" onClick={e=>{ if(e.target===e.currentTarget && !modalEditarContacto.guardando) setModalEditarContacto(p=>({...p,open:false})) }}>
+          <div className="modal-box">
+            <h3>Editar contacto</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:10}}>
+              <div className="bo-input-group"><label>Campaña</label>
+                <CampanaSelect value={modalEditarContacto.campana} onChange={v=>setModalEditarContacto(p=>({...p,campana:v}))} />
+              </div>
+              <div className="bo-input-group"><label>N1</label>
+                <input className="form-control" value={modalEditarContacto.n1} onChange={e=>setModalEditarContacto(p=>({...p,n1:e.target.value}))} placeholder="Número principal" style={{fontFamily:'monospace'}} />
+              </div>
+              <div className="bo-input-group"><label>N2 (opcional)</label>
+                <input className="form-control" value={modalEditarContacto.n2} onChange={e=>setModalEditarContacto(p=>({...p,n2:e.target.value}))} placeholder="Número secundario" style={{fontFamily:'monospace'}} />
+              </div>
+              <div className="bo-input-group"><label>Usuario WhatsApp</label>
+                <input className="form-control" value={modalEditarContacto.usuarioWhatsapp} onChange={e=>setModalEditarContacto(p=>({...p,usuarioWhatsapp:e.target.value}))} placeholder="Si no tiene N1, ej. usuario_clie" />
+              </div>
+            </div>
+            <div className="modal-btns">
+              <button className="btn-cancelar-modal" onClick={()=>setModalEditarContacto(p=>({...p,open:false}))} disabled={modalEditarContacto.guardando}>Cancelar</button>
+              <button className="btn-confirmar-modal" onClick={guardarEdicionContacto} disabled={modalEditarContacto.guardando}>{modalEditarContacto.guardando?'Guardando...':'Guardar'}</button>
             </div>
           </div>
         </div>
