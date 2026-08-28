@@ -582,6 +582,7 @@ export default function Seguimiento() {
                 <col style={{ width: 125 }} />
                 <col style={{ width: 135 }} />
                 <col style={{ width: 120 }} />
+                <col style={{ width: 150 }} />
                 <col style={{ width: 90 }} />
                 <col style={{ width: 180 }} />
                 <col style={{ width: 220 }} />
@@ -605,6 +606,7 @@ export default function Seguimiento() {
                   <th className="th-fecha">FECHA PREVENTA</th>
                   <th>FECHA INSTALACIÓN</th>
                   <th className="th-est">ESTADO</th>
+                  <th className="th-plan">COBERTURA</th>
                   <th className="th-tramo">TRAMO</th>
                   <th className="th-comment">COMENTARIO</th>
                   <th className="th-cliente">NOMBRE Y APELLIDOS</th>
@@ -625,7 +627,7 @@ export default function Seguimiento() {
               </thead>
               <tbody>
                 {ventasPag.length === 0 ? (
-                  <tr><td colSpan="20" style={{ textAlign: 'center', color: '#9ca3af', padding: '36px', fontSize: '13px' }}>Sin registros.</td></tr>
+                  <tr><td colSpan="21" style={{ textAlign: 'center', color: '#9ca3af', padding: '36px', fontSize: '13px' }}>Sin registros.</td></tr>
                 ) : ventasPag.map(v => {
                   const est     = estadoObj(v._estadoSeg)
                   const motCls  = motivoBadgeCls(v._motivoRech)
@@ -653,6 +655,14 @@ export default function Seguimiento() {
                         <span className={`badge-seg ${est.cls}`} onClick={() => abrirModalEstado(v)} style={{ cursor: 'pointer' }} title="Click para cambiar estado">
                           {est.label}
                         </span>
+                      </td>
+                      <td style={{ fontSize: '10px' }}>
+                        {v.cobertura_categoria && v.cobertura_opcion
+                          ? <span className="badge-grab bg-grabado">{v.cobertura_categoria} · {v.cobertura_opcion}</span>
+                          : <span style={{ color: '#9ca3af' }}>--</span>}
+                        {v.cobertura_categoria === 'INGRESADO' && v.cobertura_por_nombre && (
+                          <div style={{ fontSize: 9, color: '#6b7280', marginTop: 2 }}>Por: {v.cobertura_por_nombre}</div>
+                        )}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         {v._tramo ? <span className="badge-tramo">{v._tramo}</span> : '--'}
