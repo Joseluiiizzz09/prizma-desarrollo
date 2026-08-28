@@ -1178,32 +1178,33 @@ export default function Backdatareclutamiento() {
     const asesor  = masivaAsesor
     const hora    = asesor ? horaAhora() : ''
     const fecha   = fechaActiva
-    const leadsParaBackend = []
-    const nuevosRegs = []
-    lista.forEach(n1 => {
-      if ((baseData[fecha]||[]).find(r=>r.n1===n1)) return
-      const reg = { id:idCntRef.current++, _backendId:null, campana, distrito:'—', n1, n2:'', tipifBack:'', asesor, horaAsig:hora, sinAsignar:!asesor, rotaciones:0, _tipifVend:'', _tipifHora:'', historial:asesor?[{asesor,hora,fecha,motivo:'Carga masiva'}]:[] }
-      nuevosRegs.push(reg)
-      leadsParaBackend.push({ campana, distrito:'—', n1, n2:'', tipif_back:'', asesor_nombre:asesor, fecha, hora_asig:hora })
-    })
-    if (nuevosRegs.length) {
-      setBaseData(prev => ({ ...prev, [fecha]:[...(prev[fecha]||[]), ...nuevosRegs] }))
-      setFechaPestanas(prev => prev.includes(fecha) ? prev : [...prev, fecha].sort().reverse())
+    const pendientes = lista.filter(n1 => !(baseData[fecha]||[]).find(r=>r.n1===n1))
+    const CHUNK = 400
+    let importados = 0
+    let errorMsg = ''
+    for (let i = 0; i < pendientes.length; i += CHUNK) {
+      const lote = pendientes.slice(i, i + CHUNK)
+      const leadsParaBackend = lote.map(n1 => ({ campana, distrito:'—', n1, n2:'', tipif_back:'', asesor_nombre:asesor, fecha, hora_asig:hora }))
       try {
         const res  = await fetch(`${API}/leads-reclutamiento`, { method:'POST', headers:ncHeaders(), body:JSON.stringify(leadsParaBackend) })
-        const data = await res.json()
-        if (data.ok && data.ids) {
-          setBaseData(prev => {
-            const next = { ...prev }
-            const arr  = [...(next[fecha]||[])]
-            const off  = arr.length - nuevosRegs.length
-            data.ids.forEach((bid,i) => { if(arr[off+i]) arr[off+i]={...arr[off+i],_backendId:bid} })
-            next[fecha] = arr
-            return next
-          })
-        }
-      } catch(e) {}
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data.ok) { errorMsg = data.mensaje || `Error del servidor (${res.status})`; break }
+        const nuevosRegs = lote.map(n1 => ({ id:idCntRef.current++, _backendId:null, campana, distrito:'—', n1, n2:'', tipifBack:'', asesor, horaAsig:hora, sinAsignar:!asesor, rotaciones:0, _tipifVend:'', _tipifHora:'', historial:asesor?[{asesor,hora,fecha,motivo:'Carga masiva'}]:[] }))
+        setBaseData(prev => {
+          const arr = [...(prev[fecha]||[]), ...nuevosRegs]
+          const off = arr.length - nuevosRegs.length
+          if (Array.isArray(data.ids)) data.ids.forEach((bid,i) => { if(arr[off+i]) arr[off+i]={...arr[off+i],_backendId:bid} })
+          return { ...prev, [fecha]:arr }
+        })
+        setFechaPestanas(prev => prev.includes(fecha) ? prev : [...prev, fecha].sort().reverse())
+        importados += lote.length
+      } catch (e) {
+        errorMsg = 'Error de conexión con el servidor'
+        break
+      }
     }
+    if (errorMsg) mostrarToast(`Se importaron ${importados} de ${pendientes.length}. ${errorMsg}`)
+    else if (importados) mostrarToast(`${importados} registro(s) importado(s) correctamente`)
     setMasivaNums(''); setMasivaFilas([]); setInclDup(false)
   }
 
@@ -1238,17 +1239,28 @@ export default function Backdatareclutamiento() {
   async function ejecutarCargaArchivo() {
     if (!archivoRows.length) { mostrarToast('No hay datos'); return }
     const fecha = fechaActiva
-    const nuevos = []; const leadsBackend = []
-    archivoRows.forEach(r => {
-      if ((baseData[fecha]||[]).find(x=>x.n1===r.n1)) return
-      nuevos.push({ id:idCntRef.current++, _backendId:null, campana:r.camp, distrito:r.dist, n1:r.n1, n2:r.n2, tipifBack:r.tipif, asesor:'', horaAsig:'', sinAsignar:true, rotaciones:0, _tipifVend:'', _tipifHora:'', historial:[] })
-      leadsBackend.push({ campana:r.camp, distrito:r.dist, n1:r.n1, n2:r.n2, tipif_back:r.tipif, asesor_nombre:'', fecha, hora_asig:'' })
-    })
-    const omitidos = archivoRows.length - nuevos.length
-    if (nuevos.length) {
-      setBaseData(prev => ({ ...prev, [fecha]:[...(prev[fecha]||[]), ...nuevos] }))
-      try { await fetch(`${API}/leads-reclutamiento`, { method:'POST', headers:ncHeaders(), body:JSON.stringify(leadsBackend) }) } catch(e) {}
+    const pendientes = archivoRows.filter(r => !(baseData[fecha]||[]).find(x=>x.n1===r.n1))
+    const omitidos = archivoRows.length - pendientes.length
+    const CHUNK = 400
+    let importados = 0
+    let errorMsg = ''
+    for (let i = 0; i < pendientes.length; i += CHUNK) {
+      const lote = pendientes.slice(i, i + CHUNK)
+      const leadsBackend = lote.map(r => ({ campana:r.camp, distrito:r.dist, n1:r.n1, n2:r.n2, tipif_back:r.tipif, asesor_nombre:'', fecha, hora_asig:'' }))
+      try {
+        const res  = await fetch(`${API}/leads-reclutamiento`, { method:'POST', headers:ncHeaders(), body:JSON.stringify(leadsBackend) })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data.ok) { errorMsg = data.mensaje || `Error del servidor (${res.status})`; break }
+        const nuevos = lote.map(r => ({ id:idCntRef.current++, _backendId:null, campana:r.camp, distrito:r.dist, n1:r.n1, n2:r.n2, tipifBack:r.tipif, asesor:'', horaAsig:'', sinAsignar:true, rotaciones:0, _tipifVend:'', _tipifHora:'', historial:[] }))
+        setBaseData(prev => ({ ...prev, [fecha]:[...(prev[fecha]||[]), ...nuevos] }))
+        importados += lote.length
+      } catch (e) {
+        errorMsg = 'Error de conexión con el servidor'
+        break
+      }
     }
+    if (errorMsg) mostrarToast(`Se importaron ${importados} de ${pendientes.length}${omitidos?` (${omitidos} ya existían)`:''}. ${errorMsg}`)
+    else mostrarToast(`${importados} registro(s) importado(s)${omitidos?`, ${omitidos} ya existían`:''}`)
     setArchivoRows([]); setArchivoInfo(''); setArchivoStatus('')
     if (archivoInputRef.current) archivoInputRef.current.value = ''
   }
@@ -1285,23 +1297,41 @@ export default function Backdatareclutamiento() {
 
   async function ejecutarCargaLegacy() {
     if (!legacyRows.length) { mostrarToast('No hay datos'); return }
-    let importados=0, omitidos=0
-    const leadsBackend = []
-    const updates = {}
+    // El backend rechaza lotes de más de 500 registros (y el rechazo es de
+    // todo-o-nada), así que se parte en tandas para no perder la importación
+    // completa por exceder el límite. Antes esto fallaba en silencio: la
+    // pantalla mostraba las filas como importadas aunque el servidor las
+    // hubiera rechazado, y desaparecían al recargar.
+    const CHUNK = 400
+    let importados = 0
+    let errorMsg = ''
     const nuevasFechasLocal = []
-    legacyRows.forEach(r => {
-      const fecha = r.fecha
-      if (!fechaPestanas.includes(fecha)&&!nuevasFechasLocal.includes(fecha)) nuevasFechasLocal.push(fecha)
-      if (!updates[fecha]) updates[fecha] = []
-      // Permitir duplicados: no se descartan números repetidos en la carga del sistema antiguo.
-      const hist = r.asesores.map((a,i)=>({ asesor:a, hora:r.hora||'—', fecha, motivo:i===0?'Asignacion inicial':`Rotacion ${i}` }))
-      updates[fecha].push({ id:idCntRef.current++, _backendId:null, campana:r.campana, distrito:r.distrito, n1:r.n1, n2:r.n2, tipifBack:r.tipifBack, asesor:r.asesores[r.asesores.length-1]||'', horaAsig:r.hora, sinAsignar:r.asesores.length===0, rotaciones:Math.max(0,r.asesores.length-1), _tipifVend:r.tipifVend||'', _tipifHora:r.hora||'', historial:hist })
-      leadsBackend.push({ campana:r.campana, distrito:r.distrito, n1:r.n1, n2:r.n2, tipif_back:r.tipifBack, asesor_nombre:r.asesores[r.asesores.length-1]||'', fecha, hora_asig:r.hora })
-      importados++
-    })
-    setBaseData(prev => { const n={...prev}; for(const f in updates) n[f]=[...(prev[f]||[]),...updates[f]]; return n })
+    for (let i = 0; i < legacyRows.length; i += CHUNK) {
+      const lote = legacyRows.slice(i, i + CHUNK)
+      const leadsBackend = lote.map(r => ({ campana:r.campana, distrito:r.distrito, n1:r.n1, n2:r.n2, tipif_back:r.tipifBack, asesor_nombre:r.asesores[r.asesores.length-1]||'', fecha:r.fecha, hora_asig:r.hora }))
+      try {
+        const res  = await fetch(`${API}/leads-reclutamiento`, { method:'POST', headers:ncHeaders(), body:JSON.stringify(leadsBackend) })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data.ok) { errorMsg = data.mensaje || `Error del servidor (${res.status})`; break }
+        const updates = {}
+        lote.forEach(r => {
+          const fecha = r.fecha
+          if (!fechaPestanas.includes(fecha) && !nuevasFechasLocal.includes(fecha)) nuevasFechasLocal.push(fecha)
+          if (!updates[fecha]) updates[fecha] = []
+          // Permitir duplicados: no se descartan números repetidos en la carga del sistema antiguo.
+          const hist = r.asesores.map((a,idx)=>({ asesor:a, hora:r.hora||'—', fecha, motivo:idx===0?'Asignacion inicial':`Rotacion ${idx}` }))
+          updates[fecha].push({ id:idCntRef.current++, _backendId:null, campana:r.campana, distrito:r.distrito, n1:r.n1, n2:r.n2, tipifBack:r.tipifBack, asesor:r.asesores[r.asesores.length-1]||'', horaAsig:r.hora, sinAsignar:r.asesores.length===0, rotaciones:Math.max(0,r.asesores.length-1), _tipifVend:r.tipifVend||'', _tipifHora:r.hora||'', historial:hist })
+        })
+        setBaseData(prev => { const n={...prev}; for(const f in updates) n[f]=[...(prev[f]||[]),...updates[f]]; return n })
+        importados += lote.length
+      } catch (e) {
+        errorMsg = 'Error de conexión con el servidor'
+        break
+      }
+    }
     setFechaPestanas(prev => [...prev, ...nuevasFechasLocal.filter(f=>!prev.includes(f))].sort().reverse())
-    if (leadsBackend.length) { try { await fetch(`${API}/leads-reclutamiento`,{method:'POST',headers:ncHeaders(),body:JSON.stringify(leadsBackend)}) } catch(e){} }
+    if (errorMsg) mostrarToast(`Se importaron ${importados} de ${legacyRows.length}. ${errorMsg}`)
+    else mostrarToast(`${importados} registro(s) importado(s) correctamente`)
     setLegacyRows([]); setLegacyInfo(''); setLegacyStatus('')
     if (legacyInputRef.current) legacyInputRef.current.value = ''
   }
