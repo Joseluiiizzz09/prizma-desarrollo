@@ -274,6 +274,14 @@ body{
 }
 .bo-root .bo-nav-icon{width:20px;height:20px;flex:0 0 20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 .bo-root .bo-nav.active{font-weight:700;}
+.bo-root .bo-sidebar-add{white-space:normal;display:flex;flex-direction:column;gap:9px;margin-top:6px;padding-top:10px;border-top:1px solid var(--line);}
+.bo-root .bo-sidebar-add .bo-input-group{gap:4px;min-width:0;}
+.bo-root .bo-sidebar-add .bo-input-group label{white-space:normal;}
+.bo-root .bo-sidebar-add .form-control,.bo-root .bo-sidebar-add .form-select{font-size:12px;padding:6px 8px;}
+.bo-root .bo-sidebar-add-fecha{font-size:10px;color:var(--ink-4);font-weight:600;margin-top:-4px;}
+.bo-root .bo-sidebar-add-btns{display:flex;gap:6px;}
+.bo-root .bo-sidebar-add-btns .bo-btn-limpiar{flex:1;padding:6px 8px;font-size:11px;}
+.bo-root .bo-sidebar-add-btns .bo-btn-agregar{flex:1;padding:6px 8px;font-size:11px;white-space:nowrap;}
 .bo-root .numero-copiar.secundario{color:#64748b;font-weight:600;}
 .bo-root .numero-copiar button{
   width:22px;height:22px;padding:0;border:1px solid #e2e8f0;border-radius:6px;

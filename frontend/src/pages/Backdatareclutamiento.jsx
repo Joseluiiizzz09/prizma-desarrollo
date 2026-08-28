@@ -86,6 +86,64 @@ function AsesorBuscador({ value, asesores, disabled, onChange, title, className,
   )
 }
 
+// Encabezado de tabla con menú desplegable de filtro (▼), en vez de solo
+// ordenar — mismo patrón de portal que AsesorBuscador, usado para Campaña /
+// Asesor asignado / Tipif. Vendedor (igual que KRONO).
+function HeaderFiltroDropdown({ label, valor, onChange, opciones, buscable }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const btnRef = useRef(null)
+  const boxRef = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    function onDoc(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+  function toggle() {
+    if (open) { setOpen(false); return }
+    const r = btnRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + 4, left: r.left })
+    setQ(''); setOpen(true)
+  }
+  function elegir(v) { onChange(v); setOpen(false) }
+  const lista = (buscable && q.trim())
+    ? opciones.filter(o => (o.label ?? o).toLowerCase().includes(q.trim().toLowerCase()))
+    : opciones
+  return (
+    <th style={{ whiteSpace:'nowrap' }}>
+      <span ref={btnRef} onClick={toggle} title="Filtrar" style={{ display:'inline-flex', alignItems:'center', gap:3, cursor:'pointer', userSelect:'none' }}>
+        {label}
+        <span style={{ fontSize:9, lineHeight:1, color: valor ? '#6d28d9' : '#cbd5e1' }}>▼</span>
+      </span>
+      {open && createPortal(
+        <div ref={boxRef} style={{ position:'fixed', top:pos.top, left:pos.left, minWidth:190, zIndex:9999, background:'#fff', border:'1px solid #e5e7eb', borderRadius:10, boxShadow:'0 10px 30px rgba(0,0,0,.16)', padding:8 }}>
+          {buscable && (
+            <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar…"
+              style={{ width:'100%', padding:'6px 8px', border:'1px solid #e5e7eb', borderRadius:7, outline:'none', fontSize:12, marginBottom:6, boxSizing:'border-box', fontFamily:'inherit' }} />
+          )}
+          <div style={{ maxHeight:220, overflowY:'auto' }}>
+            <div onMouseDown={e=>e.preventDefault()} onClick={()=>elegir('')}
+              style={{ padding:'6px 8px', cursor:'pointer', fontSize:12, borderRadius:6, fontWeight: !valor?700:400, background: !valor?'#fff7ed':'transparent', color: !valor?'#c2410c':'#6b7280' }}>Todas</div>
+            {lista.map(o => {
+              const v = o.value ?? o, l = o.label ?? o
+              return (
+                <div key={v} onMouseDown={e=>e.preventDefault()} onClick={()=>elegir(v)}
+                  style={{ padding:'6px 8px', cursor:'pointer', fontSize:12, borderRadius:6, fontWeight: v===valor?700:400, background: v===valor?'#fff7ed':'transparent', color: v===valor?'#c2410c':'#111827' }}>
+                  {l}
+                </div>
+              )
+            })}
+            {lista.length===0 && <div style={{ padding:'8px 9px', fontSize:12, color:'#9ca3af' }}>Sin resultados</div>}
+          </div>
+        </div>, document.body)}
+    </th>
+  )
+}
+
 // ── Utilities ────────────────────────────────────────────────────────────
 const COLORES_AV = ['#3b82f6','#8b5cf6','#22c55e','#f97316','#f97316','#06b6d4','#ec4899']
 const DOT_COLORS  = ['#185FA5','#0F6E56','#854F0B','#7C3AED','#ea580c']
@@ -307,11 +365,8 @@ export default function Backdatareclutamiento() {
   const [calPicker,   setCalPicker]   = useState('')
   const [cmCalPicker, setCmCalPicker] = useState('')
 
-  // ── Distritos (solo Lima) ──
-  const distritos = LIMA_DISTRITOS
-
   // ── Filtros base ──
-  const [filtros, setFiltros] = useState({ tip:'', tipVend:'', asesor:'', numero:'', verTipVend:true, global:false, duplicados:false, desde:'', hasta:'' })
+  const [filtros, setFiltros] = useState({ tip:'', tipVend:'', asesor:'', campana:'', numero:'', verTipVend:true, global:false, duplicados:false, desde:'', hasta:'' })
   const [baseSort, setBaseSort] = useState({ col:null, dir:'asc' })
   const [modalEditarContacto, setModalEditarContacto] = useState({ open:false, regId:null, campana:'', n1:'', n2:'', usuarioWhatsapp:'', guardando:false })
 
@@ -1271,10 +1326,17 @@ export default function Backdatareclutamiento() {
     return new Set(Object.keys(cont).filter(k => cont[k] > 1))
   }, [todosLosRegistros])
 
+  const campanasDisponibles = useMemo(() => {
+    const set = new Set()
+    todosLosRegistros.forEach(r => { if (r.campana && r.campana !== '—') set.add(r.campana) })
+    return Array.from(set).sort()
+  }, [todosLosRegistros])
+
   const registrosFiltrados0 = registrosActivos.filter(r => {
     if (filtros.tip    && !(r.tipifBack||'').toUpperCase().includes(filtros.tip.toUpperCase())) return false
     if (filtros.tipVend&& (r._tipifVend||'').toUpperCase() !== filtros.tipVend.toUpperCase())  return false
     if (filtros.asesor && !(r.asesor||'').toUpperCase().includes(filtros.asesor.toUpperCase())) return false
+    if (filtros.campana&& r.campana !== filtros.campana) return false
     if (filtros.numero && !r.n1.includes(filtros.numero) && !(r.n2||'').includes(filtros.numero) && !(r.usuarioWhatsapp||'').toUpperCase().includes(filtros.numero.toUpperCase())) return false
     if (filtros.duplicados && !n1Duplicados.has((r.n1||'').trim())) return false
     return true
@@ -1448,6 +1510,21 @@ export default function Backdatareclutamiento() {
           <button className={`bo-nav${seccion==='carga-masiva'?' active':''}`} onClick={()=>irSeccion('carga-masiva')}><BoNavIcon tipo="carga" /> <span>Carga Masiva</span></button>
           <button className={`bo-nav${seccion==='entrevistas'?' active':''}`} onClick={()=>irSeccion('entrevistas')}><BoNavIcon tipo="avance" /> <span>Entrevistas</span></button>
           <button className={`bo-nav${seccion==='capacitacion'?' active':''}`} onClick={()=>irSeccion('capacitacion')}><BoNavIcon tipo="avance" /> <span>Capacitación</span></button>
+
+          {seccion==='base' && (
+            <div className="bo-sidebar-add">
+              <div className="sidebar-sep">Agregar registro</div>
+              <div className="bo-sidebar-add-fecha">{formatFecha(fechaActiva)}</div>
+              <div className="bo-input-group"><label>Campaña</label><CampanaSelect value={form.campana} onChange={v=>setForm(p=>({...p,campana:v}))} /></div>
+              <div className="bo-input-group"><label>N1</label><input className={`form-control${n1Error?' obligatorio-error':''}`} value={form.n1} onChange={e=>{ setN1Error(false); setForm(p=>({...p,n1:e.target.value})) }} placeholder="Número principal" style={{fontFamily:'monospace'}} /></div>
+              <div className="bo-input-group"><label>N2 (opcional)</label><input className="form-control" value={form.n2} onChange={e=>setForm(p=>({...p,n2:e.target.value}))} placeholder="Número secundario" style={{fontFamily:'monospace'}} /></div>
+              <div className="bo-input-group"><label>Usuario WhatsApp</label><input className={`form-control${n1Error?' obligatorio-error':''}`} value={form.usuarioWhatsapp} onChange={e=>{ setN1Error(false); setForm(p=>({...p,usuarioWhatsapp:e.target.value})) }} placeholder="Si no tiene N1, ej. usuario_clie" /></div>
+              <div className="bo-sidebar-add-btns">
+                <button className="bo-btn-limpiar btn btn-sm" onClick={()=>setForm({campana:'',distrito:'',n1:'',n2:'',usuarioWhatsapp:'',asesor:''})}>Limpiar</button>
+                <button className="bo-btn-agregar" onClick={agregarRegistro}>+ Agregar</button>
+              </div>
+            </div>
+          )}
         </aside>
 
         <main className="bo-main">
@@ -1598,17 +1675,6 @@ export default function Backdatareclutamiento() {
 
             {/* FILTROS EN UNA SOLA FILA, DEBAJO DE LAS FECHAS */}
             <div className="base-filtros">
-              <div className="bo-input-group"><label>Tipif. vendedor</label>
-                <select className="form-select" value={filtros.tipVend} onChange={e=>setFiltros(p=>({...p,tipVend:e.target.value}))}>
-                  <option value="">Todas</option>
-                  {TIPIF_VEND_OPCIONES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div className="bo-input-group"><label>Asesor</label>
-                <AsesorBuscador value={filtros.asesor} asesores={asesores}
-                  onChange={v=>setFiltros(p=>({...p,asesor:v}))}
-                  className="form-select" placeholderText="Todos" emptyLabel="Todos" />
-              </div>
               <div className="bo-input-group base-filtro-numero"><label>Número</label>
                 <input className="form-control" value={filtros.numero} onChange={e=>setFiltros(p=>({...p,numero:e.target.value}))} placeholder="Buscar N1, N2 o usuario WhatsApp..." />
               </div>
@@ -1630,38 +1696,10 @@ export default function Backdatareclutamiento() {
                 <input type="checkbox" checked={filtros.verTipVend} onChange={e=>setFiltros(p=>({...p,verTipVend:e.target.checked}))} />
                 <span>Ver tipif. vendedor</span>
               </label>
-              <button className="bo-btn-limpiar btn btn-sm base-filtro-limpiar" onClick={()=>{ setFiltros({tip:'',tipVend:'',asesor:'',numero:'',verTipVend:true,global:false,duplicados:false,desde:'',hasta:''}); setBaseSort({col:null,dir:'asc'}) }}>Limpiar filtros</button>
+              <button className="bo-btn-limpiar btn btn-sm base-filtro-limpiar" onClick={()=>{ setFiltros({tip:'',tipVend:'',asesor:'',campana:'',numero:'',verTipVend:true,global:false,duplicados:false,desde:'',hasta:''}); setBaseSort({col:null,dir:'asc'}) }}>Limpiar filtros</button>
               <button className="btn-rotar-masivo" onClick={ordenarBaseDelDia} type="button">Ordenar base del día</button>
             </div>
 
-            {/* FORMULARIO AGREGAR INDIVIDUAL */}
-            <div className="bo-panel" style={{marginBottom:14}}>
-              <div className="bo-panel-title">
-                + Agregar registro individual —&nbsp;
-                <span style={{fontSize:10,color:'#374151',fontWeight:600,textTransform:'none',letterSpacing:0}}>{formatFecha(fechaActiva)}</span>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10,marginBottom:10}}>
-                <div className="bo-input-group"><label>Campaña</label><CampanaSelect value={form.campana} onChange={v=>setForm(p=>({...p,campana:v}))} /></div>
-                <div className="bo-input-group"><label>N1</label><input className={`form-control${n1Error?' obligatorio-error':''}`} value={form.n1} onChange={e=>{ setN1Error(false); setForm(p=>({...p,n1:e.target.value})) }} placeholder="Número principal" style={{fontFamily:'monospace'}} /></div>
-                <div className="bo-input-group"><label>N2 (opcional)</label><input className="form-control" value={form.n2} onChange={e=>setForm(p=>({...p,n2:e.target.value}))} placeholder="Número secundario" style={{fontFamily:'monospace'}} /></div>
-                <div className="bo-input-group"><label>Usuario WhatsApp</label><input className={`form-control${n1Error?' obligatorio-error':''}`} value={form.usuarioWhatsapp} onChange={e=>{ setN1Error(false); setForm(p=>({...p,usuarioWhatsapp:e.target.value})) }} placeholder="Si no tiene N1, ej. usuario_clie" /></div>
-                <div className="bo-input-group"><label>Distrito</label>
-                  <select className="form-select" value={form.distrito} onChange={e=>setForm(p=>({...p,distrito:e.target.value}))}>
-                    <option value="">— Seleccionar —</option>
-                    {distritos.map(d=><option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="bo-input-group"><label>Asesor</label>
-                  <AsesorBuscador value={form.asesor} asesores={asesores}
-                    onChange={v=>setForm(p=>({...p,asesor:v}))}
-                    className="form-select" placeholderText="— Sin asignar —" emptyLabel="— Sin asignar —" />
-                </div>
-              </div>
-              <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-                <button className="bo-btn-limpiar btn btn-sm" onClick={()=>setForm({campana:'',distrito:'',n1:'',n2:'',usuarioWhatsapp:'',asesor:''})}>Limpiar</button>
-                <button className="bo-btn-agregar" onClick={agregarRegistro}>+ Agregar registro</button>
-              </div>
-            </div>
 
             {/* TABLA BASE */}
             <datalist id="asesores-datalist">
@@ -1672,10 +1710,14 @@ export default function Backdatareclutamiento() {
               <table className="base-tabla table table-sm table-hover">
                 <thead>
                   <tr>
-                    <th>#</th>{baseTh('campana','Campaña')}
+                    <th>#</th>
+                    <HeaderFiltroDropdown label="Campaña" valor={filtros.campana} onChange={v=>setFiltros(p=>({...p,campana:v}))} opciones={campanasDisponibles} buscable />
                     <th>N1</th><th>N2</th>
-                    {baseTh('asesor','Asesor asignado')}{baseTh('hora','Hora / Fecha asign.')}
-                    {filtros.verTipVend && baseTh('tipVend','Tipif. Vendedor')}
+                    <HeaderFiltroDropdown label="Asesor asignado" valor={filtros.asesor} onChange={v=>setFiltros(p=>({...p,asesor:v}))} opciones={asesores.map(a=>a.nombre)} buscable />
+                    {baseTh('hora','Hora / Fecha asign.')}
+                    {filtros.verTipVend && (
+                      <HeaderFiltroDropdown label="Tipif. Vendedor" valor={filtros.tipVend} onChange={v=>setFiltros(p=>({...p,tipVend:v}))} opciones={TIPIF_VEND_OPCIONES} />
+                    )}
                     <th>Comentario</th>{baseTh('rotac','Rotaciones')}<th>Acciones</th>
                   </tr>
                 </thead>
