@@ -227,16 +227,18 @@ export default function Grabaciones() {
     if (cargandoVentasRef.current) return  // evita polls solapados (respuestas fuera de orden que causan parpadeo)
     cargandoVentasRef.current = true
     try {
-      const res  = await fetch(`${API}/ventas?estado=validado`, { headers: ncHeaders() })
+      const res  = await fetch(`${API}/ventas`, { headers: ncHeaders() })
       const data = await res.json()
       if (data.ok && responseChanged(firmaVentasRef, data.data)) {
         setVentas(data.data
           .filter(v => {
             const e  = (v.estado||'').toLowerCase()
+            const eg = (v.estado_grab||'').toLowerCase()
             // Super de Grabaciones ya no opera su cola: la venta se queda
             // visible en Grabaciones sin importar la etiqueta que se le
-            // ponga (GRABADO incluido), solo cambia el badge mostrado.
-            return e==='validado'
+            // ponga (GRABADO incluido), solo cambia el badge mostrado. Y se
+            // mantiene aunque una etapa posterior cambie `estado` (Seguimiento).
+            return e==='validado' || eg==='grabado'
           })
           .map(mapVenta)
         )

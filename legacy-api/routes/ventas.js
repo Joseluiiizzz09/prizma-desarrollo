@@ -1317,7 +1317,10 @@ router.get('/', auth(ROLES_VENTAS), async (req, res) => {
     }
 
     if (cargoEfectivo === 'grabaciones') {
-      sql += ` AND UPPER(v.estado) = 'VALIDADO'`;
+      // Una venta que ya se marcó GRABADO se queda visible en Grabaciones
+      // aunque una etapa posterior (Seguimiento, etc.) cambie `estado` —
+      // la cola no debe perder registros que ya se grabaron.
+      sql += ` AND (UPPER(v.estado) = 'VALIDADO' OR LOWER(v.estado_grab) = 'grabado')`;
     }
 
     if (cargoEfectivo === 'seguimiento') {
