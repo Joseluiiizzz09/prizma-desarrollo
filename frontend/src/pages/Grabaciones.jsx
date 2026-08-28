@@ -666,35 +666,35 @@ export default function Grabaciones() {
             <table className="tabla grabaciones-ventas-tabla">
               <colgroup>
                 <col style={{width:400}} />
-                <col style={{width:150}} />
-                <col style={{width:130}} />
-                <col style={{width:150}} />
                 <col style={{width:120}} />
-                <col style={{width:250}} />
-                <col style={{width:120}} />
-                <col style={{width:140}} />
                 <col style={{width:150}} />
-                <col style={{width:230}} />
+                <col style={{width:170}} />
                 <col style={{width:110}} />
-                <col style={{width:210}} />
-                <col style={{width:180}} />
+                <col style={{width:190}} />
+                <col style={{width:90}} />
+                <col style={{width:110}} />
+                <col style={{width:160}} />
+                <col style={{width:240}} />
+                <col style={{width:90}} />
                 <col style={{width:220}} />
+                <col style={{width:150}} />
+                <col style={{width:180}} />
               </colgroup>
               <thead>
                 <tr>
                   <th style={{width:400,minWidth:400}}>ACCIONES</th>
-                  <th style={{width:110}}>ESTADO GRAB.</th>
-                  <th style={{width:130}}>USUARIO</th>
-                  <th style={{width:150}}>ESTADO</th>
-                  <th style={{width:120}}>FECHA</th>
-                  <th style={{width:160}}>NOMBRE Y APELLIDOS</th>
+                  <th style={{width:120}}>ESTADO GRAB.</th>
+                  <th style={{width:150}}>USUARIO</th>
+                  <th style={{width:170}}>ESTADO</th>
+                  <th style={{width:110}}>FECHA</th>
+                  <th style={{width:190}}>NOMBRE Y APELLIDOS</th>
                   <th style={{width:90}}>DNI / DOC.</th>
                   <th style={{width:110}}>TEL. CONTACTO</th>
-                  <th style={{width:150}}>DISTRITO</th>
-                  <th style={{width:230}}>DIRECCIÓN</th>
-                  <th style={{width:110}}>SALA</th>
-                  <th style={{width:210}}>EMAIL</th>
-                  <th style={{width:130}}>VENDEDOR</th>
+                  <th style={{width:160}}>DISTRITO</th>
+                  <th style={{width:240}}>DIRECCIÓN</th>
+                  <th style={{width:90}}>SALA</th>
+                  <th style={{width:220}}>EMAIL</th>
+                  <th style={{width:150}}>VENDEDOR</th>
                   <th style={{width:180}}>ÚLTIMA OBS.</th>
                 </tr>
               </thead>
