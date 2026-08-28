@@ -288,6 +288,18 @@ async function initDB() {
     if (!idxLR2[0].n) {
       await conn.query(`CREATE INDEX idx_lr_n1 ON leads_reclutamiento(n1)`);
     }
+    // routes/leads-reclutamiento.js usa estas dos columnas (usuario de WhatsApp
+    // como alternativa al N1, y tipif_back para el flujo de derivacion) desde
+    // el port de KRONO, pero nunca se migraron aqui — el INSERT/UPDATE fallaba
+    // con "Unknown column" (500) en cada alta nueva.
+    const columnasLeadsReclutamiento = [
+      ['usuario_whatsapp', "VARCHAR(100) DEFAULT ''"],
+      ['tipif_back',       "VARCHAR(100) DEFAULT ''"],
+    ];
+    for (const [columna, definicion] of columnasLeadsReclutamiento) {
+      await conn.query(`ALTER TABLE leads_reclutamiento ADD COLUMN ${columna} ${definicion}`)
+        .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
+    }
 
     // Postulantes de Reclutamiento ("Nuevo Postulante" en dashboardreclutamiento.jsx).
     // Tabla completamente separada de `ventas` (comercial) — solo candidatos a
