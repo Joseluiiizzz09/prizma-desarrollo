@@ -698,6 +698,9 @@ export default function Backoffice() {
   const [rotProgress,   setRotProgress]   = useState(0)
   const [rotResultado,  setRotResultado]  = useState([])
 
+  // ── Modal tipificación especial (Preventa / Sin cobertura) ──
+  const [modalTipifEsp, setModalTipifEsp] = useState(null)
+
   // ── Modal rotación manual ──
   const [modalRotar,    setModalRotar]    = useState({ open:false, regId:null, desc:'', asesorActual:'' })
   const [rotModalAsesor,setRotModalAsesor]= useState('')
@@ -1347,6 +1350,16 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
     const found = findReg(id)
     if (!found) return
     const { reg } = found
+    // PREVENTA y SIN COBERTURA requieren datos adicionales que el backend
+    // exige (documento / distrito+coordenadas) — se piden en un modal en
+    // vez de guardar directo, igual que en el Dashboard del asesor.
+    if (valor === 'PREVENTA' || valor === 'SIN COBERTURA') {
+      setModalTipifEsp({
+        id, tipo:valor, tipoDoc:'DNI', documento:'',
+        distrito: reg.distrito || '', coordenadas: reg.coordenadas || '', guardando:false,
+      })
+      return
+    }
     const hora = horaAhora()
     updateReg(id, { _tipifVend:valor, _tipifHora:hora })
     if (reg._backendId) {
@@ -1358,6 +1371,38 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
           throw new Error(data.mensaje || 'No se pudo guardar la tipificaciÃ³n')
         }
       } catch (e) { mostrarToast(e.message || 'Error al guardar la tipificaciÃ³n') }
+    }
+  }
+
+  async function guardarTipifEspecial() {
+    if (!modalTipifEsp || modalTipifEsp.guardando) return
+    const { id, tipo, tipoDoc, documento, distrito, coordenadas } = modalTipifEsp
+    const found = findReg(id)
+    if (!found) { setModalTipifEsp(null); return }
+    const { reg } = found
+    const body = { tipif_vend: tipo }
+    if (tipo === 'PREVENTA') {
+      const longitud = { DNI:8, CE:9, RUC:11 }[tipoDoc]
+      if (!new RegExp(`^\\d{${longitud}}$`).test(documento))
+        return mostrarToast(`${tipoDoc} debe tener exactamente ${longitud} dígitos`)
+      Object.assign(body, { tipo_doc:tipoDoc, documento })
+    } else {
+      if (!distrito.trim()) return mostrarToast('El distrito es obligatorio')
+      if (!coordenadas.trim()) return mostrarToast('Las coordenadas son obligatorias')
+      Object.assign(body, { distrito:distrito.trim(), coordenadas:coordenadas.trim() })
+    }
+    setModalTipifEsp(p => ({ ...p, guardando:true }))
+    try {
+      const hora = horaAhora()
+      const res = await fetch(`${API}/leads/${reg._backendId}/tipif`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify(body) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) { mostrarToast(data.mensaje || 'No se pudo guardar la tipificación'); return }
+      updateReg(id, { _tipifVend:tipo, _tipifHora:hora })
+      setModalTipifEsp(null)
+    } catch (e) {
+      mostrarToast('Error conectando al servidor')
+    } finally {
+      setModalTipifEsp(p => p ? ({ ...p, guardando:false }) : p)
     }
   }
 
@@ -3610,6 +3655,46 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
 
         </main>
       </div>
+
+      {/* ══ MODAL TIPIFICACIÓN ESPECIAL (Preventa / Sin cobertura) ══════════ */}
+      {modalTipifEsp && (
+        <div className="modal-overlay open" onClick={e=>{ if(e.target===e.currentTarget && !modalTipifEsp.guardando) setModalTipifEsp(null) }}>
+          <div className="modal-box">
+            <h3>{modalTipifEsp.tipo}</h3>
+            {modalTipifEsp.tipo === 'PREVENTA' ? (
+              <>
+                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:4}}>Tipo de documento</label>
+                <select value={modalTipifEsp.tipoDoc} onChange={e=>setModalTipifEsp(p=>({...p,tipoDoc:e.target.value,documento:''}))} style={{width:'100%',marginBottom:10,padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:8,fontFamily:'inherit'}}>
+                  <option value="DNI">DNI</option>
+                  <option value="CE">CE</option>
+                  <option value="RUC">RUC</option>
+                </select>
+                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:4}}>Número de documento</label>
+                <input value={modalTipifEsp.documento} inputMode="numeric"
+                  maxLength={{DNI:8,CE:9,RUC:11}[modalTipifEsp.tipoDoc]}
+                  onChange={e=>setModalTipifEsp(p=>({...p,documento:e.target.value.replace(/\D/g,'')}))}
+                  style={{width:'100%',padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:8,fontFamily:'inherit'}} />
+              </>
+            ) : (
+              <>
+                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:4}}>Distrito</label>
+                <input value={modalTipifEsp.distrito} onChange={e=>setModalTipifEsp(p=>({...p,distrito:e.target.value}))}
+                  style={{width:'100%',marginBottom:10,padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:8,fontFamily:'inherit'}} />
+                <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:4}}>Coordenadas</label>
+                <input value={modalTipifEsp.coordenadas} placeholder="-12.000000, -77.000000"
+                  onChange={e=>setModalTipifEsp(p=>({...p,coordenadas:e.target.value}))}
+                  style={{width:'100%',padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:8,fontFamily:'inherit'}} />
+              </>
+            )}
+            <div className="modal-btns">
+              <button className="btn-cancelar-modal" onClick={()=>setModalTipifEsp(null)} disabled={modalTipifEsp.guardando}>Cancelar</button>
+              <button className="btn-confirmar-modal" onClick={guardarTipifEspecial} disabled={modalTipifEsp.guardando}>
+                {modalTipifEsp.guardando ? 'Guardando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ MODAL ROTACIÓN MANUAL ════════════════════════════════════════════ */}
       {modalRotar.open && (
