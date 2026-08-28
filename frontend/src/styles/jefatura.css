@@ -209,6 +209,9 @@ body {
 .tabla-count { font-size: 11px; font-weight: 700; color: #fff; background: var(--dark); padding: 2px 9px; border-radius: 99px; }
 .tabla-search { padding: 7px 12px; border: 1.5px solid var(--border); border-radius: 9px; font-size: 12px; font-family: inherit; outline: none; width: 210px; background: #f9fafb; transition: all .2s; }
 .tabla-search:focus { border-color: var(--mid); background: #fff; }
+.usuarios-filtros-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tabla-select-filtro { width: auto; min-width: 150px; cursor: pointer; }
+@media (max-width: 700px) { .usuarios-filtros-right { width: 100%; } .usuarios-filtros-right .tabla-search { width: 100%; } }
 .tabla { width: 100%; border-collapse: collapse; font-size: 11px; white-space: nowrap; }
 .tabla thead th { background: var(--dark); color: rgba(255,255,255,.75); padding: 10px 12px; font-size: 9px; font-weight: 700; text-align: left; letter-spacing: .5px; text-transform: uppercase; position: sticky; top: 0; z-index: 2; }
 .tabla tbody td { padding: 9px 12px; border-bottom: 1px solid #f0f2f5; color: var(--mid); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }

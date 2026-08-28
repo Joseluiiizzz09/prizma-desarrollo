@@ -361,6 +361,8 @@ export default function Jefatura() {
   })
   const [mesReporte, setMesReporte] = useState('')
   const [busqUsuarios, setBusqUsuarios] = useState('')
+  const [filtroCargoUsuarios, setFiltroCargoUsuarios] = useState('')
+  const [filtroSalaUsuarios, setFiltroSalaUsuarios] = useState('')
   const [filtroFlujoVentas, setFiltroFlujoVentas] = useState('todas')
   const [busqFlujoVentas, setBusqFlujoVentas] = useState('')
 
@@ -979,11 +981,21 @@ export default function Jefatura() {
   }, [usuarios, ventasCache, salaReporte, mesReporte])
 
   /* ── usuarios filtrados ── */
+  const salasUsuariosDisponibles = useMemo(() => {
+    const set = new Set()
+    usuarios.forEach(u => { if (u.sala) set.add(u.sala) })
+    return Array.from(set).sort()
+  }, [usuarios])
+
   const usuariosFiltrados = useMemo(() => {
-    if (!busqUsuarios) return usuarios
     const b = busqUsuarios.toLowerCase()
-    return usuarios.filter(u => (u.nombre||'').toLowerCase().includes(b)||(u.usuario||'').toLowerCase().includes(b)||(u.sala||'').toLowerCase().includes(b))
-  }, [usuarios, busqUsuarios])
+    return usuarios.filter(u => {
+      if (b && !(u.nombre||'').toLowerCase().includes(b) && !(u.usuario||'').toLowerCase().includes(b) && !(u.sala||'').toLowerCase().includes(b)) return false
+      if (filtroCargoUsuarios && !usuarioTieneCargo(u, filtroCargoUsuarios)) return false
+      if (filtroSalaUsuarios && u.sala !== filtroSalaUsuarios) return false
+      return true
+    })
+  }, [usuarios, busqUsuarios, filtroCargoUsuarios, filtroSalaUsuarios])
 
   /* ── modal usuario ── */
   function abrirModalNuevo() {
@@ -1547,8 +1559,18 @@ export default function Jefatura() {
                     {usuariosCarga.cargando ? 'Cargando...' : usuariosCarga.error ? 'Sin conexión' : `${usuariosFiltrados.length} usuarios`}
                   </span>
                 </div>
-                <input type="text" className="tabla-search" value={busqUsuarios}
-                  onChange={e=>setBusqUsuarios(e.target.value)} placeholder="Buscar usuario..." />
+                <div className="tabla-header-right usuarios-filtros-right">
+                  <input type="text" className="tabla-search" value={busqUsuarios}
+                    onChange={e=>setBusqUsuarios(e.target.value)} placeholder="Buscar usuario..." />
+                  <select className="tabla-search tabla-select-filtro" value={filtroCargoUsuarios} onChange={e=>setFiltroCargoUsuarios(e.target.value)}>
+                    <option value="">Todos los cargos</option>
+                    {CARGOS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                  <select className="tabla-search tabla-select-filtro" value={filtroSalaUsuarios} onChange={e=>setFiltroSalaUsuarios(e.target.value)}>
+                    <option value="">Todas las salas</option>
+                    {salasUsuariosDisponibles.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
               <table className="tabla tabla-usuarios-pro">
                 <colgroup>
