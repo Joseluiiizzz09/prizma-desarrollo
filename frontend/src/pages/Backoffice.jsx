@@ -1969,7 +1969,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
 
   async function importarLegadoEnLotes(registros) {
     const LOTE = 200
-    let creados=0, actualizados=0, existentes=0, errores=0
+    let creados=0, actualizados=0, existentes=0, errores=0, saltadosMismaCampana=0
     const erroresDetalle = []
     for (let i=0; i<registros.length; i+=LOTE) {
       const batch = registros.slice(i, i+LOTE)
@@ -1985,9 +1985,10 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
       actualizados += data.actualizados || 0
       existentes += data.existentes || 0
       errores    += data.errores    || 0
+      saltadosMismaCampana += data.saltados_misma_campana || 0
       if (data.erroresDetalle) erroresDetalle.push(...data.erroresDetalle)
     }
-    return { creados, actualizados, existentes, errores, erroresDetalle }
+    return { creados, actualizados, existentes, errores, saltadosMismaCampana, erroresDetalle }
   }
 
   async function ejecutarCargaLegacy() {
@@ -2041,6 +2042,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
         existentes: resultado.existentes,
         duplicados: resultado.existentes,
         errores: resultado.errores,
+        saltadosMismaCampana: resultado.saltadosMismaCampana || 0,
         erroresDetalle: resultado.erroresDetalle,
         filas:[],
       })
@@ -3436,7 +3438,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
             )}
             {/* Resultado de importación */}
             {importResult && (() => {
-              const { total, importados, creados, actualizados, existentes, duplicados, errores, erroresDetalle, fecha, fechas, distribucion } = importResult
+              const { total, importados, creados, actualizados, existentes, duplicados, errores, saltadosMismaCampana, erroresDetalle, fecha, fechas, distribucion } = importResult
               const fechasSorted = (fechas||[]).slice().sort()
               const esMultifecha = fechasSorted.length > 1
               const titulo = esMultifecha
@@ -3461,6 +3463,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                     ['Actualizados',actualizados ?? 0,          '#1d4ed8'],
                     ['Existentes',  existentes ?? duplicados ?? 0, '#b45309'],
                     ['Con error',   errores,                    '#ea580c'],
+                    ...(saltadosMismaCampana ? [['Repetidos misma campaña', saltadosMismaCampana, '#9333ea']] : []),
                   ].map(([label,val,color])=>(
                     <div key={label} style={{textAlign:'center',minWidth:60}}>
                       <div style={{fontSize:22,fontWeight:800,color}}>{val}</div>

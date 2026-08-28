@@ -245,6 +245,23 @@ async function existeTipificadoOtraCampana(conn, n1, fecha, campana, excluirId =
   return rows.some(r => resumenTipificadoDia(r, r.historial, fecha).aplica);
 }
 
+// Un numero repetido el mismo dia en la MISMA campana no debe cargarse
+// (infla las metricas de leads de esa campana). En otra campana si se
+// carga normal — solo cambia el conteo de Marketing, no el flujo de
+// rotacion/NO ROTAR que ya protege al numero contra doble trabajo.
+async function existeMismaCampanaMismoDia(conn, n1, fecha, campanaNormalizada) {
+  const numero = normalizarN1(n1);
+  if (!numero || !fecha) return false;
+  const [rows] = await conn.query(`
+    SELECT id FROM leads
+    WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(n1, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', '') = ?
+      AND fecha = ?
+      AND campana = ?
+    LIMIT 1
+  `, [numero, fecha, campanaNormalizada || '']);
+  return rows.length > 0;
+}
+
 async function idLeadMasAntiguoDelDia(conn, n1, fecha) {
   const numero = normalizarN1(n1);
   if (!numero || !fecha) return null;
@@ -787,7 +804,7 @@ router.post('/import-legacy', auth(ROLES_BO), async (req, res) => {
     if (!registros.length)
       return res.status(400).json({ ok: false, mensaje: 'No se recibieron registros' });
 
-    let creados = 0, actualizados = 0, existentes = 0, errores = 0;
+    let creados = 0, actualizados = 0, existentes = 0, errores = 0, saltadosMismaCampana = 0;
     const erroresDetalle = [];
     const cargadoPorImport = await nombreUsuario(req.user.id);
     const ipCarga = req.ip || req.socket?.remoteAddress || '';
@@ -810,6 +827,15 @@ router.post('/import-legacy', auth(ROLES_BO), async (req, res) => {
 
         const fechaLead  = String(l.fecha || fechaPeruHoy()).substring(0, 10);
         const campana    = normalizarCampana(l.campana);
+
+        // Numero repetido el mismo dia en la MISMA campana: no se carga
+        // (evita inflar el conteo de leads de esa campana). En otra
+        // campana se carga normal, igual que antes.
+        if (await existeMismaCampanaMismoDia(conn, n1Raw, fechaLead, campana)) {
+          saltadosMismaCampana++;
+          continue;
+        }
+
         const distrito   = String(l.distrito   || '').substring(0, 100);
         const tipifBack  = normalizarTipifBack(l.tipif_back);
         let tipifVend  = normalizarTipifVendLegacy(l.tipif_vend).substring(0, 100);
@@ -909,6 +935,7 @@ router.post('/import-legacy', auth(ROLES_BO), async (req, res) => {
       actualizados,
       existentes,
       errores,
+      saltados_misma_campana: saltadosMismaCampana,
       erroresDetalle: erroresDetalle.slice(0, 30),
     });
 
@@ -932,6 +959,7 @@ router.post('/', auth(ROLES_BO), async (req, res) => {
     const fechaHoy  = fechaPeruHoy();
     const horaAhora = horaPeruAhora();
     let creados = 0;
+    let saltadosMismaCampana = 0;
     const ids = [];
     const fechasUsadas = [];
 
@@ -997,6 +1025,17 @@ router.post('/', auth(ROLES_BO), async (req, res) => {
       const horaFinal  = asesorId ? horaAhora : '';
       const tipifBackInicial = normalizarTipifBack(l.tipif_back);
       const campanaNormalizada = normalizarCampana(l.campana);
+
+      // Numero repetido el mismo dia en la MISMA campana: no se carga (evita
+      // inflar el conteo de leads de esa campana). En otra campana se carga
+      // normal, como hasta ahora. Se empuja null a `ids` para conservar la
+      // posicion (el llamador hace coincidir ids[i] con leads[i]).
+      if (await existeMismaCampanaMismoDia(db, n1Normalizado, fechaLead, campanaNormalizada)) {
+        saltadosMismaCampana++;
+        ids.push(null);
+        continue;
+      }
+
       const bloquearRotacion = Boolean(await idLeadMasAntiguoDelDia(db, n1Normalizado, fechaLead));
       const obsBackInicial = !tipifBackInicial ? '' : (tipifBackInicial === 'DERIVADO' ? 'DERIVADO' : 'LLAMAR AHORA');
       const nombreCargador = await nombreUsuario(req.user.id);
@@ -1029,7 +1068,10 @@ router.post('/', auth(ROLES_BO), async (req, res) => {
       ok: true,
       creados,
       ids,
-      mensaje: `${creados} lead(s) creado(s)`,
+      saltados_misma_campana: saltadosMismaCampana,
+      mensaje: saltadosMismaCampana
+        ? `${creados} lead(s) creado(s), ${saltadosMismaCampana} omitido(s) por ser número repetido en la misma campaña`
+        : `${creados} lead(s) creado(s)`,
       fecha_usada: fechasUsadas[0] || fechaHoy,
       fechas_usadas: [...new Set(fechasUsadas)],
     });
