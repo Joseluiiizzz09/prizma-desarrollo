@@ -54,6 +54,7 @@ export default function Usuarios() {
   const [buscar, setBuscar]         = useState('')
   const [filtroCargo, setFiltroCargo] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
+  const [filtroSala, setFiltroSala] = useState('')
 
   // Modal crear/editar
   const [modalOpen, setModalOpen]   = useState(false)
@@ -86,13 +87,20 @@ export default function Usuarios() {
 
   useEffect(() => { cargarUsuarios() }, [cargarUsuarios])
 
+  const salasDisponibles = useMemo(() => {
+    const set = new Set()
+    usuarios.forEach(u => { if (u.sala) set.add(u.sala) })
+    return Array.from(set).sort()
+  }, [usuarios])
+
   const usuariosFiltrados = useMemo(() => usuarios.filter(u => {
     const q = buscar.toLowerCase()
     if (q && !u.nombre.toLowerCase().includes(q) && !u.usuario.toLowerCase().includes(q)) return false
     if (filtroCargo  && !usuarioTieneCargo(u, filtroCargo)) return false
     if (filtroEstado && (filtroEstado === 'activo' ? !u.activo : u.activo)) return false
+    if (filtroSala   && u.sala !== filtroSala) return false
     return true
-  }), [usuarios, buscar, filtroCargo, filtroEstado])
+  }), [usuarios, buscar, filtroCargo, filtroEstado, filtroSala])
 
   const kpis = useMemo(() => ({
     total:        usuarios.length,
@@ -102,7 +110,7 @@ export default function Usuarios() {
     supervisores: usuarios.filter(u => usuarioTieneCargo(u, 'supervisor')).length,
   }), [usuarios])
 
-  function limpiarFiltros() { setBuscar(''); setFiltroCargo(''); setFiltroEstado('') }
+  function limpiarFiltros() { setBuscar(''); setFiltroCargo(''); setFiltroEstado(''); setFiltroSala('') }
 
   // MODAL CREAR
   function abrirModal() {
@@ -249,6 +257,10 @@ export default function Usuarios() {
             <option value="">Todos los estados</option>
             <option value="activo">Activos</option>
             <option value="inactivo">Inactivos</option>
+          </select>
+          <select className="select-filtro" value={filtroSala} onChange={e => setFiltroSala(e.target.value)}>
+            <option value="">Todas las salas</option>
+            {salasDisponibles.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <button className="btn-limpiar" onClick={limpiarFiltros}>✕ Limpiar</button>
         </div>
