@@ -1800,7 +1800,13 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
       });
     }
 
-    if (cargoEfectivo === 'grabaciones' && String(rows[0].estado || '').toUpperCase() !== 'VALIDADO') {
+    // La venta grabada se queda visible en Grabaciones aunque una etapa
+    // posterior la haga avanzar de estado (ver GET /). Por eso esta
+    // restricción solo aplica cuando se está tocando el flujo real de
+    // grabaciones (estado, estado_grab, etc.), no para cosas como la
+    // cobertura técnica o una observación, que deben poder seguir
+    // editándose aunque la venta ya haya avanzado.
+    if (cargoEfectivo === 'grabaciones' && modificaFlujo && String(rows[0].estado || '').toUpperCase() !== 'VALIDADO') {
       return res.status(403).json({ ok: false, mensaje: 'Solo puedes gestionar ventas con estado VALIDADO' });
     }
 
