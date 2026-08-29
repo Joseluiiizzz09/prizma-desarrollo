@@ -1,12 +1,55 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { usuarioTieneCargo } from '../utils/roles'
 import JefaturaViewControls from '../components/JefaturaViewControls'
 import CambiarAreaMenu from '../components/CambiarAreaMenu'
 import { API, ncHeaders } from '../services/api'
 import '../styles/cobranzas.css'
 
 const PAGE_SIZE = 25
+
+const COBRANZA_TIPIFICACIONES = ['PAGADO', 'PENDIENTE', 'BAJA', 'SUSPENDIDO', 'VENCIDO']
+
+// Resultado de la llamada de cobranza a un recibo (distinto del estado de pago de arriba).
+const TIPIFICACIONES_LLAMADA_COBRANZA = [
+  'PAGO', 'NO CONTESTA', 'CORTA LLAMADA', 'GENERAR DESCUENTO', 'NO PAGARÁ',
+  'CONFORME', 'PROBLEMAS CON EL SERVICIO', 'AGENDADO', 'NUMERO INCORRECTO', 'NO TIENE WHATSAPP',
+]
+
+function claseLlamadaCobranza(valor) {
+  const texto = String(valor || '').toUpperCase()
+  if (['PAGO', 'CONFORME'].includes(texto)) return 'positivo'
+  if (['NO PAGARÁ', 'NUMERO INCORRECTO'].includes(texto)) return 'negativo'
+  if (['GENERAR DESCUENTO', 'PROBLEMAS CON EL SERVICIO'].includes(texto)) return 'alerta'
+  if (['AGENDADO'].includes(texto)) return 'informativo'
+  return 'pendiente'
+}
+
+// Replica FECHA.MES/EDATE de Excel: suma n meses y recorta al ultimo dia del
+// mes destino si el dia de origen no existe ahi (31 ene + 1 mes = 28/29 feb).
+function sumarMesesExcel(fecha, n) {
+  const anio = fecha.getFullYear()
+  const mesDestino = fecha.getMonth() + n
+  const ultimoDia = new Date(anio, mesDestino + 1, 0).getDate()
+  return new Date(anio, mesDestino, Math.min(fecha.getDate(), ultimoDia))
+}
+
+// Replica las formulas de Excel dadas por Cobranza para los 6 vencimientos:
+// venc1 = FECHA(anio,mes,ciclo+18) de la instalacion (empujado 1 mes si cae antes
+// de la instalacion); venc2..6 = FECHA.MES(anterior, 1).
+function calcularVencimientosRecibos(fechaInstalacionValor, ciclo) {
+  const cicloNum = Number(ciclo)
+  const fechaInstalacionIso = fechaISO(fechaInstalacionValor)
+  if (!fechaInstalacionIso || !Number.isInteger(cicloNum)) return []
+  const instalacion = new Date(`${fechaInstalacionIso}T00:00:00`)
+  if (Number.isNaN(instalacion.getTime())) return []
+  let vencimiento = new Date(instalacion.getFullYear(), instalacion.getMonth(), cicloNum + 18)
+  if (vencimiento < instalacion) vencimiento = sumarMesesExcel(vencimiento, 1)
+  const fechas = [vencimiento]
+  for (let i = 1; i < 6; i++) fechas.push(sumarMesesExcel(fechas[i - 1], 1))
+  return fechas.map(f => `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`)
+}
 
 const TIPIFICACIONES_CALIDAD = {
   llamada: ['PENDIENTE', 'CONTESTA', 'NO CONTESTA', 'APAGADO', 'CORTA LLAMADA'],
@@ -120,6 +163,10 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
   const [guardando, setGuardando] = useState('')
   const [usuariosCalidad, setUsuariosCalidad] = useState([])
   const [clienteCalidad, setClienteCalidad] = useState(null)
+  const [clienteCobranza, setClienteCobranza] = useState(null)
+  const [cicloInput, setCicloInput] = useState('')
+  const [codigoPagoInput, setCodigoPagoInput] = useState('')
+  const [comentarioCobranza, setComentarioCobranza] = useState('')
   const [comentarioCalidad, setComentarioCalidad] = useState('')
   const [historialCalidad, setHistorialCalidad] = useState(null)
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
@@ -137,6 +184,8 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
   // Jefatura las supervisa al entrar por Accesos directos, pero solo Calidad edita.
   const esCalidad = areaNombre.toLowerCase().includes('calidad') && ['calidad','supcalidad'].includes(sesion?.cargo)
   const puedeEditarCalidad = esCalidad && !sesion?._actorJefatura
+  const esCobranza = areaNombre.toLowerCase().includes('cobranza') && usuarioTieneCargo(sesion, 'cobranzas')
+  const puedeEditarCobranza = esCobranza && !sesion?._actorJefatura
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -192,6 +241,13 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
     window.addEventListener('keydown', cerrar)
     return () => window.removeEventListener('keydown', cerrar)
   }, [clienteCalidad])
+
+  useEffect(() => {
+    if (!clienteCobranza) return undefined
+    const cerrar = evento => { if (evento.key === 'Escape') setClienteCobranza(null) }
+    window.addEventListener('keydown', cerrar)
+    return () => window.removeEventListener('keydown', cerrar)
+  }, [clienteCobranza])
 
   const filtrados = useMemo(() => {
     const texto = busqueda.trim().toLowerCase()
@@ -443,6 +499,117 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
     } finally { setGuardando('') }
   }
 
+  function resumenCobranza(cliente) {
+    if (!cliente.cobranza_ciclo_facturacion) return 'SIN CICLO'
+    const pagados = [1, 2, 3, 4, 5, 6].filter(n => (cliente[`cobranza_recibo${n}_tipificacion`] || 'PENDIENTE') === 'PAGADO').length
+    return pagados === 6 ? 'COMPLETADO' : `${pagados}/6 PAGADOS`
+  }
+
+  function abrirCobranza(cliente) {
+    setClienteCobranza(cliente)
+    setCicloInput(cliente.cobranza_ciclo_facturacion || '')
+    setCodigoPagoInput(cliente.cobranza_codigo_pago || '')
+    setComentarioCobranza(cliente.cobranza_comentario || '')
+  }
+
+  async function guardarCiclo(cliente) {
+    const ciclo = Number(cicloInput)
+    if (!Number.isInteger(ciclo) || ciclo < 1 || ciclo > 31) { setMensaje('Ingresa un ciclo de facturación válido (1-31)'); return }
+    const anterior = cliente.cobranza_ciclo_facturacion
+    const clave = `${cliente.id}-ciclo`
+    setMensaje('')
+    setGuardando(clave)
+    const aplicar = actual => actual?.id === cliente.id ? { ...actual, cobranza_ciclo_facturacion: ciclo } : actual
+    setClientes(actuales => actuales.map(aplicar)); setClienteCobranza(aplicar)
+    try {
+      const res = await fetch(`${API}/ventas/cobranza/${cliente.id}/ciclo`, { method: 'PATCH', headers: ncHeaders(), body: JSON.stringify({ ciclo }) })
+      const json = await res.json()
+      if (!res.ok || !json.ok) throw new Error(json.mensaje || 'No se pudo guardar el ciclo de facturación')
+    } catch (error) {
+      const revertir = actual => actual?.id === cliente.id ? { ...actual, cobranza_ciclo_facturacion: anterior } : actual
+      setClientes(actuales => actuales.map(revertir)); setClienteCobranza(revertir)
+      setMensaje(error.message || 'Error conectando con el servidor')
+    } finally { setGuardando('') }
+  }
+
+  async function guardarCodigoPago(cliente) {
+    const codigoPago = codigoPagoInput.trim()
+    const anterior = cliente.cobranza_codigo_pago || ''
+    const clave = `${cliente.id}-codigo`
+    setMensaje('')
+    setGuardando(clave)
+    const aplicar = actual => actual?.id === cliente.id ? { ...actual, cobranza_codigo_pago: codigoPago } : actual
+    setClientes(actuales => actuales.map(aplicar)); setClienteCobranza(aplicar)
+    try {
+      const res = await fetch(`${API}/ventas/cobranza/${cliente.id}/codigo-pago`, { method: 'PATCH', headers: ncHeaders(), body: JSON.stringify({ codigo_pago: codigoPago }) })
+      const json = await res.json()
+      if (!res.ok || !json.ok) throw new Error(json.mensaje || 'No se pudo guardar el código de pago')
+    } catch (error) {
+      const revertir = actual => actual?.id === cliente.id ? { ...actual, cobranza_codigo_pago: anterior } : actual
+      setClientes(actuales => actuales.map(revertir)); setClienteCobranza(revertir)
+      setMensaje(error.message || 'Error conectando con el servidor')
+    } finally { setGuardando('') }
+  }
+
+  async function guardarRecibo(cliente, numero, valor) {
+    const propiedad = `cobranza_recibo${numero}_tipificacion`
+    const anterior = cliente[propiedad] || 'PENDIENTE'
+    const clave = `${cliente.id}-recibo${numero}`
+    setMensaje('')
+    setGuardando(clave)
+    const aplicar = actual => actual?.id === cliente.id ? { ...actual, [propiedad]: valor } : actual
+    setClientes(actuales => actuales.map(aplicar)); setClienteCobranza(aplicar)
+    try {
+      const res = await fetch(`${API}/ventas/cobranza/${cliente.id}/recibo`, { method: 'PATCH', headers: ncHeaders(), body: JSON.stringify({ numero, valor }) })
+      const json = await res.json()
+      if (!res.ok || !json.ok) throw new Error(json.mensaje || 'No se pudo guardar la tipificación del recibo')
+    } catch (error) {
+      const revertir = actual => actual?.id === cliente.id ? { ...actual, [propiedad]: anterior } : actual
+      setClientes(actuales => actuales.map(revertir)); setClienteCobranza(revertir)
+      setMensaje(error.message || 'Error conectando con el servidor')
+    } finally { setGuardando('') }
+  }
+
+  async function guardarReciboLlamada(cliente, numero, valor) {
+    const propiedad = `cobranza_recibo${numero}_tipificacion_llamada`
+    const propiedadFecha = `cobranza_recibo${numero}_fecha_llamada`
+    const anterior = cliente[propiedad] || null
+    const anteriorFecha = cliente[propiedadFecha] || null
+    const clave = `${cliente.id}-recibo${numero}-llamada`
+    setMensaje('')
+    setGuardando(clave)
+    const aplicar = actual => actual?.id === cliente.id ? { ...actual, [propiedad]: valor, [propiedadFecha]: new Date().toISOString() } : actual
+    setClientes(actuales => actuales.map(aplicar)); setClienteCobranza(aplicar)
+    try {
+      const res = await fetch(`${API}/ventas/cobranza/${cliente.id}/recibo-llamada`, { method: 'PATCH', headers: ncHeaders(), body: JSON.stringify({ numero, valor }) })
+      const json = await res.json()
+      if (!res.ok || !json.ok) throw new Error(json.mensaje || 'No se pudo guardar la tipificación de la llamada')
+    } catch (error) {
+      const revertir = actual => actual?.id === cliente.id ? { ...actual, [propiedad]: anterior, [propiedadFecha]: anteriorFecha } : actual
+      setClientes(actuales => actuales.map(revertir)); setClienteCobranza(revertir)
+      setMensaje(error.message || 'Error conectando con el servidor')
+    } finally { setGuardando('') }
+  }
+
+  async function guardarComentarioCobranza(cliente) {
+    const anterior = cliente.cobranza_comentario || ''
+    const comentario = comentarioCobranza.trim()
+    const clave = `${cliente.id}-comentario-cobranza`
+    setMensaje('')
+    setGuardando(clave)
+    const aplicar = actual => actual?.id === cliente.id ? { ...actual, cobranza_comentario: comentario } : actual
+    setClientes(actuales => actuales.map(aplicar)); setClienteCobranza(aplicar)
+    try {
+      const res = await fetch(`${API}/ventas/cobranza/${cliente.id}/comentario`, { method: 'PATCH', headers: ncHeaders(), body: JSON.stringify({ comentario }) })
+      const json = await res.json()
+      if (!res.ok || !json.ok) throw new Error(json.mensaje || 'No se pudo guardar el comentario')
+    } catch (error) {
+      const revertir = actual => actual?.id === cliente.id ? { ...actual, cobranza_comentario: anterior } : actual
+      setClientes(actuales => actuales.map(revertir)); setClienteCobranza(revertir)
+      setMensaje(error.message || 'Error conectando con el servidor')
+    } finally { setGuardando('') }
+  }
+
   async function abrirHistorial(cliente) {
     setCargandoHistorial(true)
     setHistorialCalidad({ cliente, entradas:[] })
@@ -519,7 +686,7 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
           {mensaje && <div className="cobranzas-error">{mensaje}</div>}
           <div className="cobranzas-table-scroll">
             <table>
-              <thead><tr><th>#</th><th>NOMBRE DEL CLIENTE</th><th>DOCUMENTO</th><th>SOT</th><th>N1</th><th>N2</th><th>{esCalidad ? <FiltroColumna titulo="VENDEDOR" opciones={vendedoresFiltro} seleccionados={filtroVendedores} onChange={setFiltroVendedores} buscable /> : 'VENDEDOR'}</th><th>FECHA DE INSTALACIÓN</th><th>PAQUETE CONTRATADO</th>{esCalidad && <><th>RESPONSABLE CALIDAD</th><th><FiltroColumna titulo="ESTADO FINAL" opciones={estadosFiltro} seleccionados={filtroEstados} onChange={setFiltroEstados} /></th><th>FECHA DE TRATAMIENTO</th><th>GESTIÓN DE CALIDAD</th><th>HISTORIAL</th><th>COMENTARIO</th></>}</tr></thead>
+              <thead><tr><th>#</th><th>NOMBRE DEL CLIENTE</th><th>DOCUMENTO</th><th>SOT</th><th>N1</th><th>N2</th><th>{esCalidad ? <FiltroColumna titulo="VENDEDOR" opciones={vendedoresFiltro} seleccionados={filtroVendedores} onChange={setFiltroVendedores} buscable /> : 'VENDEDOR'}</th><th>FECHA DE INSTALACIÓN</th><th>PAQUETE CONTRATADO</th>{esCalidad && <><th>RESPONSABLE CALIDAD</th><th><FiltroColumna titulo="ESTADO FINAL" opciones={estadosFiltro} seleccionados={filtroEstados} onChange={setFiltroEstados} /></th><th>FECHA DE TRATAMIENTO</th><th>GESTIÓN DE CALIDAD</th><th>HISTORIAL</th><th>COMENTARIO</th></>}{esCobranza && <th>COBRANZA</th>}</tr></thead>
               <tbody>
                 {!cargando && visibles.map((cliente, index) => (
                   <tr key={cliente.id}>
@@ -541,10 +708,17 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
                       <td><button className="calidad-historial-btn" onClick={() => abrirHistorial(cliente)}>Historial</button></td>
                       <td className="calidad-comentario-col" title={cliente.calidad_comentario || ''}>{cliente.calidad_comentario || '—'}</td>
                     </>}
+                    {esCobranza && (
+                      <td className="cobranza-gestion-cell">
+                        <button className={`cobranza-gestion-btn ${resumenCobranza(cliente) === 'COMPLETADO' ? 'completo' : resumenCobranza(cliente) === 'SIN CICLO' ? 'alerta' : ''}`} onClick={() => abrirCobranza(cliente)}>
+                          <span>Gestionar cobranza</span><small>{resumenCobranza(cliente)}</small>
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
-                {!cargando && !visibles.length && <tr><td colSpan={esCalidad ? 15 : 9} className="cobranzas-empty">No hay clientes instalados para los filtros seleccionados.</td></tr>}
-                {cargando && <tr><td colSpan={esCalidad ? 15 : 9} className="cobranzas-empty">Cargando clientes instalados…</td></tr>}
+                {!cargando && !visibles.length && <tr><td colSpan={esCalidad ? 15 : esCobranza ? 10 : 9} className="cobranzas-empty">No hay clientes instalados para los filtros seleccionados.</td></tr>}
+                {cargando && <tr><td colSpan={esCalidad ? 15 : esCobranza ? 10 : 9} className="cobranzas-empty">Cargando clientes instalados…</td></tr>}
               </tbody>
             </table>
           </div>
@@ -718,6 +892,77 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
               {historialCalidad.entradas.map(entrada => <article key={entrada.id}><div><strong>{entrada.campo.replaceAll('_',' ').toUpperCase()}</strong><time>{fechaHoraVisible(entrada.created_at)}</time></div><p><span>{entrada.valor_anterior || '—'}</span><b>→</b><span>{entrada.valor_nuevo || '—'}</span></p><small>Gestionado por {entrada.usuario_nombre || 'Calidad'}</small></article>)}
             </div>
             <footer><span>{historialCalidad.entradas.length} movimientos registrados</span><button onClick={() => setHistorialCalidad(null)}>Cerrar historial</button></footer>
+          </section>
+        </div>
+      )}
+
+      {esCobranza && clienteCobranza && (
+        <div className="calidad-modal-overlay" onMouseDown={evento => { if (evento.target === evento.currentTarget) setClienteCobranza(null) }}>
+          <section className="calidad-modal" role="dialog" aria-modal="true" aria-label={`Gestión de cobranza de ${clienteCobranza.nombre || 'cliente'}`}>
+            <header>
+              <div><span>GESTIÓN DE COBRANZA</span><h2>{clienteCobranza.nombre || 'Cliente'}</h2><p>Documento: {clienteCobranza.dni || '—'} · SOT: {clienteCobranza.sot || '—'}</p></div>
+              <button onClick={() => setClienteCobranza(null)} aria-label="Cerrar">×</button>
+            </header>
+            <div className="cobranza-datos-box">
+              <label><span>CICLO DE FACTURACIÓN</span>
+                <div className="cobranza-input-row">
+                  <input type="number" min="1" max="31" value={cicloInput} disabled={!puedeEditarCobranza} onChange={e => setCicloInput(e.target.value)} placeholder="Ej. 5" />
+                  {puedeEditarCobranza && <button disabled={guardando === `${clienteCobranza.id}-ciclo`} onClick={() => guardarCiclo(clienteCobranza)}>{guardando === `${clienteCobranza.id}-ciclo` ? 'Guardando…' : 'Guardar'}</button>}
+                </div>
+              </label>
+              <label><span>CÓDIGO DE PAGO</span>
+                <div className="cobranza-input-row">
+                  <input type="text" maxLength={60} value={codigoPagoInput} disabled={!puedeEditarCobranza} onChange={e => setCodigoPagoInput(e.target.value)} placeholder="Código de pago del cliente" />
+                  {puedeEditarCobranza && <button disabled={guardando === `${clienteCobranza.id}-codigo`} onClick={() => guardarCodigoPago(clienteCobranza)}>{guardando === `${clienteCobranza.id}-codigo` ? 'Guardando…' : 'Guardar'}</button>}
+                </div>
+              </label>
+            </div>
+            {clienteCobranza.cobranza_ciclo_facturacion ? (
+              <div className="cobranza-modal-recibos">
+                {calcularVencimientosRecibos(clienteCobranza.fecha_instalacion, clienteCobranza.cobranza_ciclo_facturacion).map((fecha, indice) => {
+                  const numero = indice + 1
+                  const valorActual = clienteCobranza[`cobranza_recibo${numero}_tipificacion`] || 'PENDIENTE'
+                  const valorLlamada = clienteCobranza[`cobranza_recibo${numero}_tipificacion_llamada`] || ''
+                  const fechaLlamada = clienteCobranza[`cobranza_recibo${numero}_fecha_llamada`]
+                  return (
+                    <div className="cobranza-recibo-row" key={numero}>
+                      <div className="cobranza-recibo-info">
+                        <b>RECIBO {numero}</b><span>Vence {fechaVisible(fecha)}</span>
+                        {fechaLlamada && <span className="cobranza-recibo-ultima-llamada">Última llamada: {fechaHoraVisible(fechaLlamada)}</span>}
+                      </div>
+                      <div className="cobranza-recibo-selects">
+                        <select
+                          value={valorActual}
+                          disabled={!puedeEditarCobranza || guardando === `${clienteCobranza.id}-recibo${numero}`}
+                          onChange={e => guardarRecibo(clienteCobranza, numero, e.target.value)}
+                          className={`cobranza-tipificacion-${valorActual.toLowerCase()}`}
+                          title="Estado de pago"
+                        >
+                          {COBRANZA_TIPIFICACIONES.map(opcion => <option value={opcion} key={opcion}>{opcion}</option>)}
+                        </select>
+                        <select
+                          value={valorLlamada}
+                          disabled={!puedeEditarCobranza || guardando === `${clienteCobranza.id}-recibo${numero}-llamada`}
+                          onChange={e => guardarReciboLlamada(clienteCobranza, numero, e.target.value)}
+                          className={`cobranza-select-llamada ${claseLlamadaCobranza(valorLlamada)}`}
+                          title="Resultado de la llamada"
+                        >
+                          <option value="">— Sin gestionar —</option>
+                          {TIPIFICACIONES_LLAMADA_COBRANZA.map(opcion => <option value={opcion} key={opcion}>{opcion}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="cobranza-sin-ciclo">Ingresa el ciclo de facturación para calcular los vencimientos de los 6 recibos.</p>
+            )}
+            <div className="calidad-comentario-box">
+              <label><span>COMENTARIO (OPCIONAL)</span><textarea maxLength="1500" value={comentarioCobranza} disabled={!puedeEditarCobranza} onChange={e => setComentarioCobranza(e.target.value)} placeholder="Escribe aquí una observación de la gestión…" /></label>
+              {puedeEditarCobranza && <button disabled={guardando === `${clienteCobranza.id}-comentario-cobranza`} onClick={() => guardarComentarioCobranza(clienteCobranza)}>{guardando === `${clienteCobranza.id}-comentario-cobranza` ? 'Guardando…' : 'Guardar comentario'}</button>}
+            </div>
+            <footer><span>{resumenCobranza(clienteCobranza)}</span><button onClick={() => setClienteCobranza(null)}>Cerrar ficha</button></footer>
           </section>
         </div>
       )}

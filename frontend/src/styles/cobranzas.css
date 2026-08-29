@@ -908,3 +908,55 @@ Gestión de Calidad compacta: ficha anterior descartada durante la integración.
   .sup-calidad-persona>header{flex-wrap:wrap}
   .sup-rend-kpis{grid-template-columns:1fr 1fr}
 }
+
+/* ============================================================
+   Cobranzas — modal de gestión (ciclo, código de pago, 6 recibos)
+   Copiado de KRONO (rama codex-desarrollo). Reutiliza las clases
+   .calidad-modal-overlay/.calidad-modal/.calidad-comentario-box ya
+   existentes arriba — solo se agregan las clases .cobranza-* propias.
+   ============================================================ */
+.cobranza-gestion-cell{min-width:150px}
+.cobranza-gestion-btn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:135px;padding:8px 11px;border:1px solid #93c5fd;border-radius:9px;background:#eff6ff;color:#1d4ed8;font:inherit;font-size:10px;font-weight:900;cursor:pointer}
+.cobranza-gestion-btn small{font-size:8px;letter-spacing:.2px;opacity:.75}
+.cobranza-gestion-btn:hover{box-shadow:0 4px 12px rgba(29,78,216,.14);transform:translateY(-1px)}
+.cobranza-gestion-btn.completo{border-color:#6ee7b7;background:#ecfdf5;color:#047857}
+.cobranza-gestion-btn.completo:hover{box-shadow:0 4px 12px rgba(4,120,87,.14)}
+.cobranza-gestion-btn.alerta{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
+.cobranza-gestion-btn.alerta:hover{box-shadow:0 4px 12px rgba(194,65,12,.14)}
+.cobranza-datos-box{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;padding:17px 22px;background:#f0fdfa;border-bottom:1px solid #ccfbf1}
+.cobranza-datos-box label span{display:block;margin-bottom:7px;color:#475569;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.3px}
+.cobranza-input-row{display:flex;gap:8px}
+.cobranza-input-row input{box-sizing:border-box;flex:1;height:40px;padding:0 12px;border:1px solid #99e6d7;border-radius:9px;background:#ecfdf8;color:#0f766e;font:inherit;font-size:11px;font-weight:700;outline:none}
+.cobranza-input-row input:focus{border-color:#14b8a6;box-shadow:0 0 0 3px rgba(20,184,166,.13)}
+.cobranza-input-row input:disabled{cursor:default;opacity:1;-webkit-text-fill-color:currentColor}
+.cobranza-input-row button{height:40px;padding:0 14px;border:0;border-radius:9px;background:#0f766e;color:#fff;font:inherit;font-size:10px;font-weight:900;cursor:pointer;white-space:nowrap}
+.cobranza-input-row button:disabled{opacity:.6}
+.cobranza-modal-recibos{display:flex;flex-direction:column;gap:8px;padding:18px 22px}
+.cobranza-recibo-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
+.cobranza-recibo-info{display:flex;flex-direction:column;gap:2px}
+.cobranza-recibo-info b{font-size:11px;color:#334155;letter-spacing:.3px}
+.cobranza-recibo-info span{font-size:10px;color:#64748b}
+.cobranza-recibo-row select{width:150px;height:36px;padding:0 10px;border:1px solid #e2e8f0;border-radius:8px;font:inherit;font-size:10px;font-weight:800;outline:none;cursor:pointer}
+.cobranza-recibo-row select:disabled{cursor:default;opacity:1;-webkit-text-fill-color:currentColor}
+.cobranza-tipificacion-pagado{border-color:#6ee7b7!important;background:#ecfdf5!important;color:#047857!important}
+.cobranza-tipificacion-pendiente{border-color:#f5c67b!important;background:#fff8e7!important;color:#b45309!important}
+.cobranza-tipificacion-vencido{border-color:#fca5a5!important;background:#fef2f2!important;color:#b91c1c!important}
+.cobranza-tipificacion-suspendido{border-color:#fdba74!important;background:#fff7ed!important;color:#c2410c!important}
+.cobranza-tipificacion-baja{border-color:#cbd5e1!important;background:#f1f5f9!important;color:#475569!important}
+.cobranza-sin-ciclo{margin:0;padding:24px 22px;text-align:center;color:#94a3b8;font-size:12px}
+.cobranza-recibo-ultima-llamada{color:#94a3b8;font-size:9px;font-style:italic}
+.cobranza-recibo-selects{display:flex;gap:8px;flex-wrap:wrap}
+.cobranza-select-llamada{width:190px;height:36px;padding:0 10px;border:1px solid #e2e8f0;border-radius:8px;font:inherit;font-size:10px;font-weight:800;outline:none;cursor:pointer;background:#f8fafc;color:#475569}
+.cobranza-select-llamada:disabled{cursor:default;opacity:1;-webkit-text-fill-color:currentColor}
+.cobranza-select-llamada.positivo{border-color:#6ee7b7;background:#ecfdf5;color:#047857}
+.cobranza-select-llamada.negativo{border-color:#fca5a5;background:#fef2f2;color:#b91c1c}
+.cobranza-select-llamada.alerta{border-color:#fdba74;background:#fff7ed;color:#c2410c}
+.cobranza-select-llamada.informativo{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
+@media(max-width:620px){
+  .cobranza-datos-box{grid-template-columns:1fr}
+  .cobranza-input-row{flex-direction:column}
+  .cobranza-input-row button{width:100%}
+  .cobranza-recibo-row{flex-direction:column;align-items:stretch}
+  .cobranza-recibo-row select{width:100%}
+  .cobranza-select-llamada{width:100%}
+}
