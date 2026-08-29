@@ -1570,7 +1570,16 @@ router.patch('/:id', auth(ROLES_BO), async (req, res) => {
     try { historialServidor = JSON.parse(lead.historial || '[]'); } catch { historialServidor = []; }
     let historialJSON;
     if (historial || cambiaTipifBack) {
-      const histArr = cambiaTipifBack ? [...historialServidor] : [...historial];
+      // Igual que con tipif_back: la copia de historial que manda el navegador
+      // puede estar desactualizada si otra acción (ej. marcar DERIVADO) se guardó
+      // en el servidor un instante antes de que el cliente construyera la suya.
+      // Usar esa copia tal cual borraba lo que el servidor ya había escrito
+      // (ej. el DERIVADO se perdía al reasignar justo después). Se usa el
+      // historial real del servidor como base y solo se agrega la entrada nueva
+      // que el cliente construyó (siempre la última de su arreglo).
+      const histArr = cambiaTipifBack
+        ? [...historialServidor]
+        : (Array.isArray(historial) && historial.length ? [...historialServidor, historial[historial.length - 1]] : [...historialServidor]);
       if (histArr.length > 0) {
         const lastIdx = histArr.length - 1;
         let lastEntry = { ...histArr[lastIdx] };
