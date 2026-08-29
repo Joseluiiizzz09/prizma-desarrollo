@@ -1590,6 +1590,15 @@ router.patch('/:id', auth(ROLES_BO), async (req, res) => {
           // principal la siga mostrando hasta que el nuevo asesor tipifique.
           if (lastEntry.tipifVendAntes == null) lastEntry.tipifVendAntes = lead.tipif_vend || '';
           if (lastEntry.obsAsesorAntes == null) lastEntry.obsAsesorAntes = lead.obs_asesor || '';
+          // Si Back marcó DERIVADO (u otro obsBackPersonal) mientras el lead
+          // todavía no tenía asesor, esa marca queda guardada con asesor:"" y
+          // el nuevo asesor nunca la encuentra (la búsqueda de obs_back_personal
+          // exige que el nombre del asesor coincida). Se traslada ese aviso a la
+          // asignación nueva para que sí le aparezca en su base.
+          if (lastEntry.obsBackPersonal == null && !lead.asesor_nombre) {
+            const previo = [...histArr].reverse().find(h => h?.obsBackPersonal != null);
+            if (previo) lastEntry.obsBackPersonal = previo.obsBackPersonal;
+          }
         }
         histArr[lastIdx] = lastEntry;
       }
