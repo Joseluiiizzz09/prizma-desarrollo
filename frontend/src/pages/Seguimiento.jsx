@@ -40,6 +40,8 @@ const ESTADO_BD_MAP = {
   rechazo_mesa: 'rechazo_mesa',
   ejecutada:    'ejecutada',
 }
+// Estados donde el modal "Cambiar estado" pide fecha (instalación/ejecución).
+const ESTADOS_CON_FECHA = ['programada', 'reprogramado', 'ejecutada']
 
 const SEG_FILTRO_KEY = 'nc_seguimiento_filtro'
 const ORD_EST = { caida:0, rechazo:1, rechazo_mesa:1, desaprobado:2, sin_ingreso:3, reprogramado:4, tecnico:5, en_progreso:6, programada:7, ejecutada:8 }
@@ -350,7 +352,7 @@ export default function Seguimiento() {
     const comentario = estObs.trim() || modalEstado._comentario
     const motivoAplica = estNuevo === 'caida' || estNuevo === 'rechazo'
     const body = { estado: estadoBD, obs_seguimiento: comentario, tramo_seguimiento: estTramo }
-    if (estNuevo === 'programada' || estNuevo === 'reprogramado') {
+    if (ESTADOS_CON_FECHA.includes(estNuevo)) {
       if (!estFechaInstalacion) { mostrarToast('Ingresa la fecha de instalación'); return }
       body.fecha_programada = estFechaInstalacion
     }
@@ -368,7 +370,7 @@ export default function Seguimiento() {
     } catch (e) { console.error(e); mostrarToast('No se pudo guardar el estado'); return }
     setVentas(list => list.map(x =>
       x.id === modalEstado.id
-        ? { ...x, _estadoSeg: estNuevo, _tramo: estTramo, _comentario: comentario, fecha_programada: (estNuevo === 'programada' || estNuevo === 'reprogramado') ? estFechaInstalacion : x.fecha_programada, _motivoRech: motivoAplica ? estMotivo : x._motivoRech }
+        ? { ...x, _estadoSeg: estNuevo, _tramo: estTramo, _comentario: comentario, fecha_programada: ESTADOS_CON_FECHA.includes(estNuevo) ? estFechaInstalacion : x.fecha_programada, _motivoRech: motivoAplica ? estMotivo : x._motivoRech }
         : x
     ))
     setModalEstado(null)
@@ -733,7 +735,7 @@ export default function Seguimiento() {
                   </select>
                 </div>
               )}
-              {(estNuevo === 'programada' || estNuevo === 'reprogramado') && (
+              {ESTADOS_CON_FECHA.includes(estNuevo) && (
                 <div className="modal-campo" style={{ gridColumn: '1/-1' }}>
                   <label>Fecha de instalación *</label>
                   <input type="date" value={estFechaInstalacion} onChange={e => setEstFechaInstalacion(e.target.value)} />
