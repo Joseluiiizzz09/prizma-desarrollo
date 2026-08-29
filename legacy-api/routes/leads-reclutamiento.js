@@ -202,6 +202,12 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
         const [uRows] = await db.query(`SELECT id, nombre, cargo, permisos, activo FROM usuarios WHERE nombre = ?`, [nombreBuscar]);
         if (uRows.length && await esAsesorReclutamientoValido(uRows[0].id)) {
           asesorId = uRows[0].id; asesorNombre = uRows[0].nombre;
+        } else {
+          // Nombre sin cuenta real de asesorreclutamiento en PRIZMA (ej.
+          // importación de un sistema anterior con gente que aún no se dio de
+          // alta). Se guarda el nombre tal cual como referencia, sin asesor_id:
+          // nadie puede gestionarlo desde su sesión hasta que exista la cuenta.
+          asesorNombre = nombreBuscar;
         }
       }
 

@@ -270,19 +270,6 @@ const TIPIF_VEND_FUERTE = {
   'VOLVER A LLAMAR': ['#dbeafe','#1d4ed8','#93c5fd'],
   'FRAUDE':          ['#fee2e2','#991b1b','#fca5a5'],
 }
-// Importación Legacy: el CSV trae solo el nombre de pila del asesor
-// ("LUCERO"), no el nombre completo que exige el backend para asignar.
-// Empareja por palabra exacta contra la lista de asesores real; si hay 0 o
-// más de 1 candidato (nombre ambiguo/repetido) no asigna, para no adivinar mal.
-function resolverAsesorLegacy(nombreCorto, listaAsesores) {
-  const q = String(nombreCorto || '').trim().toUpperCase()
-  if (!q) return ''
-  const candidatos = listaAsesores.filter(a =>
-    String(a.nombre || '').toUpperCase().trim().split(/\s+/).includes(q)
-  )
-  return candidatos.length === 1 ? candidatos[0].nombre : ''
-}
-
 function estiloTipifVend(v) {
   const paleta = TIPIF_VEND_FUERTE[v]
   return {
@@ -1347,21 +1334,18 @@ export default function Backdatareclutamiento() {
     // hubiera rechazado, y desaparecían al recargar.
     const CHUNK = 400
     let importados = 0
-    let sinAsesorResuelto = 0
     let errorMsg = ''
     const nuevasFechasLocal = []
-    // Resuelve cada fila una sola vez (nombres cortos del CSV -> nombre
-    // completo real) antes de mandar nada, para mantener el historial de
-    // rotaciones y el asesor final coherentes con lo que de verdad existe.
-    const filasResueltas = legacyRows.map(r => {
-      const asesoresResueltos = r.asesores.map(a => resolverAsesorLegacy(a, asesores)).filter(Boolean)
-      return { ...r, asesoresRaw:r.asesores, asesoresResueltos }
-    })
-    for (let i = 0; i < filasResueltas.length; i += CHUNK) {
-      const lote = filasResueltas.slice(i, i + CHUNK)
+    // El nombre corto del CSV (ej. "LUCERO") no siempre tiene cuenta real en
+    // PRIZMA. El backend ahora lo guarda tal cual como referencia aunque no
+    // resuelva a un usuario real (queda sin asesor_id, sin permisos de
+    // gestión). Se manda el último de la lista como asesor actual y el resto
+    // queda en el historial de rotaciones.
+    for (let i = 0; i < legacyRows.length; i += CHUNK) {
+      const lote = legacyRows.slice(i, i + CHUNK)
       const leadsBackend = lote.map(r => {
-        const asesorFinal = r.asesoresResueltos[r.asesoresResueltos.length - 1] || ''
-        const historial = r.asesoresResueltos.map((a, idx) => ({ asesor:a, hora:r.hora||'—', fecha:r.fecha, motivo: idx===0 ? 'Asignacion inicial' : `Rotacion ${idx}` }))
+        const asesorFinal = r.asesores[r.asesores.length - 1] || ''
+        const historial = r.asesores.map((a, idx) => ({ asesor:a, hora:r.hora||'—', fecha:r.fecha, motivo: idx===0 ? 'Asignacion inicial' : `Rotacion ${idx}` }))
         return {
           campana:r.campana, distrito:r.distrito, n1:r.n1, n2:r.n2,
           tipif_back:r.tipifBack, tipif_vend:r.tipifVend, obs_asesor:r.comentario,
@@ -1378,11 +1362,10 @@ export default function Backdatareclutamiento() {
           const fecha = r.fecha
           if (!fechaPestanas.includes(fecha) && !nuevasFechasLocal.includes(fecha)) nuevasFechasLocal.push(fecha)
           if (!updates[fecha]) updates[fecha] = []
-          if (r.asesoresRaw.length && !r.asesoresResueltos.length) sinAsesorResuelto++
-          const asesorFinal = r.asesoresResueltos[r.asesoresResueltos.length - 1] || ''
+          const asesorFinal = r.asesores[r.asesores.length - 1] || ''
           // Permitir duplicados: no se descartan números repetidos en la carga del sistema antiguo.
-          const hist = r.asesoresResueltos.map((a,idx)=>({ asesor:a, hora:r.hora||'—', fecha, motivo:idx===0?'Asignacion inicial':`Rotacion ${idx}` }))
-          updates[fecha].push({ id:idCntRef.current++, _backendId:null, campana:r.campana, distrito:r.distrito, n1:r.n1, n2:r.n2, tipifBack:r.tipifBack, obsAsesor:r.comentario||'', asesor:asesorFinal, horaAsig:r.hora, sinAsignar:!asesorFinal, rotaciones:Math.max(0,r.asesoresResueltos.length-1), _tipifVend:r.tipifVend||'', _tipifHora:r.tipifVend?(r.hora||''):'', historial:hist })
+          const hist = r.asesores.map((a,idx)=>({ asesor:a, hora:r.hora||'—', fecha, motivo:idx===0?'Asignacion inicial':`Rotacion ${idx}` }))
+          updates[fecha].push({ id:idCntRef.current++, _backendId:null, campana:r.campana, distrito:r.distrito, n1:r.n1, n2:r.n2, tipifBack:r.tipifBack, obsAsesor:r.comentario||'', asesor:asesorFinal, horaAsig:r.hora, sinAsignar:!asesorFinal, rotaciones:Math.max(0,r.asesores.length-1), _tipifVend:r.tipifVend||'', _tipifHora:r.tipifVend?(r.hora||''):'', historial:hist })
         })
         setBaseData(prev => { const n={...prev}; for(const f in updates) n[f]=[...(prev[f]||[]),...updates[f]]; return n })
         importados += lote.length
@@ -1393,7 +1376,7 @@ export default function Backdatareclutamiento() {
     }
     setFechaPestanas(prev => [...prev, ...nuevasFechasLocal.filter(f=>!prev.includes(f))].sort().reverse())
     if (errorMsg) mostrarToast(`Se importaron ${importados} de ${legacyRows.length}. ${errorMsg}`)
-    else mostrarToast(`${importados} registro(s) importado(s)${sinAsesorResuelto?`, ${sinAsesorResuelto} sin asesor reconocido (nombre no coincide o es ambiguo)`:' correctamente'}`)
+    else mostrarToast(`${importados} registro(s) importado(s) correctamente`)
     setLegacyRows([]); setLegacyInfo(''); setLegacyStatus('')
     if (legacyInputRef.current) legacyInputRef.current.value = ''
   }
