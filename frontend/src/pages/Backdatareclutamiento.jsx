@@ -212,6 +212,15 @@ const TIPIF_VEND_OPCIONES = [
   { value:'AGENDADO',      label:'Agendado' },
   { value:'NO TOCAR',      label:'No cumple perfil' },
   { value:'FRAUDE',        label:'Provincia' },
+  // Valores tal cual como vienen de importaciones del sistema anterior — no
+  // se mapean a las opciones de arriba (distintas aunque el texto se parezca)
+  // para no alterar la lógica de rotación ya atada a esos valores existentes.
+  { value:'ACEPTA PROPUESTA',    label:'ACEPTA PROPUESTA' },
+  { value:'BUZON',               label:'BUZON' },
+  { value:'GESTION WSP',         label:'GESTION WSP' },
+  { value:'NO CUMPLE EL PERFIL', label:'NO CUMPLE EL PERFIL' },
+  { value:'NO INTERESADO',       label:'NO INTERESADO' },
+  { value:'SH NO ROTAR',         label:'SH NO ROTAR' },
 ]
 function labelTipifVend(valor) {
   const texto = String(valor || '').trim().toUpperCase()
