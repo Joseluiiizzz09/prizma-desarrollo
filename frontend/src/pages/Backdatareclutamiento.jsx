@@ -205,28 +205,36 @@ function tipifBadgeClass(t) {
 const TIPIF_BACK_OPTIONS = ['BUZON','NO CONTESTA','DER CHAMO','VENTA CERRADA','NO DESEA','CORTA LLAMADA','PREVENTA','EN EJECUCION','AGENDADO','NO CALIFICA','EDIFICIO NO LIBERADO']
 // Value interno se conserva igual al de Backoffice comercial para heredar automáticamente
 // el mismo comportamiento (bloqueo de rotación en NO TOCAR/FRAUDE); solo cambia el label visible.
+// Lista igual a la de KRONO (mismo orden y labels). El value interno de
+// "Acepta propuesta"/"Provincia" se conserva como VENTA CERRADA/FRAUDE porque
+// ya hay lógica atada a esos textos (bloqueo de rotación, conteos de
+// Rendimiento, el modal de "Agendar entrevista") — cambiar el value rompería
+// todo eso. Los "ACEPTA PROPUESTA" sueltos que vienen de una importación
+// Legacy se normalizan a VENTA CERRADA solo para que el select los muestre
+// seleccionados (ver normalizarTipifVendSelect).
 const TIPIF_VEND_OPCIONES = [
-  { value:'VENTA CERRADA', label:'Acepta propuesta' },
-  { value:'NO CONTESTA',   label:'No contesta' },
-  { value:'CORTA LLAMADA', label:'Corta llamada' },
-  { value:'AGENDADO',      label:'Agendado' },
-  { value:'NO TOCAR',      label:'No cumple perfil' },
-  { value:'FRAUDE',        label:'Provincia' },
-  // Valores tal cual como vienen de importaciones del sistema anterior — no
-  // se mapean a las opciones de arriba (distintas aunque el texto se parezca)
-  // para no alterar la lógica de rotación ya atada a esos valores existentes.
-  { value:'ACEPTA PROPUESTA',    label:'ACEPTA PROPUESTA' },
-  { value:'BUZON',               label:'BUZON' },
-  { value:'GESTION WSP',         label:'GESTION WSP' },
-  { value:'NO CUMPLE EL PERFIL', label:'NO CUMPLE EL PERFIL' },
-  { value:'NO INTERESADO',       label:'NO INTERESADO' },
-  { value:'SH NO ROTAR',         label:'SH NO ROTAR' },
+  { value:'VENTA CERRADA',       label:'Acepta propuesta' },
+  { value:'BUZON',               label:'Buzón de voz' },
+  { value:'NO CUMPLE EL PERFIL', label:'No cumple el perfil' },
+  { value:'CORTA LLAMADA',       label:'Corta llamada' },
+  { value:'GESTION WSP',         label:'Gestión WSP' },
+  { value:'NO CONTESTA',         label:'No contesta' },
+  { value:'NO INTERESADO',       label:'No interesado' },
+  { value:'SH NO ROTAR',         label:'No rotar' },
+  { value:'VOLVER A LLAMAR',     label:'Volver a llamar' },
+  { value:'FRAUDE',              label:'Provincia' },
 ]
 function labelTipifVend(valor) {
   const texto = String(valor || '').trim().toUpperCase()
   return TIPIF_VEND_OPCIONES.find(t => t.value === texto)?.label || valor || ''
 }
-const TIPIF_PROHIBIDAS_ROTACION = new Set(['NO TOCAR','FRAUDE'])
+// Solo para que el <select> muestre la opción correcta ya marcada — no cambia
+// lo que hay guardado en la base.
+function normalizarTipifVendSelect(valor) {
+  const texto = String(valor || '').trim().toUpperCase()
+  return texto === 'ACEPTA PROPUESTA' ? 'VENTA CERRADA' : texto
+}
+const TIPIF_PROHIBIDAS_ROTACION = new Set(['NO TOCAR','FRAUDE','SH NO ROTAR'])
 const LIMA_DISTRITOS = [
   'Ancón','Ate','Barranco','Breña','Carabayllo','Cercado de Lima','Chaclacayo','Chorrillos',
   'Cieneguilla','Comas','El Agustino','Independencia','Jesús María','La Molina','La Victoria',
@@ -1422,7 +1430,7 @@ export default function Backdatareclutamiento() {
 
   const registrosFiltrados0 = registrosActivos.filter(r => {
     if (filtros.tip    && !(r.tipifBack||'').toUpperCase().includes(filtros.tip.toUpperCase())) return false
-    if (filtros.tipVend&& (r._tipifVend||'').toUpperCase() !== filtros.tipVend.toUpperCase())  return false
+    if (filtros.tipVend&& normalizarTipifVendSelect(r._tipifVend) !== filtros.tipVend.toUpperCase())  return false
     if (filtros.asesor && !(r.asesor||'').toUpperCase().includes(filtros.asesor.toUpperCase())) return false
     if (filtros.campana&& r.campana !== filtros.campana) return false
     if (filtros.numero && !r.n1.includes(filtros.numero) && !(r.n2||'').includes(filtros.numero) && !(r.usuarioWhatsapp||'').toUpperCase().includes(filtros.numero.toUpperCase())) return false
@@ -1837,7 +1845,7 @@ export default function Backdatareclutamiento() {
                             {filtros.verTipVend && (
                               <td>
                                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
-                                  <select className="sel-tipif-vend" value={r._tipifVend} onChange={e=>guardarTipif(r.id,e.target.value)} style={esExclusiva?{fontSize:10,padding:'3px 6px',border:'1px solid #ea580c',borderRadius:6,fontFamily:'inherit',maxWidth:155,cursor:'pointer',color:'#ea580c',fontWeight:700,background:'#fff7ed'}:estiloTipifVend(r._tipifVend)}>
+                                  <select className="sel-tipif-vend" value={normalizarTipifVendSelect(r._tipifVend)} onChange={e=>guardarTipif(r.id,e.target.value)} style={esExclusiva?{fontSize:10,padding:'3px 6px',border:'1px solid #ea580c',borderRadius:6,fontFamily:'inherit',maxWidth:155,cursor:'pointer',color:'#ea580c',fontWeight:700,background:'#fff7ed'}:estiloTipifVend(normalizarTipifVendSelect(r._tipifVend))}>
                                     <option value="">— Pendiente —</option>
                                     {TIPIF_VEND_OPCIONES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                                   </select>
