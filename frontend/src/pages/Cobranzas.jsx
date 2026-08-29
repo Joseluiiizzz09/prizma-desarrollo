@@ -272,6 +272,36 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
     ...clientes.map(cliente => String(cliente.calidad_estado_cliente || 'PENDIENTE').trim().toUpperCase()),
   ])].sort((a, b) => a.localeCompare(b, 'es')), [clientes])
 
+  // Agrupa por mes de instalación (más reciente primero) para el landing de
+  // tarjetas — evita mostrar la tabla plana completa de una vez según crece.
+  const clientesPorMes = useMemo(() => {
+    const nombresMes = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
+    const mapa = new Map()
+    filtrados.forEach(cliente => {
+      const iso = fechaISO(cliente.fecha_instalacion)
+      const clave = iso ? iso.slice(0, 7) : 'sin-fecha'
+      if (!mapa.has(clave)) mapa.set(clave, [])
+      mapa.get(clave).push(cliente)
+    })
+    return [...mapa.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([clave, clientesMes]) => {
+        let label = 'Sin fecha'
+        if (clave !== 'sin-fecha') {
+          const [anio, mes] = clave.split('-')
+          const nombre = nombresMes[Number(mes) - 1] || mes
+          label = `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${anio}`
+        }
+        return { clave, label, clientes: clientesMes }
+      })
+  }, [filtrados])
+  // Tarjetas por mes solo como landing por defecto: en cuanto haya un rango
+  // de fechas o una búsqueda activa, se muestra la tabla plana filtrada (clic
+  // en una tarjeta de mes fija ese rango).
+  const mostrarMesesCalidad = esCalidad && pestanaCalidad === 'llamadas' && !desde && !hasta && !busqueda.trim()
+  const mostrarMesesCobranza = !esCalidad && !desde && !hasta && !busqueda.trim()
+  const mostrarMeses = esCalidad ? mostrarMesesCalidad : mostrarMesesCobranza
+
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
   const paginaSegura = Math.min(pagina, totalPaginas)
   const visibles = filtrados.slice((paginaSegura - 1) * PAGE_SIZE, paginaSegura * PAGE_SIZE)
@@ -681,8 +711,45 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
           <button onClick={limpiar}>Limpiar</button>
         </section>
 
+        {mostrarMeses ? (
+        <section className="calidad-meses-resumen">
+          <div className="cobranzas-table-title"><strong>{modoSupervisorCalidad ? 'Llamadas de Calidad' : 'Listado de clientes'}</strong><span>{clientes.length} registros</span></div>
+          <div className="calidad-meses-grid">
+            {clientesPorMes.filter(grupo => grupo.clave !== 'sin-fecha').map(grupo => {
+              const pctMes = esCalidad
+                ? (grupo.clientes.length ? Math.round((grupo.clientes.filter(c => String(c.calidad_estado_cliente || 'PENDIENTE').trim().toUpperCase() === 'SATISFECHO').length / grupo.clientes.length) * 100) : 0)
+                : (grupo.clientes.length ? Math.round((grupo.clientes.filter(c => resumenCobranza(c) === 'COMPLETADO').length / grupo.clientes.length) * 100) : 0)
+              const detalle = esCalidad
+                ? `${grupo.clientes.filter(c => String(c.calidad_estado_cliente || 'PENDIENTE').trim().toUpperCase() === 'PENDIENTE').length} pendientes`
+                : `${grupo.clientes.filter(c => resumenCobranza(c) === 'SIN CICLO').length} sin ciclo`
+              return (
+                <button type="button" key={grupo.clave} className="calidad-mes-card" onClick={() => {
+                  const [anio, mes] = grupo.clave.split('-')
+                  const ultimoDia = new Date(Number(anio), Number(mes), 0).getDate()
+                  setDesde(`${grupo.clave}-01`); setHasta(`${grupo.clave}-${String(ultimoDia).padStart(2, '0')}`)
+                }}>
+                  <div className="calidad-mes-card-header">
+                    <span className="calidad-mes-nombre">{grupo.label}</span>
+                    <span className="calidad-mes-total">{grupo.clientes.length} clientes</span>
+                  </div>
+                  <div className="calidad-mes-barra"><i style={{ width: `${pctMes}%` }} /></div>
+                  <div className="calidad-mes-footer">
+                    <span className="calidad-mes-pct">{pctMes}% {esCalidad ? 'conformidad' : 'cobranza completa'}</span>
+                    <span className="calidad-mes-pendientes">{detalle}</span>
+                  </div>
+                </button>
+              )
+            })}
+            {!clientesPorMes.filter(grupo => grupo.clave !== 'sin-fecha').length && <div className="cobranzas-empty">No hay clientes instalados para mostrar.</div>}
+          </div>
+        </section>
+        ) : (
         <section className="cobranzas-table-card">
-          <div className="cobranzas-table-title"><strong>{modoSupervisorCalidad ? 'Llamadas de Calidad' : 'Listado de clientes'}</strong><span>{filtrados.length} registros</span></div>
+          <div className="cobranzas-table-title">
+            <strong>{modoSupervisorCalidad ? 'Llamadas de Calidad' : 'Listado de clientes'}</strong>
+            <span>{filtrados.length} registros</span>
+            {(desde || hasta) && <button type="button" className="calidad-volver-meses" onClick={() => { setDesde(''); setHasta('') }}>← Todos los meses</button>}
+          </div>
           {mensaje && <div className="cobranzas-error">{mensaje}</div>}
           <div className="cobranzas-table-scroll">
             <table>
@@ -726,7 +793,8 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
             <span>Mostrando {visibles.length ? (paginaSegura - 1) * PAGE_SIZE + 1 : 0}–{(paginaSegura - 1) * PAGE_SIZE + visibles.length} de {filtrados.length}</span>
             <div><button disabled={paginaSegura <= 1} onClick={() => setPagina(p => p - 1)}>‹</button><b>Página {paginaSegura} de {totalPaginas}</b><button disabled={paginaSegura >= totalPaginas} onClick={() => setPagina(p => p + 1)}>›</button></div>
           </footer>
-        </section></>}
+        </section>
+        )}</>}
 
         {modoSupervisorCalidad && pestanaCalidad === 'rendimiento' && <section className="sup-calidad-rendimiento">
           <header>
