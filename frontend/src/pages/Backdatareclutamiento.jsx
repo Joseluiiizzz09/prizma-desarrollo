@@ -269,13 +269,17 @@ function TipifVendBadge({ tipif, hora }) {
 // mismo patrón usado en Backoffice para estiloTipifVend().
 const TIPIF_VEND_FUERTE = {
   'VENTA CERRADA':   ['#dcfce7','#166534','#86efac'],
+  'ACEPTA PROPUESTA':['#dcfce7','#166534','#86efac'],
   'BUZON DE VOZ':    ['#f3e8d4','#78350f','#d6a96c'],
+  'BUZON':           ['#f3e8d4','#78350f','#d6a96c'],
   'NO TOCAR':        ['#fee2e2','#980000','#fca5a5'],
+  'NO CUMPLE EL PERFIL': ['#fee2e2','#980000','#fca5a5'],
   'CORTA LLAMADA':   ['#ffedd5','#c2410c','#fdba74'],
   'GESTION WSP':     ['#fef9c3','#854d0e','#fde047'],
   'NO CONTESTA':     ['#fef9c3','#854d0e','#fde047'],
   'NO INTERESADO':   ['#ffedd5','#9a3412','#fdba74'],
   'NO ROTAR':        ['#fee2e2','#980000','#fca5a5'],
+  'SH NO ROTAR':     ['#fee2e2','#980000','#fca5a5'],
   'VOLVER A LLAMAR': ['#dbeafe','#1d4ed8','#93c5fd'],
   'FRAUDE':          ['#fee2e2','#991b1b','#fca5a5'],
 }
@@ -1833,7 +1837,7 @@ export default function Backdatareclutamiento() {
                             {filtros.verTipVend && (
                               <td>
                                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
-                                  <select className="sel-tipif-vend" value={r._tipifVend} onChange={e=>guardarTipif(r.id,e.target.value)} style={{fontSize:10,padding:'3px 6px',border:`1px solid ${esExclusiva?'#ea580c':'#e5e7eb'}`,borderRadius:6,fontFamily:'inherit',maxWidth:155,cursor:'pointer',color:esExclusiva?'#ea580c':'inherit',fontWeight:esExclusiva?700:'inherit',background:esExclusiva?'#fff7ed':'#fff'}}>
+                                  <select className="sel-tipif-vend" value={r._tipifVend} onChange={e=>guardarTipif(r.id,e.target.value)} style={esExclusiva?{fontSize:10,padding:'3px 6px',border:'1px solid #ea580c',borderRadius:6,fontFamily:'inherit',maxWidth:155,cursor:'pointer',color:'#ea580c',fontWeight:700,background:'#fff7ed'}:estiloTipifVend(r._tipifVend)}>
                                     <option value="">— Pendiente —</option>
                                     {TIPIF_VEND_OPCIONES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                                   </select>
