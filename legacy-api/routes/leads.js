@@ -1612,24 +1612,14 @@ router.patch('/:id', auth(ROLES_BO), async (req, res) => {
       historialJSON = lead.historial;
     }
 
-    // Si Back marca (cualquiera de los dos slots) como DERIVADO, el asesor debe
-    // verlo reflejado como estado DERIVADO en su propia base, no seguir viendo su
-    // tipificación anterior (o NUEVO) como si nada hubiera pasado.
-    const marcaDerivado = (tipif_back !== undefined && tipifBackReal === 'DERIVADO')
-      || (tipif_back_2 !== undefined && tipifBack2Real === 'DERIVADO');
-
     // Al cambiar de asesor se limpia la tipif_vend del NUEVO asesor (la ve vacía y
     // coloca la suya). La base principal sigue mostrando la del asesor anterior
     // derivándola del historial (tipifVendAntes) hasta que el nuevo tipifique.
-    let sqlExtra = '';
-    let paramsExtra = [];
-    if (asesorCambia) {
-      sqlExtra = ', tipif_vend=?, tipif_hora=?, obs_asesor=?';
-      paramsExtra = [marcaDerivado ? 'DERIVADO' : '', marcaDerivado ? horaPeruAhora() : '', ''];
-    } else if (marcaDerivado) {
-      sqlExtra = ', tipif_vend=?, tipif_hora=?';
-      paramsExtra = ['DERIVADO', horaPeruAhora()];
-    }
+    // DERIVADO ya se comunica al asesor vía obs_back_personal (columna "OBS. BACK"
+    // en su base) — el estado se deja en NUEVO como cualquier lead sin tipificar,
+    // no se fuerza a "DERIVADO" aquí.
+    const sqlExtra = asesorCambia ? ', tipif_vend=?, tipif_hora=?, obs_asesor=?' : '';
+    const paramsExtra = asesorCambia ? ['', '', ''] : [];
 
     const rotacionesReales = contarRotacionesHistorial(historialJSON);
     await db.query(`
