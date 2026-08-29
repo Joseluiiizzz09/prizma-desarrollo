@@ -1875,7 +1875,7 @@ export default function Backdatareclutamiento() {
                                       ? (h.rotadoPor || '—')
                                       : (h.reasignadoPor || h.motivo || '—')
                                     const nombreAsesor = String(h.asesor||'').trim().toUpperCase()
-                                    const tipsAsesor = hist
+                                    const tipsAsesor = (r.historial||[])
                                       .filter(t => t?.tipo==='TIPIF_VEND' && String(t.asesor||'').trim().toUpperCase()===nombreAsesor)
                                       .sort((a,b)=>(a.ts||0)-(b.ts||0))
                                     return (
