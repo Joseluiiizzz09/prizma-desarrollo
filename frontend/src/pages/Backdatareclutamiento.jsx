@@ -1289,18 +1289,48 @@ export default function Backdatareclutamiento() {
       const prim  = lineas[0].split(sep)
       const cab   = isNaN((prim[3]||'').replace(/\s/g,''))||(prim[3]||'').length<6
       const datos = cab ? lineas.slice(1) : lineas
+      // Formato original: CAMPAÑA·DISTRITO·N2·N1·TIPIF.BACK·COMENTARIO·TIPIFICACIÓN·HORA·ASESOR1..6
+      // Formato "corregido": CAMPAÑA·FECHA·CONTACTO·OBSERVACIONES·TIPIFICACIÓN·HORA·ASESOR1..6
+      // (sin DISTRITO/N2/TIPIF.BACK, con una columna FECHA real por fila).
+      // Se detecta por los nombres del encabezado para no romper el formato ya usado.
+      const encabezados = cab ? prim.map(c=>c.trim().toUpperCase()) : []
+      const esFormatoCorregido = encabezados.includes('CONTACTO') && encabezados.includes('FECHA') && !encabezados.includes('DISTRITO')
       const fechaDest = legacyFecha || fechaActiva
       const usarFF = legacyUsarFecha === 'si'
       const rows   = []
       datos.forEach(linea => {
-        const c  = linea.split(sep).map(x=>x.trim().replace(/^["']|["']$/g,''))
-        const n1 = c[3]||c[0]||''
+        const c = linea.split(sep).map(x=>x.trim().replace(/^["']|["']$/g,''))
+        const campana = c[0]||'—'
+        let n1, distrito, n2, tipifBack, comentario, tipifVend, hora, asesorInicio, fechaFilaRaw
+        if (esFormatoCorregido) {
+          fechaFilaRaw = c[1]||''
+          n1 = c[2]||''
+          distrito = '—'; n2 = ''; tipifBack = ''
+          comentario = c[3]||''
+          tipifVend  = c[4]||''
+          hora       = c[5]||''
+          asesorInicio = 6
+        } else {
+          fechaFilaRaw = ''
+          n1 = c[3]||c[0]||''
+          distrito = c[1]||'—'; n2 = c[2]||''; tipifBack = c[4]||''
+          comentario = c[5]||''
+          tipifVend  = c[6]||''
+          hora       = c[7]||''
+          asesorInicio = 8
+        }
         if (!n1||n1.length<6) return
         const asesoresHist = []
-        for (let i=8;i<=13;i++) { const a=(c[i]||'').trim(); if(a&&a.length>1) asesoresHist.push(a) }
+        for (let i=asesorInicio;i<=asesorInicio+5;i++) { const a=(c[i]||'').trim(); if(a&&a.length>1) asesoresHist.push(a) }
         let fechaFila = fechaDest
-        if (usarFF) { for(let i=0;i<c.length;i++) { const m=c[i].match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m){fechaFila=`${m[3]}-${m[2]}-${m[1]}`;break;} if(/^\d{4}-\d{2}-\d{2}$/.test(c[i])){fechaFila=c[i];break;} } }
-        rows.push({ campana:c[0]||'—', distrito:c[1]||'—', n2:c[2]||'', n1, tipifBack:c[4]||'', comentario:c[5]||'', tipifVend:c[6]||'', hora:c[7]||'', asesores:asesoresHist, fecha:fechaFila })
+        if (esFormatoCorregido && fechaFilaRaw) {
+          const m = fechaFilaRaw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+          if (m) fechaFila = `${m[3]}-${m[2]}-${m[1]}`
+          else if (/^\d{4}-\d{2}-\d{2}$/.test(fechaFilaRaw)) fechaFila = fechaFilaRaw
+        } else if (usarFF) {
+          for(let i=0;i<c.length;i++) { const m=c[i].match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m){fechaFila=`${m[3]}-${m[2]}-${m[1]}`;break;} if(/^\d{4}-\d{2}-\d{2}$/.test(c[i])){fechaFila=c[i];break;} }
+        }
+        rows.push({ campana, distrito, n2, n1, tipifBack, comentario, tipifVend, hora, asesores:asesoresHist, fecha:fechaFila })
       })
       if (!rows.length) { setLegacyStatus('No se encontraron filas validas'); return }
       setLegacyRows(rows); setLegacyInfo(`${rows.length} registros desde "${file.name}"`); setLegacyStatus('')
