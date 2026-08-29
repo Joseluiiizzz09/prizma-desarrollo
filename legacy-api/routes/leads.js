@@ -1639,6 +1639,14 @@ router.patch('/:id', auth(ROLES_BO), async (req, res) => {
     const sqlExtra = asesorCambia ? ', tipif_vend=?, tipif_hora=?, obs_asesor=?' : '';
     const paramsExtra = asesorCambia ? ['', '', ''] : [];
 
+    // hora_asig representa cuándo se asignó el lead a su asesor actual. Antes
+    // se pisaba con la hora actual en cualquier cambio (ej. solo cambiar
+    // Tipif. Back sin tocar el asesor), así que un número sin asesor mostraba
+    // una hora que no correspondía a ninguna asignación real. Solo se
+    // actualiza si de verdad cambió el asesor, o si el cliente mandó una hora
+    // explícita (ej. importación Legacy con hora real del sistema anterior).
+    const horaAsigParaGuardar = (asesorCambia || hora_asig !== undefined) ? horaReal : (lead.hora_asig || '');
+
     const rotacionesReales = contarRotacionesHistorial(historialJSON);
     await db.query(`
       UPDATE leads SET asesor_id=?, asesor_nombre=?, tipif_back=?, tipif_back_2=?, hora_asig=?,
@@ -1647,7 +1655,7 @@ router.patch('/:id', auth(ROLES_BO), async (req, res) => {
       WHERE id=?
     `, [
       asesorId, asesorNombreReal, tipifBackReal, tipifBack2Real,
-      horaReal, asesorId?0:1, historialJSON,
+      horaAsigParaGuardar, asesorId?0:1, historialJSON,
       rotacionesReales,
       derivadoPorId, derivadoPorNombre,
       derivadoPor2Id, derivadoPor2Nombre,
