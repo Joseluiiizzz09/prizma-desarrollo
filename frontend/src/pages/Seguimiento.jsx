@@ -350,7 +350,7 @@ export default function Seguimiento() {
     const comentario = estObs.trim() || modalEstado._comentario
     const motivoAplica = estNuevo === 'caida' || estNuevo === 'rechazo'
     const body = { estado: estadoBD, obs_seguimiento: comentario, tramo_seguimiento: estTramo }
-    if (estNuevo === 'programada') {
+    if (estNuevo === 'programada' || estNuevo === 'reprogramado') {
       if (!estFechaInstalacion) { mostrarToast('Ingresa la fecha de instalación'); return }
       body.fecha_programada = estFechaInstalacion
     }
@@ -368,7 +368,7 @@ export default function Seguimiento() {
     } catch (e) { console.error(e); mostrarToast('No se pudo guardar el estado'); return }
     setVentas(list => list.map(x =>
       x.id === modalEstado.id
-        ? { ...x, _estadoSeg: estNuevo, _tramo: estTramo, _comentario: comentario, fecha_programada: estNuevo === 'programada' ? estFechaInstalacion : x.fecha_programada, _motivoRech: motivoAplica ? estMotivo : x._motivoRech }
+        ? { ...x, _estadoSeg: estNuevo, _tramo: estTramo, _comentario: comentario, fecha_programada: (estNuevo === 'programada' || estNuevo === 'reprogramado') ? estFechaInstalacion : x.fecha_programada, _motivoRech: motivoAplica ? estMotivo : x._motivoRech }
         : x
     ))
     setModalEstado(null)
@@ -733,7 +733,7 @@ export default function Seguimiento() {
                   </select>
                 </div>
               )}
-              {estNuevo === 'programada' && (
+              {(estNuevo === 'programada' || estNuevo === 'reprogramado') && (
                 <div className="modal-campo" style={{ gridColumn: '1/-1' }}>
                   <label>Fecha de instalación *</label>
                   <input type="date" value={estFechaInstalacion} onChange={e => setEstFechaInstalacion(e.target.value)} />

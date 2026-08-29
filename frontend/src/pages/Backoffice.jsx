@@ -1674,21 +1674,31 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
     // de tipificación ocurridos mientras el panel estaba abierto.
     const rotados  = allLeads.filter(l => selToUse[l.id] && rotApto(l, asesorActual).apto)
     const res = [...resultadosPrevios]
+    // El contador de rotaciones es compartido entre todas las filas del mismo
+    // numero+fecha (mismo criterio que el backend). Si dos leads del mismo
+    // grupo caen en la misma tanda, rotar el primero ya sube el contador que
+    // el segundo esperaba, y el backend lo rechazaba con "ya fue actualizado
+    // por otro usuario" aunque el cambio vino de esta misma tanda.
+    const rotacionesActualizadas = new Map()
     for (const l of rotados) {
       const reg = l._reg
       if (!reg._backendId) continue
+      const clave = `${l.tel}|${l.fecha}`
+      const rotacionesEsperadas = rotacionesActualizadas.has(clave) ? rotacionesActualizadas.get(clave) : cantidadRotaciones(reg)
       try {
         const respuesta = await fetch(`${API}/leads/${reg._backendId}/rotar`, { method:'POST', headers:ncHeaders(), body:JSON.stringify({
           asesor_nombre:asesorActual, motivo:'Rotacion masiva',
           asesor_id_esperado:reg._asesorId ?? null,
-          rotaciones_esperadas:cantidadRotaciones(reg),
+          rotaciones_esperadas:rotacionesEsperadas,
         }) })
         const data = await respuesta.json().catch(() => ({}))
         if (respuesta.ok && data.ok) {
+          const nuevasRotaciones = Number(data.rotaciones ?? (rotacionesEsperadas+1))
+          rotacionesActualizadas.set(clave, nuevasRotaciones)
           updateReg(reg.id, {
             asesor:data.asesor||asesorActual, horaAsig:hora, horaAsigDisplay:hora,
             _asesorId:data.asesor_id == null ? reg._asesorId : Number(data.asesor_id),
-            rotaciones:Number(data.rotaciones ?? (cantidadRotaciones(reg)+1)),
+            rotaciones:nuevasRotaciones,
             historial:Array.isArray(data.historial)?data.historial:reg.historial,
             sinAsignar:false, _tipifVend:'', _tipifHora:'',
           })
@@ -2955,7 +2965,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                                 <button className="btn-hist btn-hist-sm" onClick={()=>setHistOpen(p=>({...p,[r.id]:!p[r.id]}))} title="Historial">
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                 </button>
-                                <button className="btn-del" onClick={()=>eliminarReg(r.id)} title="Eliminar">
+                                <button className="btn-del" onClick={()=>{ if(window.confirm(`¿Eliminar el número ${r.n1}? Se borrará por completo y no se puede deshacer.`)) eliminarReg(r.id) }} title="Eliminar">
                                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                                 </button>
                               </div>

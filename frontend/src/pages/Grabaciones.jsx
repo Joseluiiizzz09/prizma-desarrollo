@@ -168,6 +168,7 @@ export default function Grabaciones() {
   const [fEstado,  setFEstado]  = useState('')
   const [fDoc,     setFDoc]     = useState('')
   const [fVendedor,setFVendedor]= useState('')
+  const [fUsuario, setFUsuario] = useState('')
   const [fDesde,   setFDesde]   = useState('')
   const [fHasta,   setFHasta]   = useState('')
   const [busqueda, setBusqueda] = useState('')
@@ -258,7 +259,7 @@ export default function Grabaciones() {
     return () => clearInterval(t)
   }, [])
 
-  useEffect(() => { setPagina(1) }, [fEstado, fDoc, fVendedor, fDesde, fHasta, busqueda, tabActiva])
+  useEffect(() => { setPagina(1) }, [fEstado, fDoc, fVendedor, fUsuario, fDesde, fHasta, busqueda, tabActiva])
 
   // ── Computed ─────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
@@ -278,6 +279,7 @@ export default function Grabaciones() {
       : ventas.filter(v => v._fechaGrab < hoy)
     return base.filter(v => {
       if (fVendedor && !(v.vendedor||'').toLowerCase().includes(fVendedor.toLowerCase())) return false
+      if (fUsuario  && v.grabando_por_nombre !== fUsuario) return false
       if (fDesde    && v.fechaIngreso < fDesde) return false
       if (fHasta    && v.fechaIngreso > fHasta) return false
       if (fDoc      && !(v.dni||'').toLowerCase().includes(fDoc.toLowerCase())) return false
@@ -288,7 +290,13 @@ export default function Grabaciones() {
       }
       return true
     })
-  }, [ventas, tabActiva, fEstado, fDoc, fVendedor, fDesde, fHasta, busqueda])
+  }, [ventas, tabActiva, fEstado, fDoc, fVendedor, fUsuario, fDesde, fHasta, busqueda])
+
+  const usuariosGrabDisponibles = useMemo(() => {
+    const set = new Set()
+    ventas.forEach(v => { if (v.grabando_por_nombre) set.add(v.grabando_por_nombre) })
+    return Array.from(set).sort()
+  }, [ventas])
 
   const totalPags    = Math.max(1, Math.ceil(ventasFiltradas.length / porPagina))
   const pagActual    = Math.min(pagina, totalPags)
@@ -621,6 +629,13 @@ export default function Grabaciones() {
               <input value={fVendedor} onChange={e=>setFVendedor(e.target.value)} placeholder="Buscar vendedor..." />
             </div>
             <div className="fg">
+              <label>Usuario grabación</label>
+              <select value={fUsuario} onChange={e=>setFUsuario(e.target.value)}>
+                <option value="">Todos</option>
+                {usuariosGrabDisponibles.map(u=><option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div className="fg">
               <label>Desde</label>
               <input type="date" value={fDesde} onChange={e=>setFDesde(e.target.value)} />
             </div>
@@ -629,7 +644,7 @@ export default function Grabaciones() {
               <input type="date" value={fHasta} onChange={e=>setFHasta(e.target.value)} />
             </div>
             <div style={{alignSelf:'flex-end'}}>
-              <button className="btn-limpiar" onClick={()=>{ setFEstado(''); setFDoc(''); setFVendedor(''); setFDesde(''); setFHasta(''); setBusqueda('') }}>✕ Limpiar</button>
+              <button className="btn-limpiar" onClick={()=>{ setFEstado(''); setFDoc(''); setFVendedor(''); setFUsuario(''); setFDesde(''); setFHasta(''); setBusqueda('') }}>✕ Limpiar</button>
             </div>
           </div>
         </div>
