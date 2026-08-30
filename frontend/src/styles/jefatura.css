@@ -1041,7 +1041,7 @@ button.export-kpi-card:hover {
 
 .filtros-grid label {
   display: flex;
-  min-width: 100px;
+  min-width: 150px;
   flex: 1;
   flex-direction: column;
   gap: 3px;
