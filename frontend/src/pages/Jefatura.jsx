@@ -156,7 +156,11 @@ function normEstado(v) {
     .replace(/^_+|_+$/g, '')
 }
 const FLUJO_NO_VALIDA = new Set(['venta','corta_llamada','fraude','no_desea','no_contesta','buzon_voz','servicio_activo','no_validado','bloqueado','zona_restringida','caracter_especial','sin_agenda','corregir','mala_oferta'])
-const FLUJO_GRABADA = new Set(['grabado','grabada','aprobado','programado','en_ejecucion','instalado','caida','rechazo_campo','tecnico_casa','levantar_sot','tecnicos_camino','instalado_no_validado','reasignacion','derivado_planta_externa'])
+// 'grabado'/'aprobado'/'programado' son estados propios de Validacion/
+// Programacion (ya avanzo mas alla de "solo validada"); el resto es
+// cualquier estado de campo (vigente o retirado) — la venta ya entro al
+// flujo de Seguimiento.
+const FLUJO_GRABADA = new Set(['grabado','grabada','aprobado','programado', ...Object.keys(SEG_MAP), ...Object.keys(SEG_RETIRADOS)])
 const FLUJO_SEGUIMIENTO = new Set([...Object.keys(SEG_MAP), ...Object.keys(SEG_RETIRADOS)])
 function estadoSeguimiento(v) {
   const estado = normEstado(v?.estado || v?.estado_venta)
