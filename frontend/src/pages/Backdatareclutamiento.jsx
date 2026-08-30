@@ -1286,6 +1286,13 @@ export default function Backdatareclutamiento() {
     if (archivoInputRef.current) archivoInputRef.current.value = ''
   }
 
+  // La fecha final de cada fila se resuelve en resolverFechaFila(), leyendo
+  // legacyFecha/legacyUsarFecha EN VIVO — no aqui. Antes se "horneaba" la
+  // fecha una sola vez al leer el archivo, asi que si el usuario cambiaba
+  // el selector "Fecha destino" DESPUES de soltar el archivo (el flujo
+  // normal: primero se ve la vista previa, despues se ajusta la fecha), el
+  // cambio no se reflejaba y todo se subia con la fecha vieja (o con hoy,
+  // el valor por defecto de legacyFecha).
   function procesarLegacy(file) {
     setLegacyStatus(`Leyendo ${file.name}...`)
     const reader = new FileReader()
@@ -1303,8 +1310,6 @@ export default function Backdatareclutamiento() {
       // Se detecta por los nombres del encabezado para no romper el formato ya usado.
       const encabezados = cab ? prim.map(c=>c.trim().toUpperCase()) : []
       const esFormatoCorregido = encabezados.includes('CONTACTO') && encabezados.includes('FECHA') && !encabezados.includes('DISTRITO')
-      const fechaDest = legacyFecha || fechaActiva
-      const usarFF = legacyUsarFecha === 'si'
       const rows   = []
       datos.forEach(linea => {
         const c = linea.split(sep).map(x=>x.trim().replace(/^["']|["']$/g,''))
@@ -1330,24 +1335,44 @@ export default function Backdatareclutamiento() {
         if (!n1||n1.length<6) return
         const asesoresHist = []
         for (let i=asesorInicio;i<=asesorInicio+5;i++) { const a=(c[i]||'').trim(); if(a&&a.length>1) asesoresHist.push(a) }
-        let fechaFila = fechaDest
+        // Fecha propia de la fila (formato "corregido"): siempre es la real,
+        // sin importar el selector.
+        let fechaPropia = ''
         if (esFormatoCorregido && fechaFilaRaw) {
           const m = fechaFilaRaw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
-          if (m) fechaFila = `${m[3]}-${m[2]}-${m[1]}`
-          else if (/^\d{4}-\d{2}-\d{2}$/.test(fechaFilaRaw)) fechaFila = fechaFilaRaw
-        } else if (usarFF) {
-          for(let i=0;i<c.length;i++) { const m=c[i].match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m){fechaFila=`${m[3]}-${m[2]}-${m[1]}`;break;} if(/^\d{4}-\d{2}-\d{2}$/.test(c[i])){fechaFila=c[i];break;} }
+          if (m) fechaPropia = `${m[3]}-${m[2]}-${m[1]}`
+          else if (/^\d{4}-\d{2}-\d{2}$/.test(fechaFilaRaw)) fechaPropia = fechaFilaRaw
         }
-        rows.push({ campana, distrito, n2, n1, tipifBack, comentario, tipifVend, hora, asesores:asesoresHist, fecha:fechaFila })
+        // Fecha detectada en cualquier celda de la fila (formato original con
+        // "Usar fecha de la fila"): se detecta siempre, se aplica solo si el
+        // selector correspondiente esta en "si" al momento de resolver.
+        let fechaDetectada = ''
+        if (!esFormatoCorregido) {
+          for (let i=0;i<c.length;i++) { const m=c[i].match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m){fechaDetectada=`${m[3]}-${m[2]}-${m[1]}`;break;} if(/^\d{4}-\d{2}-\d{2}$/.test(c[i])){fechaDetectada=c[i];break;} }
+        }
+        rows.push({ campana, distrito, n2, n1, tipifBack, comentario, tipifVend, hora, asesores:asesoresHist, _fechaPropia:fechaPropia, _fechaDetectada:fechaDetectada })
       })
       if (!rows.length) { setLegacyStatus('No se encontraron filas validas'); return }
       setLegacyRows(rows); setLegacyInfo(`${rows.length} registros desde "${file.name}"`); setLegacyStatus('')
     }
     reader.readAsText(file, 'UTF-8')
   }
+  // Resuelve la fecha final de una fila leyendo el estado actual de los
+  // selectores — se llama tanto para la vista previa como para el envio,
+  // asi que cambiar "Fecha destino" despues de soltar el archivo si tiene
+  // efecto.
+  function resolverFechaFila(r) {
+    if (r._fechaPropia) return r._fechaPropia
+    if (legacyUsarFecha === 'si' && r._fechaDetectada) return r._fechaDetectada
+    return legacyFecha || fechaActiva
+  }
+  const legacyRowsResueltos = useMemo(
+    () => legacyRows.map(r => ({ ...r, fecha: resolverFechaFila(r) })),
+    [legacyRows, legacyFecha, legacyUsarFecha, fechaActiva]
+  )
 
   async function ejecutarCargaLegacy() {
-    if (!legacyRows.length) { mostrarToast('No hay datos'); return }
+    if (!legacyRowsResueltos.length) { mostrarToast('No hay datos'); return }
     // El backend rechaza lotes de más de 500 registros (y el rechazo es de
     // todo-o-nada), así que se parte en tandas para no perder la importación
     // completa por exceder el límite. Antes esto fallaba en silencio: la
@@ -1362,8 +1387,8 @@ export default function Backdatareclutamiento() {
     // resuelva a un usuario real (queda sin asesor_id, sin permisos de
     // gestión). Se manda el último de la lista como asesor actual y el resto
     // queda en el historial de rotaciones.
-    for (let i = 0; i < legacyRows.length; i += CHUNK) {
-      const lote = legacyRows.slice(i, i + CHUNK)
+    for (let i = 0; i < legacyRowsResueltos.length; i += CHUNK) {
+      const lote = legacyRowsResueltos.slice(i, i + CHUNK)
       const leadsBackend = lote.map(r => {
         const asesorFinal = r.asesores[r.asesores.length - 1] || ''
         const historial = r.asesores.map((a, idx) => ({ asesor:a, hora:r.hora||'—', fecha:r.fecha, motivo: idx===0 ? 'Asignacion inicial' : `Rotacion ${idx}` }))
@@ -1396,7 +1421,7 @@ export default function Backdatareclutamiento() {
       }
     }
     setFechaPestanas(prev => [...prev, ...nuevasFechasLocal.filter(f=>!prev.includes(f))].sort().reverse())
-    if (errorMsg) mostrarToast(`Se importaron ${importados} de ${legacyRows.length}. ${errorMsg}`)
+    if (errorMsg) mostrarToast(`Se importaron ${importados} de ${legacyRowsResueltos.length}. ${errorMsg}`)
     else mostrarToast(`${importados} registro(s) importado(s) correctamente`)
     setLegacyRows([]); setLegacyInfo(''); setLegacyStatus('')
     if (legacyInputRef.current) legacyInputRef.current.value = ''
@@ -2182,7 +2207,7 @@ export default function Backdatareclutamiento() {
                         <span style={{fontSize:12,fontWeight:600,color:'#374151'}}>{legacyInfo}</span>
                         <div style={{display:'flex',gap:6}}>
                           <button className="btn-masiva-preview" onClick={()=>setLegacyRows([])}>Cancelar</button>
-                          <button className="btn-masiva-go" onClick={ejecutarCargaLegacy} style={{background:'#c2410c'}}>Importar {legacyRows.length} registros</button>
+                          <button className="btn-masiva-go" onClick={ejecutarCargaLegacy} style={{background:'#c2410c'}}>Importar {legacyRowsResueltos.length} registros</button>
                         </div>
                       </div>
                       <div style={{maxHeight:200,overflowY:'auto',border:'1px solid #e5e7eb',borderRadius:8,background:'#fff'}}>
@@ -2193,7 +2218,7 @@ export default function Backdatareclutamiento() {
                             ))}
                           </tr></thead>
                           <tbody>
-                            {legacyRows.slice(0,60).map((r,i)=>(
+                            {legacyRowsResueltos.slice(0,60).map((r,i)=>(
                               <tr key={i} style={{borderBottom:'1px solid #f3f4f6'}}>
                                 <td style={{padding:'4px 10px',color:'#9ca3af'}}>{i+1}</td>
                                 <td style={{padding:'4px 10px',fontWeight:600}}>{r.campana}</td>
