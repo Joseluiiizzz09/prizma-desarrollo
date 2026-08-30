@@ -306,7 +306,7 @@ function FiltroEstadoMultiple({ opciones, seleccionados, onChange }) {
     <div ref={boxRef} style={{ position: 'relative' }}>
       <button type="button" className="filtro-estado-btn" onClick={() => setAbierto(o => !o)}>
         <span>{label}</span>
-        <span style={{ marginLeft: 6, opacity: .6 }}>▾</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 6, opacity: .6, flexShrink: 0 }}><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       {abierto && (
         <div className="filtro-estado-panel">
