@@ -1461,7 +1461,6 @@ button.export-kpi-card:hover {
 /* Dashboard de Leads para Marketing */
 .marketing-filtros{margin-bottom:16px}
 .marketing-filtros .filtros-grid{grid-template-columns:repeat(4,minmax(150px,1fr)) auto}
-.marketing-filtros select{width:100%;height:36px;border:1px solid #dbe2ea;border-radius:8px;background:#fff;padding:0 10px;font:inherit;color:#334155;outline:none}
 .marketing-kpis{grid-template-columns:repeat(4,minmax(150px,1fr));margin-bottom:16px}
 .marketing-grid{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(520px,1.4fr);gap:16px;align-items:start}
 .marketing-ranking{min-height:310px}
