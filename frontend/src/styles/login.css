@@ -2,7 +2,7 @@
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
 
 body{
-  font-family:'Inter',-apple-system,sans-serif;
+  font-family:'DM Sans',-apple-system,sans-serif;
   background:#f2f2f7;height:100vh;
   display:flex;justify-content:center;align-items:center;
   overflow:hidden;-webkit-font-smoothing:antialiased;

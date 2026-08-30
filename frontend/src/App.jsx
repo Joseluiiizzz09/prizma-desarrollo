@@ -21,7 +21,7 @@ const DashboardReclutamiento = lazy(() => import('./pages/dashboardreclutamiento
 
 function RouteLoader() {
   return (
-    <div style={{ minHeight:'100vh', display:'grid', placeItems:'center', background:'#f5f6fa', color:'#64748b', fontFamily:'Inter, sans-serif' }}>
+    <div style={{ minHeight:'100vh', display:'grid', placeItems:'center', background:'#f5f6fa', color:'#64748b', fontFamily:"'DM Sans', sans-serif" }}>
       Cargando módulo…
     </div>
   )
