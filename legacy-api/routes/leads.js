@@ -99,8 +99,16 @@ function limpiarN2(raw) {
   return null;
 }
 
+// Una tipificacion real nunca es puramente numerica. Evita que coordenadas GPS
+// u otros valores numericos de una columna desalineada en un CSV se guarden
+// como si fueran la tipificacion (paso lo mismo con "-77.611..." el 27/ago/2026).
+function pareceNumeroOCoordenada(valor) {
+  return /^-?\d+(\.\d+)?$/.test(String(valor || '').trim());
+}
+
 function normalizarTipifBack(valor) {
   const tipif = String(valor || '').trim().toUpperCase();
+  if (pareceNumeroOCoordenada(tipif)) return '';
   if (tipif === 'BUZON' || tipif === 'BUZÓN') return 'BUZON DE VOZ';
   if (tipif === 'DER CHAMO') return 'DERIVADO';
   return tipif;
@@ -108,6 +116,7 @@ function normalizarTipifBack(valor) {
 
 function normalizarTipifVendLegacy(valor) {
   const v = String(valor || '').trim();
+  if (pareceNumeroOCoordenada(v)) return '';
   const u = v.toUpperCase();
   if (u === 'SH INSTALADO') return 'INSTALADO';
   if (u === 'SH NO ROTAR') return 'NO ROTAR';
