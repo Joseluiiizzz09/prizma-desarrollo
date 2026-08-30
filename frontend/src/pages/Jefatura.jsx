@@ -41,30 +41,44 @@ function usuarioRequiereSala(cargo, cargo2) {
   return CARGOS_CON_SALA.includes(cargo) || CARGOS_CON_SALA.includes(cargo2)
 }
 
+// Estados vigentes que /seguimiento escribe hoy en ventas.estado (ver
+// ESTADO_BD_MAP en Seguimiento.jsx). Los valores antiguos (en_ejecucion,
+// instalado, levantar_sot, etc.) ya no se escriben, pero ventas viejas
+// pueden conservarlos — se reubican en su equivalente vigente mas abajo,
+// igual que mapearEstado() en Seguimiento.jsx.
 const SEG_MAP = {
-  en_ejecucion:'ejecucion',
-  instalado:'instalado',caida:'caida',rechazo_campo:'rechazo',tecnico_casa:'tecnico',
-  levantar_sot:'levantar_sot', tecnicos_camino:'tecnicos_camino',
-  instalado_no_validado:'instalado_no_validado', reasignacion:'reasignacion',
-  derivado_planta_externa:'derivado_planta_externa', servicio_activo:'servicio_activo',
+  caida:'caida', rechazo_campo:'rechazo', tecnico_casa:'tecnico',
+  en_progreso:'en_progreso', programada:'programada', reprogramado:'reprogramado',
+  sin_ingreso:'sin_ingreso', desaprobado:'desaprobado', rechazo_mesa:'rechazo_mesa',
+  ejecutada:'ejecutada',
+}
+// Estados retirados de /seguimiento — solo para reubicar ventas antiguas
+// bajo su categoria vigente mas parecida (no se escriben mas, pero pueden
+// seguir existiendo en registros viejos).
+const SEG_RETIRADOS = {
+  grabado:'en_progreso', validado:'sin_ingreso', aprobado:'en_progreso',
+  en_ejecucion:'en_progreso', observado:'en_progreso',
+  instalado:'programada', instalado_no_validado:'programada', servicio_activo:'programada',
+  levantar_sot:'reprogramado', derivado_planta_externa:'reprogramado',
+  reasignacion:'reprogramado', tecnicos_camino:'reprogramado',
 }
 // Colores idénticos al resultado final real de seguimiento.css (cascada de
-// .bs-ejec/.bs-inst/.bs-rech/.bs-caida/.bs-tecnico + overrides !important en
+// .bs-ejec/.bs-inst/.bs-rech/.bs-caida/.bs-tecnico/.bs-grabado/.bs-noval/
+// .bs-desaprobado/.bs-rechazo-mesa/.bs-ejecutada + overrides !important en
 // .leyenda-item.l-*, que son los que realmente ganan en /seguimiento).
 const SEG_BADGES = {
-  ejecucion:{ label:'EN EJECUCIÓN',    bg:'#ecfdf5', color:'#047857', border:'rgba(52,211,153,.35)'  },
-  instalado:{ label:'INSTALADO',       bg:'#eff6ff', color:'#2563eb', border:'rgba(96,165,250,.35)'  },
-  rechazo:  { label:'RECHAZO CAMPO',   bg:'#fff7ed', color:'#c2410c', border:'rgba(251,146,60,.38)'  },
-  caida:    { label:'CAÍDA',           bg:'#ffedd5', color:'#c2410c', border:'rgba(248,113,113,.35)' },
-  tecnico:  { label:'TÉCNICO EN CASA', bg:'#fce7f3', color:'#be185d', border:'rgba(244,114,182,.45)' },
-  levantar_sot:{ label:'LEVANTAR SOT', bg:'#fff7ed', color:'#c2410c', border:'rgba(251,146,60,.38)' },
-  tecnicos_camino:{ label:'TÉCNICOS EN CAMINO', bg:'#fce7f3', color:'#be185d', border:'rgba(244,114,182,.45)' },
-  instalado_no_validado:{ label:'INSTALADO NO VALIDADO', bg:'#eff6ff', color:'#2563eb', border:'rgba(96,165,250,.35)' },
-  reasignacion:{ label:'REASIGNACIÓN', bg:'#ecfdf5', color:'#047857', border:'rgba(52,211,153,.35)' },
-  derivado_planta_externa:{ label:'DERIVADO A PLANTA EXTERNA', bg:'#fff7ed', color:'#c2410c', border:'rgba(251,146,60,.38)' },
-  servicio_activo:{ label:'SERVICIO ACTIVO', bg:'#f3f4f6', color:'#1f2937', border:'rgba(156,163,175,.45)' },
+  caida:       { label:'CAÍDA',            bg:'#ffedd5', color:'#c2410c', border:'rgba(248,113,113,.35)' },
+  rechazo:     { label:'RECHAZO EN CAMPO', bg:'#fff7ed', color:'#c2410c', border:'rgba(251,146,60,.38)'  },
+  tecnico:     { label:'TÉCNICOS EN CASA', bg:'#fce7f3', color:'#be185d', border:'rgba(244,114,182,.45)' },
+  en_progreso: { label:'EN PROGRESO',      bg:'#ecfdf5', color:'#047857', border:'rgba(52,211,153,.35)'  },
+  programada:  { label:'PROGRAMADA',       bg:'#eff6ff', color:'#2563eb', border:'rgba(96,165,250,.35)'  },
+  reprogramado:{ label:'REPROGRAMADO',     bg:'#fff7ed', color:'#c2410c', border:'rgba(249,115,22,.35)'  },
+  sin_ingreso: { label:'SIN INGRESO',      bg:'#fffbeb', color:'#78350f', border:'rgba(217,119,6,.35)'   },
+  desaprobado: { label:'DESAPROBADO',      bg:'#fee2e2', color:'#b91c1c', border:'rgba(248,113,113,.4)'  },
+  rechazo_mesa:{ label:'RECHAZO EN MESA',  bg:'#eef2ff', color:'#4338ca', border:'rgba(99,102,241,.35)'  },
+  ejecutada:   { label:'EJECUTADA',        bg:'#ecfeff', color:'#0e7490', border:'rgba(34,211,238,.35)'  },
 }
-const SEG_ORD = { caida:0, rechazo:1, levantar_sot:2, derivado_planta_externa:3, tecnico:4, tecnicos_camino:5, reasignacion:6, ejecucion:7, instalado_no_validado:8, servicio_activo:9, instalado:10 }
+const SEG_ORD = { caida:0, rechazo:1, rechazo_mesa:1, desaprobado:2, sin_ingreso:3, reprogramado:4, tecnico:5, en_progreso:6, programada:7, ejecutada:8 }
 
 const PROG_STYLES = {
   PROGRAMADO:       { bg:'#dcfce7',color:'#15803d',border:'rgba(74,222,128,.4)'  },
@@ -124,7 +138,7 @@ function formatF(f)    { if(!f)return'—'; const p=f.split('-'); return `${p[2]
 function cargoObj(id)  { return CARGOS.find(c=>c.id===id)||{label:id,cls:'bc-default'} }
 function colorAvatar(n){ const c=["#3b82f6","#8b5cf6","#22c55e","#f97316","#f97316","#06b6d4","#ec4899","#f59e0b"]; let s=0; for(const ch of n) s+=ch.charCodeAt(0); return c[s%c.length] }
 function iniciales(n)  { return n.trim().split(' ').slice(0,2).map(p=>p[0]).join('').toUpperCase() }
-function mapSeg(e)     { const s=(e||'').toLowerCase(); if(SEG_MAP[s])return SEG_MAP[s]; if(s.includes('tecnico'))return'tecnico'; if(s.includes('rechazo'))return'rechazo'; if(s.includes('ejecucion'))return'ejecucion'; return null }
+function mapSeg(e)     { const s=(e||'').toLowerCase().trim(); if(SEG_MAP[s])return SEG_MAP[s]; if(SEG_RETIRADOS[s])return SEG_RETIRADOS[s]; if(s.includes('tecnico'))return'tecnico'; if(s.includes('rechazo'))return'rechazo'; return null }
 function efColor(v)    { return v>=70?'#16a34a':v>=40?'#d97706':'#ea580c' }
 // EJECUTADA (Seguimiento) es el equivalente vigente del antiguo estado
 // INSTALADO — cuenta igual en todos los KPIs/gráficos de instalaciones.
@@ -143,7 +157,7 @@ function normEstado(v) {
 }
 const FLUJO_NO_VALIDA = new Set(['venta','corta_llamada','fraude','no_desea','no_contesta','buzon_voz','servicio_activo','no_validado','bloqueado','zona_restringida','caracter_especial','sin_agenda','corregir','mala_oferta'])
 const FLUJO_GRABADA = new Set(['grabado','grabada','aprobado','programado','en_ejecucion','instalado','caida','rechazo_campo','tecnico_casa','levantar_sot','tecnicos_camino','instalado_no_validado','reasignacion','derivado_planta_externa'])
-const FLUJO_SEGUIMIENTO = new Set(['en_ejecucion','instalado','caida','rechazo_campo','tecnico_casa','levantar_sot','tecnicos_camino','instalado_no_validado','reasignacion','derivado_planta_externa','servicio_activo'])
+const FLUJO_SEGUIMIENTO = new Set([...Object.keys(SEG_MAP), ...Object.keys(SEG_RETIRADOS)])
 function estadoSeguimiento(v) {
   const estado = normEstado(v?.estado || v?.estado_venta)
   if (FLUJO_SEGUIMIENTO.has(estado)) return estado
@@ -226,6 +240,13 @@ function flujoLabelEstado(estado) {
     zona_restringida:'Zona restringida',
     caracter_especial:'Carácter especial',
     sin_agenda:'Sin agenda',
+    en_progreso:'En progreso',
+    programada:'Programada',
+    reprogramado:'Reprogramado',
+    sin_ingreso:'Sin ingreso',
+    desaprobado:'Desaprobado',
+    rechazo_mesa:'Rechazo en mesa',
+    ejecutada:'Ejecutada',
   })[e] || (estado || 'Venta subida')
 }
 
@@ -853,9 +874,9 @@ export default function Jefatura() {
   }
 
   const kpisSeg = useMemo(() => ({
-    ejecucion: ventasSeg.filter(v=>v._seg==='ejecucion').length,
-    instalado: ventasSeg.filter(v=>v._seg==='instalado'||v._seg==='ejecutada').length,
-    rechazo:   ventasSeg.filter(v=>v._seg==='rechazo').length,
+    ejecucion: ventasSeg.filter(v=>v._seg==='en_progreso').length,
+    instalado: ventasSeg.filter(v=>v._seg==='programada'||v._seg==='ejecutada').length,
+    rechazo:   ventasSeg.filter(v=>v._seg==='rechazo'||v._seg==='rechazo_mesa').length,
     caida:     ventasSeg.filter(v=>v._seg==='caida').length,
     tecnico:   ventasSeg.filter(v=>v._seg==='tecnico').length,
   }), [ventasSeg])
