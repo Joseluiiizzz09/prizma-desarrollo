@@ -214,7 +214,11 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
       // hora_asig/historial: si vienen explicitos (ej. importacion Legacy con
       // fecha/hora reales del sistema anterior) se respetan tal cual, en vez de
       // sobreescribirlos con la hora actual como hacia el alta normal.
-      const horaFinal = l.hora_asig || (asesorId ? horaAhora : '');
+      // hora_asig es VARCHAR(10) en la tabla. Una carga Legacy con columnas
+      // desalineadas puede traer texto largo (ej. una tipificacion) en vez de
+      // una hora real; sin este recorte, esa fila tumbaba el INSERT completo
+      // con ER_DATA_TOO_LONG y todo el lote (hasta 400 filas) se perdia.
+      const horaFinal = String(l.hora_asig || (asesorId ? horaAhora : '')).substring(0, 10);
       const historial = Array.isArray(l.historial) && l.historial.length
         ? JSON.stringify(l.historial)
         : (asesorId
@@ -226,7 +230,7 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
       // sistema anterior) — el alta normal desde el formulario deja esto
       // vacío y el asesor lo completa después vía PATCH /:id/tipif.
       const tipifVendInicial = String(l.tipif_vend || '').trim().toUpperCase();
-      const tipifHoraInicial = tipifVendInicial ? (l.tipif_hora || horaFinal || horaAhora) : '';
+      const tipifHoraInicial = tipifVendInicial ? String(l.tipif_hora || horaFinal || horaAhora).substring(0, 10) : '';
 
       const [result] = await db.query(`
         INSERT INTO leads_reclutamiento
