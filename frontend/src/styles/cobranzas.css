@@ -975,4 +975,15 @@ Gestión de Calidad compacta: ficha anterior descartada durante la integración.
 .calidad-mes-pct{font-size:11px;font-weight:800;color:#0f766e}
 .calidad-mes-pendientes{font-size:10px;font-weight:700;color:#b45309;background:#fff7ed;padding:3px 8px;border-radius:20px;white-space:nowrap}
 .calidad-volver-meses{margin-left:auto;border:none;background:transparent;color:#0f766e;font-size:11px;font-weight:700;cursor:pointer;padding:4px 8px;border-radius:6px}
+
+/* KPIs diarios de Calidad (tab Rendimiento) + orden "pendientes primero" — copiado de KRONO. */
+.cobranzas-kpis.kpis-calidad { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kpis-calidad-dia { display: flex; align-items: flex-end; }
+.kpis-calidad-dia label { display: inline-flex; flex-direction: column; gap: 7px; }
+.kpis-calidad-dia label span { color: var(--cz-muted); font-size: 9.5px; font-weight: 800; letter-spacing: .5px; }
+.kpis-calidad-dia input { height: 39px; padding: 0 13px; border: 1px solid var(--cz-border); border-radius: var(--cz-radius-sm); background: #f8fafc; color: var(--cz-ink); font: inherit; font-size: 12.5px; outline: none; transition: .15s ease; }
+.kpis-calidad-dia input:focus { border-color: var(--cz-teal); background:#fff; }
+.cobranzas-kpis article.kpi-conforme::before { background: #16a34a; }
+.calidad-orden-btn{border:1px solid #cbd5e1;background:#fff;color:#64748b;border-radius:6px;width:22px;height:22px;line-height:1;font-size:12px;cursor:pointer;flex-shrink:0}
+.calidad-orden-btn.activo{border-color:#14b8a6;background:#ccfbf1;color:#0f766e}
 .calidad-volver-meses:hover{background:#f0fdfa}
