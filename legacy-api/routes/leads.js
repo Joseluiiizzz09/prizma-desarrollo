@@ -692,6 +692,17 @@ router.get('/ventas-cerradas', auth(['asesor', 'jefatura', 'usuarios']), async (
   }
 });
 
+// Lista cerrada de tipificaciones validas (igual que TIPIF_VEND_OPCIONES del
+// frontend). El filtro de Marketing usa esta lista fija en vez de un
+// SELECT DISTINCT sobre la tabla, para que datos sucios historicos (texto
+// libre de una carga vieja, coordenadas, etc.) nunca aparezcan como opcion.
+const TIPIFICACIONES_MARKETING = [
+  'VENTA CERRADA','PREVENTA','AGENDADO','EN EJECUCION','INSTALADO','NO CONTESTA',
+  'BUZON DE VOZ','CORTA LLAMADA','NO DESEA','NO CALIFICA','SIN COBERTURA',
+  'CONTACTO CON TERCEROS','EDIFICIO NO LIBERADO','DESEA MOVIL','SERVICIO ACTIVO',
+  'NO ROTAR','SIN TIPIFICAR',
+];
+
 // GET /api/leads/marketing-resumen
 // Resumen agregado y exclusivo de Jefatura para trasladar resultados a Marketing.
 router.get('/marketing-resumen', auth(['jefatura']), async (req, res) => {
@@ -732,13 +743,12 @@ router.get('/marketing-resumen', auth(['jefatura']), async (req, res) => {
       ORDER BY cantidad DESC, campana ASC, tipificacion ASC
     `, params);
     const [campanas] = await db.query(`SELECT DISTINCT ${campanaSql} campana FROM leads l ORDER BY campana`);
-    const [tipificaciones] = await db.query(`SELECT DISTINCT ${tipifSql} tipificacion FROM leads l ORDER BY tipificacion`);
     res.json({
       ok:true,
       data:filas.map(f => ({ ...f, cantidad:Number(f.cantidad || 0) })),
       filtros:{
         campanas:campanas.map(f => f.campana),
-        tipificaciones:tipificaciones.map(f => f.tipificacion),
+        tipificaciones:TIPIFICACIONES_MARKETING,
       },
     });
   } catch (e) {
