@@ -36,6 +36,9 @@ const CARGOS = [
   { value: 'supcalidad',     label: 'Super de Calidad' },
   { value: 'backreclutamiento',   label: 'Back Data Reclutaminto'  },
   { value: 'asesorreclutamiento', label: 'Asesor de Reclutamiento' },
+  { value: 'entrevistas',   label: 'Entrevistas'  },
+  { value: 'capacitador',   label: 'Capacitación'  },
+  { value: 'marketing',     label: 'Marketing'  },
 ]
 
 const SALAS_VALIDAS = ['SALA 1', 'SALA 2']

@@ -539,6 +539,8 @@ body{
   background:var(--brand-soft);color:var(--brand);border-color:rgba(249,115,22,.3);transform:scale(1.05);
 }
 .btn-acc:active{transform:scale(.94);}
+.btn-hist-sm{height:22px!important;padding:0 5px!important;}
+.btn-hist-sm svg{width:10px!important;height:10px!important;}
 .btn-acc-audio{border-color:rgba(5,150,105,.3);background:#ecfdf5;color:#065f46;}
 .btn-acc-audio:hover{background:#d1fae5;}
 .btn-acc-subir{border-color:rgba(37,99,235,.3);background:#eff6ff;color:#1e40af;}

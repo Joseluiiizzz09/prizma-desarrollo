@@ -327,6 +327,38 @@ function estiloTipifEntrevista(v) {
   }
 }
 
+// Días de Capacitación (CAPA día 1-2, OJT día 3-5): mismas 3 tipificaciones
+// que Entrevistas, se reutiliza su paleta con estiloTipifEntrevista().
+const TIPIF_DIA_CAPACITACION_OPCIONES = ['DESISTE','ASISTE','FALTA']
+
+// Mismas salas ya usadas en Jefatura.
+const SALAS_CAPACITACION = ['SALA 1','SALA 2','SALA 3','SALA 4','SALA CHANCAY','SALA 5','SALA 6']
+
+// Etiquetas legibles para el historial/trazabilidad de Capacitación.
+const CAMPOS_CAPACITACION_LABELS = {
+  dia1_tipif: 'Día 1', dia2_tipif: 'Día 2', dia3_tipif: 'Día 3', dia4_tipif: 'Día 4', dia5_tipif: 'Día 5',
+  sala: 'Sala', tipificacion_final: 'Tipificación final', fecha_inicio_capacitador: 'Fecha de inicio (capacitador)',
+  fecha_alta: 'Fecha de alta',
+}
+
+// Tipificación final, se asigna desde el día 3 (OJT) en adelante.
+const TIPIF_FINAL_CAPACITACION_OPCIONES = ['ALTA','DESISTE','DESAPROBADO']
+const TIPIF_FINAL_CAPACITACION_COLORES = {
+  'ALTA':        ['#dcfce7','#166534','#86efac'],
+  'DESISTE':     ['#f1f5f9','#334155','#cbd5e1'],
+  'DESAPROBADO': ['#fee2e2','#991b1b','#fca5a5'],
+}
+function estiloTipifFinalCapacitacion(v) {
+  const paleta = TIPIF_FINAL_CAPACITACION_COLORES[v]
+  return {
+    fontSize:10, padding:'3px 6px', borderRadius:6, fontFamily:'inherit', maxWidth:145, cursor:'pointer',
+    border:`1px solid ${paleta?paleta[2]:'#e5e7eb'}`,
+    color:paleta?paleta[1]:'#9ca3af',
+    fontWeight:paleta?800:'inherit',
+    background:paleta?paleta[0]:'#fff',
+  }
+}
+
 function BlBadge({ tipif }) {
   const raw = (tipif || '').trim()
   const color = BL_TIPIF_COLORS[raw.toUpperCase()] || '#9ca3af'
@@ -368,10 +400,20 @@ export default function Backdatareclutamiento() {
   const legacyInputRef  = useRef(null)
   const fechaSistemaRef = useRef(fechaHoy())
 
+  // ── Cargos: 'entrevistas' y 'capacitador' son roles que solo ven su propio
+  // apartado — sin acceso a Base/Reclutados/Carga Masiva.
+  const esBackReclutamiento = usuarioTieneCargo(sesion, 'backreclutamiento')
+  const esEntrevistas = usuarioTieneCargo(sesion, 'entrevistas')
+  const esCapacitador = usuarioTieneCargo(sesion, 'capacitador')
+  const esSoloOperativo = !esBackReclutamiento && (esEntrevistas || esCapacitador)
+  const puedeVerEntrevistas = esBackReclutamiento || esEntrevistas
+  const puedeVerCapacitacion = esBackReclutamiento || esCapacitador
+
   // ── Section ──
   const [seccion, setSeccion] = useState(() => {
+    if (esSoloOperativo) return puedeVerEntrevistas ? 'entrevistas' : 'capacitacion'
     const guardada = sessionStorage.getItem('nc_backoffice_apartado')
-    return BO_SECCIONES.includes(guardada) ? guardada : 'base'
+    return BO_SECCIONES.includes(guardada) && guardada !== 'entrevistas' && guardada !== 'capacitacion' ? guardada : 'base'
   })
   const [sidebarAbierto, setSidebarAbierto] = useState(() => sessionStorage.getItem('nc_backoffice_sidebar') !== 'cerrado')
 
@@ -400,6 +442,7 @@ export default function Backdatareclutamiento() {
 
   // ── Historial ──
   const [histOpen, setHistOpen] = useState({})
+  const [histOpenCapacitacion, setHistOpenCapacitacion] = useState({})
 
   // ── Rotación panel ──
   const [rotPanelOpen,  setRotPanelOpen]  = useState(false)
@@ -425,6 +468,7 @@ export default function Backdatareclutamiento() {
   const [filtrosCapacitacion, setFiltrosCapacitacion] = useState({ busqueda:'', desde:'', hasta:'' })
   const [modalCapacitacion, setModalCapacitacion] = useState({ open:false, entrevistaId:null, nombrePostulante:'', numero:'', fechaInicio:'', guardando:false, error:'' })
   const [modalReprogramar, setModalReprogramar] = useState({ open:false, entrevistaId:null, fechaAgendamiento:'', turno:'', guardando:false, error:'' })
+  const [modalAlta, setModalAlta] = useState({ open:false, capacitacionId:null, fechaAlta:'', guardando:false, error:'' })
   const [rotModalAsesor,setRotModalAsesor]= useState('')
   const [rotBusqueda,   setRotBusqueda]   = useState('')
   const [rotModalMotivo,setRotModalMotivo]= useState('')
@@ -786,15 +830,36 @@ export default function Backdatareclutamiento() {
 
   async function guardarCampoCapacitacion(id, campo, valorAnterior, valorNuevo) {
     if (valorNuevo === (valorAnterior||'')) return
-    if (!valorNuevo) { mostrarToast('Este campo no puede quedar vacío'); return }
     actualizarCapacitacionLocal(id, { [campo]: valorNuevo })
     try {
       const res = await fetch(`${API}/leads-reclutamiento/capacitaciones/${id}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ [campo]: valorNuevo }) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar')
+      if (Array.isArray(data.historial)) actualizarCapacitacionLocal(id, { historial:data.historial })
     } catch(e) {
       actualizarCapacitacionLocal(id, { [campo]: valorAnterior||'' })
       mostrarToast(e.message || 'No se pudo guardar')
+    }
+  }
+
+  // ── Modal fecha de alta (al marcar Tipificación final = ALTA) ────────────
+  function abrirModalAlta(capacitacionId) {
+    setModalAlta({ open:true, capacitacionId, fechaAlta:'', guardando:false, error:'' })
+  }
+
+  async function guardarAlta() {
+    const fechaAlta = modalAlta.fechaAlta
+    if (!fechaAlta) { setModalAlta(p=>({...p, error:'Ingresa la fecha de alta'})); return }
+    setModalAlta(p=>({...p, guardando:true, error:''}))
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/capacitaciones/${modalAlta.capacitacionId}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ tipificacion_final:'ALTA', fecha_alta:fechaAlta }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar')
+      actualizarCapacitacionLocal(modalAlta.capacitacionId, { tipificacion_final:'ALTA', fecha_alta:fechaAlta, ...(Array.isArray(data.historial)?{historial:data.historial}:{}) })
+      setModalAlta({ open:false, capacitacionId:null, fechaAlta:'', guardando:false, error:'' })
+      mostrarToast('Postulante marcado como ALTA')
+    } catch(e) {
+      setModalAlta(p=>({...p, guardando:false, error:e.message || 'No se pudo guardar'}))
     }
   }
 
@@ -858,6 +923,15 @@ export default function Backdatareclutamiento() {
       return entSort.dir === 'desc' ? -cmp : cmp
     })
 
+  const capacitacionesFiltradas = capacitaciones.filter(c => {
+    const fecha = String(c.fecha_inicio_capacitacion||'').slice(0,10)
+    if (filtrosCapacitacion.desde && fecha < filtrosCapacitacion.desde) return false
+    if (filtrosCapacitacion.hasta && fecha > filtrosCapacitacion.hasta) return false
+    const texto = filtrosCapacitacion.busqueda.trim().toLowerCase()
+    if (!texto) return true
+    return [c.nombre_postulante, c.numero, c.campana].some(v => String(v||'').toLowerCase().includes(texto))
+  })
+
   useEffect(() => {
     cargarAsesores()
     cargarLeads()
@@ -865,6 +939,11 @@ export default function Backdatareclutamiento() {
     const t = setVisibleInterval(cargarLeads, 1000)
     return () => clearVisibleInterval(t)
   }, [cargarAsesores, cargarLeads, cargarReclutados])
+
+  useEffect(() => {
+    if (esSoloOperativo) { puedeVerEntrevistas ? cargarEntrevistas() : cargarCapacitaciones() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // BL modal reload on fecha change
   useEffect(() => {
@@ -1757,11 +1836,13 @@ export default function Backdatareclutamiento() {
         {/* SIDEBAR */}
         <aside className={`bo-sidebar${sidebarAbierto ? '' : ' cerrado'}`} aria-hidden={!sidebarAbierto}>
           <div className="sidebar-sep">Principal</div>
+          {!esSoloOperativo && <>
           <button className={`bo-nav${seccion==='base'?' active':''}`} onClick={()=>irSeccion('base')}><BoNavIcon tipo="base" /> <span>Base</span></button>
           <button className={`bo-nav${seccion==='reclutados'?' active':''}`} onClick={()=>irSeccion('reclutados')}><BoNavIcon tipo="avance" /> <span>Reclutados</span></button>
           <button className={`bo-nav${seccion==='carga-masiva'?' active':''}`} onClick={()=>irSeccion('carga-masiva')}><BoNavIcon tipo="carga" /> <span>Carga Masiva</span></button>
-          <button className={`bo-nav${seccion==='entrevistas'?' active':''}`} onClick={()=>irSeccion('entrevistas')}><BoNavIcon tipo="avance" /> <span>Entrevistas</span></button>
-          <button className={`bo-nav${seccion==='capacitacion'?' active':''}`} onClick={()=>irSeccion('capacitacion')}><BoNavIcon tipo="avance" /> <span>Capacitación</span></button>
+          </>}
+          {puedeVerEntrevistas && <button className={`bo-nav${seccion==='entrevistas'?' active':''}`} onClick={()=>irSeccion('entrevistas')}><BoNavIcon tipo="avance" /> <span>Entrevistas</span></button>}
+          {puedeVerCapacitacion && <button className={`bo-nav${seccion==='capacitacion'?' active':''}`} onClick={()=>irSeccion('capacitacion')}><BoNavIcon tipo="avance" /> <span>Capacitación</span></button>}
 
           {seccion==='base' && (
             <div className="bo-sidebar-add">
@@ -2420,8 +2501,97 @@ export default function Backdatareclutamiento() {
           </section>
 
           <section className={`bo-seccion${seccion==='capacitacion'?'':' hidden'}`}>
-            <div className="bo-seccion-header"><div><h2>Capacitación</h2><p className="bo-sub">Postulantes que asistieron y empiezan capacitación.</p></div><button type="button" className="reclutados-refresh" onClick={cargarCapacitaciones}>↻ Actualizar</button></div>
-            <div className="base-tabla-wrap reclutados-tabla-wrap"><table className="base-tabla reclutados-tabla"><thead><tr><th>Postulante</th><th>Número</th><th>Campaña</th><th>Inicio</th><th>Estado</th><th>Observación</th></tr></thead><tbody>{cargandoCapacitaciones?<tr><td colSpan="6" className="reclutados-empty">Cargando…</td></tr>:capacitaciones.map(c=><tr key={c.id}><td>{c.nombre_postulante}</td><td>{c.numero}</td><td>{c.campana||'—'}</td><td><input type="date" className="form-control" defaultValue={String(c.fecha_inicio_capacitacion||'').slice(0,10)} onBlur={e=>guardarCampoCapacitacion(c.id,'fecha_inicio_capacitacion',String(c.fecha_inicio_capacitacion||'').slice(0,10),e.target.value)}/></td><td><input className="form-control" defaultValue={c.estado||''} onBlur={e=>guardarCampoCapacitacion(c.id,'estado',c.estado||'',e.target.value.trim())}/></td><td><input className="form-control" defaultValue={c.observacion||''} onBlur={e=>guardarCampoCapacitacion(c.id,'observacion',c.observacion||'',e.target.value.trim())}/></td></tr>)}</tbody></table></div>
+            <div className="bo-seccion-header">
+              <div>
+                <h2>Capacitación</h2>
+                <p className="bo-sub">Postulantes que asistieron a la entrevista y arrancan capacitación.</p>
+              </div>
+              <div className="reclutados-head-actions">
+                <span className="reclutados-count">{capacitacionesFiltradas.length} registros</span>
+                <button type="button" className="reclutados-refresh" onClick={cargarCapacitaciones}>↻ Actualizar</button>
+              </div>
+            </div>
+
+            <div className="filtros-grid" style={{marginBottom:14}}>
+              <div className="bo-input-group"><label>Buscar</label><input className="form-control" value={filtrosCapacitacion.busqueda} onChange={e=>setFiltrosCapacitacion(p=>({...p,busqueda:e.target.value}))} placeholder="Postulante, número o campaña…" /></div>
+              <div className="bo-input-group"><label>Desde</label><input type="date" className="form-control" value={filtrosCapacitacion.desde} onChange={e=>setFiltrosCapacitacion(p=>({...p,desde:e.target.value}))} /></div>
+              <div className="bo-input-group"><label>Hasta</label><input type="date" className="form-control" value={filtrosCapacitacion.hasta} onChange={e=>setFiltrosCapacitacion(p=>({...p,hasta:e.target.value}))} /></div>
+            </div>
+
+            <div className="base-tabla-wrap reclutados-tabla-wrap">
+              <table className="base-tabla reclutados-tabla">
+                <thead>
+                  <tr>
+                    <th>Campaña</th><th>Registrado por</th><th>Postulante</th><th>Número</th>
+                    <th>Fecha de inicio</th><th>Fecha de inicio (capacitador)</th>
+                    <th>Día 1</th><th>Día 2</th><th>Día 3</th><th>Día 4</th><th>Día 5</th>
+                    <th>Sala</th><th>Tipificación final</th>
+                    <th>Historial</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cargandoCapacitaciones ? (
+                    <tr><td colSpan="14" className="reclutados-empty">Cargando capacitaciones...</td></tr>
+                  ) : capacitacionesFiltradas.length === 0 ? (
+                    <tr><td colSpan="14" className="reclutados-empty">Sin postulantes en capacitación.</td></tr>
+                  ) : capacitacionesFiltradas.flatMap(c => ([
+                    <tr key={c.id}>
+                      <td>{c.campana||'—'}</td>
+                      <td className="reclutados-reclutador">{c.creado_por_nombre || '—'}</td>
+                      <td className="reclutados-nombre">{c.nombre_postulante}</td>
+                      <td>{c.numero}</td>
+                      <td>{formatFecha(String(c.fecha_inicio_capacitacion).slice(0,10))}</td>
+                      <td><input type="date" className="form-control" defaultValue={String(c.fecha_inicio_capacitador||'').slice(0,10)} onBlur={e=>guardarCampoCapacitacion(c.id,'fecha_inicio_capacitador', String(c.fecha_inicio_capacitador||'').slice(0,10), e.target.value)} style={{fontSize:11,padding:'5px 8px',minWidth:130}} /></td>
+                      {['dia1_tipif','dia2_tipif','dia3_tipif','dia4_tipif','dia5_tipif'].map(campo => (
+                        <td key={campo}>
+                          <select value={c[campo]||''} onChange={e=>guardarCampoCapacitacion(c.id,campo,c[campo]||'',e.target.value)} style={estiloTipifEntrevista(c[campo])}>
+                            <option value="" style={{background:'#fff',color:'#111827',fontWeight:400}}>—</option>
+                            {TIPIF_DIA_CAPACITACION_OPCIONES.map(t=><option key={t} value={t} style={{background:'#fff',color:'#111827',fontWeight:400}}>{t}</option>)}
+                          </select>
+                        </td>
+                      ))}
+                      <td>
+                        <select value={c.sala||''} onChange={e=>guardarCampoCapacitacion(c.id,'sala',c.sala||'',e.target.value)} style={{fontSize:11,padding:'4px 6px',borderRadius:6,fontFamily:'inherit',maxWidth:120,cursor:'pointer',border:'1px solid #e5e7eb',background:'#fff'}}>
+                          <option value="">— Selecciona —</option>
+                          {SALAS_CAPACITACION.map(s=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <select value={c.tipificacion_final||''} onChange={e=>{ const v=e.target.value; if (v==='ALTA' && c.tipificacion_final!=='ALTA') abrirModalAlta(c.id); else guardarCampoCapacitacion(c.id,'tipificacion_final',c.tipificacion_final||'',v) }} style={estiloTipifFinalCapacitacion(c.tipificacion_final)}>
+                          <option value="" style={{background:'#fff',color:'#111827',fontWeight:400}}>— Pendiente —</option>
+                          {TIPIF_FINAL_CAPACITACION_OPCIONES.map(t=><option key={t} value={t} style={{background:'#fff',color:'#111827',fontWeight:400}}>{t}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <button type="button" className="btn-hist btn-hist-sm" onClick={()=>setHistOpenCapacitacion(p=>({...p,[c.id]:!p[c.id]}))} title="Historial">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        </button>
+                      </td>
+                    </tr>,
+                    <tr key={`hist-cap-${c.id}`} className={`historial-row${histOpenCapacitacion[c.id]?' open':''}`}>
+                      <td colSpan={14}>
+                        <div className="historial-inner">
+                          <div className="hist-label">Trazabilidad — {c.nombre_postulante}</div>
+                          {!(c.historial||[]).length
+                            ? <div style={{fontSize:11,color:'#ccc'}}>Sin cambios registrados.</div>
+                            : (c.historial||[]).slice().reverse().map((h,hi)=>(
+                              <div key={hi} className="hist-item" style={{alignItems:'flex-start'}}>
+                                <div className="hist-dot" style={{background:DOT_COLORS[hi%DOT_COLORS.length],marginTop:4}} />
+                                <div style={{lineHeight:1.5}}>
+                                  <div><strong>{CAMPOS_CAPACITACION_LABELS[h.campo]||h.campo}</strong> <span className="hora-cell">{h.hora||'—'}</span> <span style={{color:'#9ca3af'}}>{h.fecha||''}</span></div>
+                                  <div style={{fontSize:11}}>{h.valor_anterior || '— Pendiente —'} <span style={{color:'#9ca3af'}}>→</span> <strong style={{color:'#065f46'}}>{h.valor_nuevo || '— Pendiente —'}</strong></div>
+                                  <div style={{fontSize:11,color:'#6b7280'}}>Modificado por: {h.usuario_nombre||'—'}</div>
+                                </div>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      </td>
+                    </tr>,
+                  ]))}
+                </tbody>
+              </table>
+            </div>
           </section>
         </main>
       </div>
@@ -2549,6 +2719,21 @@ export default function Backdatareclutamiento() {
             <div className="modal-btns">
               <button className="btn-cancelar-modal" onClick={()=>setModalReprogramar(p=>({...p,open:false}))} disabled={modalReprogramar.guardando}>Cancelar</button>
               <button className="btn-confirmar-modal" onClick={guardarReprogramar} disabled={modalReprogramar.guardando}>{modalReprogramar.guardando?'Guardando…':'Guardar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL FECHA DE ALTA ══════════════════════════════════════════════ */}
+      {modalAlta.open && (
+        <div className="modal-overlay open" onClick={e=>{ if(e.target===e.currentTarget && !modalAlta.guardando) setModalAlta(p=>({...p,open:false})) }}>
+          <div className="modal-box">
+            <h3>Fecha de alta</h3>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Fecha de alta</label><input type="date" className="form-control" value={modalAlta.fechaAlta} onChange={e=>setModalAlta(p=>({...p,fechaAlta:e.target.value}))} /></div>
+            {modalAlta.error && <p style={{color:'#dc2626',fontSize:12,margin:'0 0 10px'}}>{modalAlta.error}</p>}
+            <div className="modal-btns">
+              <button className="btn-cancelar-modal" onClick={()=>setModalAlta(p=>({...p,open:false}))} disabled={modalAlta.guardando}>Cancelar</button>
+              <button className="btn-confirmar-modal" onClick={guardarAlta} disabled={modalAlta.guardando}>{modalAlta.guardando?'Guardando…':'Confirmar ALTA'}</button>
             </div>
           </div>
         </div>

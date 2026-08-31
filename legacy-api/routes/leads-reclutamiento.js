@@ -13,8 +13,12 @@ const { validar, errorTexto, errorFecha, errorHora, errorHistorial, errorEnum } 
 const ROLES_BACK = ['backreclutamiento', 'jefatura', 'usuarios'];
 const ROLES_ALL  = ['backreclutamiento', 'jefatura', 'usuarios', 'asesorreclutamiento'];
 const ROLES_ENTREVISTAS = ['entrevistas', 'backreclutamiento', 'jefatura', 'usuarios'];
+const ROLES_CAPACITACION = ['capacitador', 'backreclutamiento', 'jefatura', 'usuarios'];
 const TURNOS_ENTREVISTA = ['TURNO 1', 'TURNO 2'];
 const TIPIFICACIONES_ENTREVISTA = ['NO CONTESTA', 'DESISTE', 'REPROGRAMA', 'CORTA LLAMADA', 'ASISTE', 'EN CAMINO', 'FALTA'];
+const TIPIF_DIA_CAPACITACION = ['DESISTE', 'ASISTE', 'FALTA'];
+const TIPIF_FINAL_CAPACITACION = ['ALTA', 'DESISTE', 'DESAPROBADO'];
+const SALAS_CAPACITACION = ['SALA 1','SALA 2','SALA 3','SALA 4','SALA CHANCAY','SALA 5','SALA 6'];
 
 let promesaTablaEntrevistas;
 function asegurarTablaEntrevistas() {
@@ -52,25 +56,62 @@ function asegurarTablaEntrevistas() {
   return promesaTablaEntrevistas;
 }
 
+// ventas_reclutamiento ya existe (routes/ventas-reclutamiento.js); aquí solo
+// se asegura la columna nueva que usa el flujo de ALTA en Capacitación.
+let promesaColumnaFechaAlta;
+function asegurarColumnaFechaAltaVentas() {
+  if (!promesaColumnaFechaAlta) {
+    promesaColumnaFechaAlta = (async () => {
+      const [columnas] = await db.query('SHOW COLUMNS FROM ventas_reclutamiento');
+      if (!columnas.some(c => c.Field === 'fecha_alta')) {
+        await db.query(`ALTER TABLE ventas_reclutamiento ADD COLUMN fecha_alta DATE NULL`);
+      }
+    })().catch(error => { promesaColumnaFechaAlta = null; throw error; });
+  }
+  return promesaColumnaFechaAlta;
+}
+
 // Apartado de Capacitación: se llena al tipificar una entrevista como ASISTE.
 let promesaTablaCapacitaciones;
 function asegurarTablaCapacitaciones() {
   if (!promesaTablaCapacitaciones) {
-    promesaTablaCapacitaciones = db.query(`
-      CREATE TABLE IF NOT EXISTS reclutamiento_capacitaciones (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        entrevista_id INT NULL,
-        lead_id INT NULL,
-        nombre_postulante VARCHAR(150) NOT NULL,
-        numero VARCHAR(30) NOT NULL,
-        fecha_inicio_capacitacion DATE NOT NULL,
-        creado_por_id INT NULL,
-        creado_por_nombre VARCHAR(150) NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_capacitaciones_lead (lead_id),
-        INDEX idx_capacitaciones_entrevista (entrevista_id)
-      )
-    `).catch(error => { promesaTablaCapacitaciones = null; throw error; });
+    promesaTablaCapacitaciones = (async () => {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS reclutamiento_capacitaciones (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          entrevista_id INT NULL,
+          lead_id INT NULL,
+          nombre_postulante VARCHAR(150) NOT NULL,
+          numero VARCHAR(30) NOT NULL,
+          fecha_inicio_capacitacion DATE NOT NULL,
+          creado_por_id INT NULL,
+          creado_por_nombre VARCHAR(150) NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_capacitaciones_lead (lead_id),
+          INDEX idx_capacitaciones_entrevista (entrevista_id)
+        )
+      `);
+      const [columnas] = await db.query('SHOW COLUMNS FROM reclutamiento_capacitaciones');
+      const existentes = new Set(columnas.map(c => c.Field));
+      // 5 días (2 de CAPA + 3 de OJT), cada uno con su propia tipificación
+      // DESISTE/ASISTE/FALTA; más SALA y tipificación final (desde OJT).
+      const nuevas = [
+        ['dia1_tipif', 'VARCHAR(20) NULL'],
+        ['dia2_tipif', 'VARCHAR(20) NULL'],
+        ['dia3_tipif', 'VARCHAR(20) NULL'],
+        ['dia4_tipif', 'VARCHAR(20) NULL'],
+        ['dia5_tipif', 'VARCHAR(20) NULL'],
+        ['sala', 'VARCHAR(60) NULL'],
+        ['tipificacion_final', 'VARCHAR(20) NULL'],
+        ['fecha_inicio_capacitador', 'DATE NULL'],
+        ['historial', 'TEXT NULL'],
+        ['ventas_reclutamiento_id', 'INT NULL'],
+        ['fecha_alta', 'DATE NULL'],
+      ];
+      for (const [columna, definicion] of nuevas) {
+        if (!existentes.has(columna)) await db.query(`ALTER TABLE reclutamiento_capacitaciones ADD COLUMN ${columna} ${definicion}`);
+      }
+    })().catch(error => { promesaTablaCapacitaciones = null; throw error; });
   }
   return promesaTablaCapacitaciones;
 }
@@ -559,49 +600,171 @@ router.post('/entrevistas/:entrevistaId/capacitacion', auth(ROLES_ENTREVISTAS), 
 });
 
 // GET /api/leads-reclutamiento/capacitaciones — listado para el apartado de Capacitación
-router.get('/capacitaciones', auth(ROLES_ENTREVISTAS), async (req, res) => {
+router.get('/capacitaciones', auth(ROLES_CAPACITACION), async (req, res) => {
   try {
     await asegurarTablaCapacitaciones();
     const [data] = await db.query(`
-      SELECT c.id, c.nombre_postulante, c.numero, c.fecha_inicio_capacitacion, c.creado_por_nombre, c.created_at,
+      SELECT c.id, c.nombre_postulante, c.numero, c.fecha_inicio_capacitacion, c.fecha_inicio_capacitador,
+             c.creado_por_nombre, c.created_at, c.historial, c.fecha_alta,
+             c.dia1_tipif, c.dia2_tipif, c.dia3_tipif, c.dia4_tipif, c.dia5_tipif, c.sala, c.tipificacion_final,
              l.campana
         FROM reclutamiento_capacitaciones c
         LEFT JOIN leads_reclutamiento l ON l.id = c.lead_id
        ORDER BY c.fecha_inicio_capacitacion DESC, c.id DESC
     `);
-    res.json({ ok: true, data });
+    res.json({ ok: true, data: data.map(c => ({
+      ...c,
+      historial: (() => { try { return JSON.parse(c.historial || '[]'); } catch { return []; } })(),
+    })) });
   } catch(e) {
     console.error(e);
     res.status(500).json({ ok: false, mensaje: 'Error al obtener capacitaciones' });
   }
 });
 
-// PATCH /api/leads-reclutamiento/capacitaciones/:capacitacionId — editar
-// nombre/número/fecha de inicio ya registrados.
-router.patch('/capacitaciones/:capacitacionId', auth(ROLES_ENTREVISTAS), async (req, res) => {
+// PATCH /api/leads-reclutamiento/capacitaciones/:capacitacionId — tipificar
+// los 5 días (CAPA/OJT), asignar sala y la tipificación final. Nombre, número
+// y fecha de inicio quedan fijos una vez registrados: no se editan aquí.
+router.patch('/capacitaciones/:capacitacionId', auth(ROLES_CAPACITACION), async (req, res) => {
   try {
     await asegurarTablaCapacitaciones();
-    const { nombre_postulante, numero, fecha_inicio_capacitacion } = req.body;
+    const { dia1_tipif, dia2_tipif, dia3_tipif, dia4_tipif, dia5_tipif, sala, tipificacion_final, fecha_inicio_capacitador, fecha_alta } = req.body;
     const errores = validar([
-      errorTexto(nombre_postulante, 'nombre_postulante', { max: 150 }),
-      errorTexto(numero, 'numero', { max: 30 }),
-      errorFecha(fecha_inicio_capacitacion, 'fecha_inicio_capacitacion'),
+      errorEnum(dia1_tipif, 'dia1_tipif', TIPIF_DIA_CAPACITACION),
+      errorEnum(dia2_tipif, 'dia2_tipif', TIPIF_DIA_CAPACITACION),
+      errorEnum(dia3_tipif, 'dia3_tipif', TIPIF_DIA_CAPACITACION),
+      errorEnum(dia4_tipif, 'dia4_tipif', TIPIF_DIA_CAPACITACION),
+      errorEnum(dia5_tipif, 'dia5_tipif', TIPIF_DIA_CAPACITACION),
+      errorEnum(sala, 'sala', SALAS_CAPACITACION),
+      errorEnum(tipificacion_final, 'tipificacion_final', TIPIF_FINAL_CAPACITACION),
+      errorFecha(fecha_inicio_capacitador, 'fecha_inicio_capacitador'),
+      errorFecha(fecha_alta, 'fecha_alta'),
     ]);
     if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
-    const [rows] = await db.query(`SELECT id FROM reclutamiento_capacitaciones WHERE id = ?`, [req.params.capacitacionId]);
+    const [rows] = await db.query(`SELECT * FROM reclutamiento_capacitaciones WHERE id = ?`, [req.params.capacitacionId]);
     if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Capacitación no encontrada' });
+    const actual = rows[0];
+    // La fecha de alta es obligatoria justo cuando se pasa a ALTA por primera vez.
+    if (tipificacion_final === 'ALTA' && actual.tipificacion_final !== 'ALTA' && !fecha_alta) {
+      return res.status(400).json({ ok: false, mensaje: 'Ingresa la fecha de alta' });
+    }
+    const cambios = { dia1_tipif, dia2_tipif, dia3_tipif, dia4_tipif, dia5_tipif, sala, tipificacion_final, fecha_inicio_capacitador, fecha_alta };
     const campos = [];
     const valores = [];
-    if (nombre_postulante !== undefined && nombre_postulante.trim()) { campos.push('nombre_postulante = ?'); valores.push(nombre_postulante.trim()); }
-    if (numero !== undefined && numero.trim()) { campos.push('numero = ?'); valores.push(numero.trim()); }
-    if (fecha_inicio_capacitacion !== undefined && fecha_inicio_capacitacion) { campos.push('fecha_inicio_capacitacion = ?'); valores.push(fecha_inicio_capacitacion); }
+    let historial = [];
+    try { historial = JSON.parse(actual.historial || '[]'); } catch { historial = []; }
+    for (const campo of Object.keys(cambios)) {
+      const nuevo = cambios[campo];
+      if (nuevo === undefined) continue;
+      const valorNuevo = nuevo || null;
+      const valorAnterior = actual[campo] instanceof Date
+        ? actual[campo].toISOString().slice(0, 10)
+        : (actual[campo] || null);
+      campos.push(`${campo} = ?`); valores.push(valorNuevo);
+      if (String(valorAnterior || '') !== String(valorNuevo || '')) {
+        historial.push({
+          campo, valor_anterior: valorAnterior || '', valor_nuevo: valorNuevo || '',
+          usuario_id: req.user.id, usuario_nombre: req.user.nombre || req.user.usuario || 'Usuario',
+          hora: horaPeruAhora(), fecha: fechaPeruHoy(),
+        });
+      }
+    }
     if (!campos.length) return res.status(400).json({ ok: false, mensaje: 'Nada que actualizar' });
+    campos.push('historial = ?'); valores.push(JSON.stringify(historial));
     valores.push(req.params.capacitacionId);
     await db.query(`UPDATE reclutamiento_capacitaciones SET ${campos.join(', ')} WHERE id = ?`, valores);
-    res.json({ ok: true, mensaje: 'Capacitación actualizada' });
+
+    // Al marcar la tipificación final como ALTA, el postulante pasa a
+    // Reclutados (ventas_reclutamiento) — una sola vez por capacitación.
+    // Efecto secundario "best effort": si falla, no debe tumbar el guardado
+    // de la tipificación (que ya se aplicó arriba).
+    if (tipificacion_final === 'ALTA' && actual.tipificacion_final !== 'ALTA' && !actual.ventas_reclutamiento_id) {
+      try {
+        let campanaLead = '';
+        if (actual.lead_id) {
+          const [leadRows] = await db.query(`SELECT campana FROM leads_reclutamiento WHERE id = ?`, [actual.lead_id]);
+          campanaLead = leadRows[0]?.campana || '';
+        }
+        // usuario_id tiene FK a usuarios: si req.user.id no es un usuario real
+        // (ej. un actor sintético de una vista delegada), se guarda sin dueño
+        // en vez de reventar el INSERT completo.
+        const [usuarioRows] = await db.query(`SELECT id FROM usuarios WHERE id = ?`, [req.user.id]);
+        const usuarioIdValido = usuarioRows.length ? req.user.id : null;
+        await asegurarColumnaFechaAltaVentas();
+        const [insVentas] = await db.query(`
+          INSERT INTO ventas_reclutamiento
+            (nombre, tipo_doc, dni, telefono1, telefono2, distrito, puesto, campana, empresa,
+             experiencia, disponibilidad, estado_reclutamiento, usuario_id, fecha_alta)
+          VALUES (?, 'DNI', NULL, ?, '', '', '', ?, '', '', '', 'RECLUTADO', ?, ?)
+        `, [actual.nombre_postulante, actual.numero, campanaLead, usuarioIdValido, fecha_alta || null]);
+        await db.query(`UPDATE reclutamiento_capacitaciones SET ventas_reclutamiento_id = ? WHERE id = ?`, [insVentas.insertId, req.params.capacitacionId]);
+      } catch (errAlta) {
+        console.error('[CAPACITACION] No se pudo crear en Reclutados:', errAlta.message);
+      }
+    }
+
+    res.json({ ok: true, mensaje: 'Capacitación actualizada', historial });
   } catch(e) {
     console.error(e);
     res.status(500).json({ ok: false, mensaje: 'Error al actualizar la capacitación' });
+  }
+});
+
+// GET /api/leads-reclutamiento/marketing-resumen
+// Espejo de /api/leads/marketing-resumen (Backoffice comercial) pero sobre
+// leads_reclutamiento — mismo reporte para Marketing, ahora tambien para
+// las campañas de reclutamiento. 'marketing' es el cargo acotado con acceso
+// solo a este reporte (su propia página /marketing-leads).
+router.get('/marketing-resumen', auth(['jefatura','marketing']), async (req, res) => {
+  try {
+    const desde = String(req.query.desde || '').trim();
+    const hasta = String(req.query.hasta || '').trim();
+    const campana = String(req.query.campana || '').trim();
+    const tipificacion = String(req.query.tipificacion || '').trim();
+    const errores = validar([
+      errorFecha(desde || undefined, 'desde'),
+      errorFecha(hasta || undefined, 'hasta'),
+      errorTexto(campana, 'campana', { max:100 }),
+      errorTexto(tipificacion, 'tipificacion', { max:100 }),
+    ]);
+    if (errores) return res.status(400).json({ ok:false, mensaje:errores[0] });
+    if (desde && hasta && desde > hasta)
+      return res.status(400).json({ ok:false, mensaje:'La fecha Desde no puede ser posterior a Hasta' });
+
+    const campanaSql = `COALESCE(NULLIF(TRIM(l.campana),''), 'SIN CAMPAÑA')`;
+    const tipifSql = `COALESCE(NULLIF(TRIM(l.tipif_vend),''), NULLIF(TRIM(l.tipif_back),''), 'SIN TIPIFICAR')`;
+    const condiciones = [];
+    const params = [];
+    if (desde) { condiciones.push('l.fecha >= ?'); params.push(desde); }
+    if (hasta) { condiciones.push('l.fecha <= ?'); params.push(hasta); }
+    if (campana) { condiciones.push(`${campanaSql} = ?`); params.push(campana); }
+    if (tipificacion) { condiciones.push(`${tipifSql} = ?`); params.push(tipificacion); }
+    const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
+
+    const [filas] = await db.query(`
+      SELECT ${campanaSql} AS campana,
+             ${tipifSql} AS tipificacion,
+             COUNT(*) AS cantidad,
+             MIN(l.created_at) AS primera_alta,
+             MAX(l.created_at) AS ultima_alta
+      FROM leads_reclutamiento l
+      ${where}
+      GROUP BY ${campanaSql}, ${tipifSql}
+      ORDER BY cantidad DESC, campana ASC, tipificacion ASC
+    `, params);
+    const [campanas] = await db.query(`SELECT DISTINCT ${campanaSql} campana FROM leads_reclutamiento l ORDER BY campana`);
+    const [tipificaciones] = await db.query(`SELECT DISTINCT ${tipifSql} tipificacion FROM leads_reclutamiento l ORDER BY tipificacion`);
+    res.json({
+      ok:true,
+      data:filas.map(f => ({ ...f, cantidad:Number(f.cantidad || 0) })),
+      filtros:{
+        campanas:campanas.map(f => f.campana),
+        tipificaciones:tipificaciones.map(f => f.tipificacion),
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok:false, mensaje:'Error al generar el dashboard de Marketing de Reclutamiento' });
   }
 });
 

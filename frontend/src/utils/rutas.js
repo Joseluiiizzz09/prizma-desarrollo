@@ -16,6 +16,9 @@ export const RUTAS = {
   supcalidad:     '/sup-calidad',
   backreclutamiento:   '/backdata-reclutamiento',
   asesorreclutamiento: '/reclutamiento',
+  entrevistas:         '/backdata-reclutamiento',
+  capacitador:         '/backdata-reclutamiento',
+  marketing:           '/marketing-leads',
 }
 
 export const CARGO_LABELS = {
@@ -32,4 +35,7 @@ export const CARGO_LABELS = {
   supcalidad: 'Super de Calidad',
   backreclutamiento: 'Back Data Reclutaminto',
   asesorreclutamiento: 'Asesor de Reclutamiento',
+  entrevistas: 'Entrevistas',
+  capacitador: 'Capacitación',
+  marketing: 'Marketing',
 }
