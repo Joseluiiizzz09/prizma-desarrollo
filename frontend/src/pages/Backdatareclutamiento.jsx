@@ -7,12 +7,12 @@ import CambiarAreaMenu from '../components/CambiarAreaMenu'
 import { API, ncHeaders } from '../services/api'
 import { responseChanged, setVisibleInterval, clearVisibleInterval } from '../utils/polling'
 import { usuarioTieneCargo } from '../utils/roles'
-import { CAMPANAS } from '../utils/campanas'
+import { CAMPANAS_RECLUTAMIENTO } from '../utils/campanas'
 import '../styles/Backdatareclutamiento.css'
 
 // ── Selector de campaña (lista + opción "Otro" para escribir a mano) ───────
 function CampanaSelect({ value, onChange, plain }) {
-  const [manual, setManual] = useState(() => Boolean(value) && !CAMPANAS.includes(value))
+  const [manual, setManual] = useState(() => Boolean(value) && !CAMPANAS_RECLUTAMIENTO.includes(value))
   if (manual) {
     return (
       <div style={{display:'flex',gap:6,alignItems:'center'}}>
@@ -24,10 +24,10 @@ function CampanaSelect({ value, onChange, plain }) {
     )
   }
   return (
-    <select className={plain?undefined:'form-control'} value={CAMPANAS.includes(value)?value:''}
+    <select className={plain?undefined:'form-control'} value={CAMPANAS_RECLUTAMIENTO.includes(value)?value:''}
       onChange={e=>{ const v=e.target.value; if(v==='__OTRO__'){ setManual(true); onChange('') } else onChange(v) }}>
       <option value="">— Selecciona —</option>
-      {CAMPANAS.map(c=>(<option key={c} value={c}>{c}</option>))}
+      {CAMPANAS_RECLUTAMIENTO.map(c=>(<option key={c} value={c}>{c}</option>))}
       <option value="__OTRO__">Otro (escribir a mano)…</option>
     </select>
   )
