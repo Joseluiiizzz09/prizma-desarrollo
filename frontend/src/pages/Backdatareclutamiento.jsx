@@ -410,6 +410,7 @@ export default function Backdatareclutamiento() {
   const [entrevistas, setEntrevistas] = useState([])
   const [cargandoEntrevistas, setCargandoEntrevistas] = useState(false)
   const [filtrosEntrevistas, setFiltrosEntrevistas] = useState({ turno:'', desde:'', hasta:'', busqueda:'' })
+  const [entSort, setEntSort] = useState({ col:'', dir:'asc' })
   const [modalEntrevista, setModalEntrevista] = useState({ open:false, regId:null, nombrePostulante:'', numero:'', numeroRef:'', turno:'', fechaAgendamiento:'', observacion:'', guardando:false, error:'' })
   const [capacitaciones, setCapacitaciones] = useState([])
   const [cargandoCapacitaciones, setCargandoCapacitaciones] = useState(false)
@@ -788,6 +789,40 @@ export default function Backdatareclutamiento() {
       mostrarToast(e.message || 'No se pudo guardar la fecha de entrevista')
     }
   }
+
+  function toggleEntSort(col) {
+    setEntSort(prev => prev.col === col ? { col, dir: prev.dir==='asc'?'desc':'asc' } : { col, dir:'asc' })
+  }
+  function entTh(col, label) {
+    const activo = entSort.col === col
+    return (
+      <th onClick={()=>toggleEntSort(col)} style={{ cursor:'pointer', userSelect:'none', whiteSpace:'nowrap' }} title="Ordenar">
+        <span style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
+          {label}
+          <span style={{ fontSize:9, lineHeight:1, color: activo ? '#6d28d9' : '#cbd5e1' }}>{activo ? (entSort.dir==='asc'?'▲':'▼') : '⇅'}</span>
+        </span>
+      </th>
+    )
+  }
+  const entrevistasFiltradas = entrevistas
+    .filter(en => {
+      const q = filtrosEntrevistas.busqueda.trim().toLowerCase()
+      const fechaAg = String(en.fecha_agendamiento||'').slice(0,10)
+      if (filtrosEntrevistas.turno && en.turno !== filtrosEntrevistas.turno) return false
+      if (filtrosEntrevistas.desde && fechaAg && fechaAg < filtrosEntrevistas.desde) return false
+      if (filtrosEntrevistas.hasta && fechaAg && fechaAg > filtrosEntrevistas.hasta) return false
+      if (q && !`${en.nombre_postulante} ${en.numero} ${en.campana}`.toLowerCase().includes(q)) return false
+      return true
+    })
+    .sort((a,b) => {
+      if (!entSort.col) return 0
+      const val = r => {
+        if (entSort.col === 'agendado_por') return String(r.creado_por_nombre||'')
+        return String(r[entSort.col]||'')
+      }
+      const cmp = val(a).localeCompare(val(b), 'es', { numeric:true })
+      return entSort.dir === 'desc' ? -cmp : cmp
+    })
 
   useEffect(() => {
     cargarAsesores()
@@ -2244,10 +2279,29 @@ export default function Backdatareclutamiento() {
 
 
           <section className={`bo-seccion${seccion==='entrevistas'?'':' hidden'}`}>
-            <div className="bo-seccion-header"><div><h2>Entrevistas</h2><p className="bo-sub">Seguimiento de postulantes agendados.</p></div><button type="button" className="reclutados-refresh" onClick={cargarEntrevistas}>↻ Actualizar</button></div>
-            <div className="filtros-grid" style={{marginBottom:14}}><div className="bo-input-group"><label>Buscar</label><input className="form-control" value={filtrosEntrevistas.busqueda} onChange={e=>setFiltrosEntrevistas(p=>({...p,busqueda:e.target.value}))} placeholder="Postulante, número o campaña…" /></div><div className="bo-input-group"><label>Turno</label><select className="form-select" value={filtrosEntrevistas.turno} onChange={e=>setFiltrosEntrevistas(p=>({...p,turno:e.target.value}))}><option value="">Todos</option><option value="TURNO 1">TURNO 1</option><option value="TURNO 2">TURNO 2</option></select></div></div>
-            <div className="base-tabla-wrap reclutados-tabla-wrap"><table className="base-tabla reclutados-tabla"><thead><tr><th>Registro</th><th>Campaña</th><th>Postulante</th><th>Número</th><th>Turno</th><th>Tipificación</th><th>Observación</th><th>Entrevista</th></tr></thead><tbody>
-              {cargandoEntrevistas ? <tr><td colSpan="8" className="reclutados-empty">Cargando…</td></tr> : entrevistas.filter(en=>{const q=filtrosEntrevistas.busqueda.toLowerCase();return (!filtrosEntrevistas.turno||en.turno===filtrosEntrevistas.turno)&&(!q||`${en.nombre_postulante} ${en.numero} ${en.campana}`.toLowerCase().includes(q))}).map(en=><tr key={en.id}><td>{formatFecha(normalizarFecha(en.created_at))}</td><td>{en.campana||'—'}</td><td>{en.nombre_postulante}</td><td>{en.numero}</td><td>{en.turno}</td><td><select value={en.tipificacion||''} onChange={e=>guardarTipifEntrevista(en.id,e.target.value)} style={estiloTipifEntrevista(en.tipificacion)}><option value="">— Pendiente —</option>{TIPIF_ENTREVISTA_OPCIONES.map(t=><option key={t} value={t}>{t}</option>)}</select></td><td><input className="form-control" defaultValue={en.observacion||''} onBlur={e=>guardarObservacionEntrevista(en.id,en.observacion||'',e.target.value.trim())}/></td><td><input type="date" className="form-control" defaultValue={String(en.fecha_entrevista||'').slice(0,10)} onBlur={e=>guardarFechaEntrevista(en.id,String(en.fecha_entrevista||'').slice(0,10),e.target.value)}/></td></tr>)}
+            <div className="bo-seccion-header"><div><h2>Entrevistas agendadas</h2><p className="bo-sub">Postulantes que aceptaron la propuesta y programaron entrevista.</p></div><div style={{display:'flex',alignItems:'center',gap:8}}><span className="reclutados-count">{entrevistasFiltradas.length} registros</span><button type="button" className="reclutados-refresh" onClick={cargarEntrevistas}>↻ Actualizar</button></div></div>
+            <div className="filtros-grid" style={{marginBottom:14}}>
+              <div className="bo-input-group"><label>Buscar</label><input className="form-control" value={filtrosEntrevistas.busqueda} onChange={e=>setFiltrosEntrevistas(p=>({...p,busqueda:e.target.value}))} placeholder="Postulante, número o campaña…" /></div>
+              <div className="bo-input-group"><label>Turno</label><select className="form-select" value={filtrosEntrevistas.turno} onChange={e=>setFiltrosEntrevistas(p=>({...p,turno:e.target.value}))}><option value="">Todos</option><option value="TURNO 1">TURNO 1</option><option value="TURNO 2">TURNO 2</option></select></div>
+              <div className="bo-input-group"><label>Desde</label><input type="date" className="form-control" value={filtrosEntrevistas.desde} onChange={e=>setFiltrosEntrevistas(p=>({...p,desde:e.target.value}))} /></div>
+              <div className="bo-input-group"><label>Hasta</label><input type="date" className="form-control" value={filtrosEntrevistas.hasta} onChange={e=>setFiltrosEntrevistas(p=>({...p,hasta:e.target.value}))} /></div>
+            </div>
+            <div className="base-tabla-wrap reclutados-tabla-wrap"><table className="base-tabla reclutados-tabla"><thead><tr>
+              <th>Fecha de registro</th><th>Campaña</th>{entTh('agendado_por','Agendado por')}<th>Turno</th><th>Postulante</th><th>Número</th><th>Número ref</th><th>Fecha de agendamiento</th><th>Fecha de entrevista</th><th>Tipificación</th><th>Observación</th>
+            </tr></thead><tbody>
+              {cargandoEntrevistas ? <tr><td colSpan="11" className="reclutados-empty">Cargando…</td></tr> : entrevistasFiltradas.length===0 ? <tr><td colSpan="11" className="reclutados-empty">Sin registros.</td></tr> : entrevistasFiltradas.map(en=><tr key={en.id}>
+                <td>{formatFecha(normalizarFecha(en.created_at))}</td>
+                <td>{en.campana||'—'}</td>
+                <td>{en.creado_por_nombre||'—'}</td>
+                <td>{en.turno}</td>
+                <td>{en.nombre_postulante}</td>
+                <td>{en.numero}</td>
+                <td>{en.numero_ref||'—'}</td>
+                <td>{formatFecha(String(en.fecha_agendamiento||'').slice(0,10))}</td>
+                <td><input type="date" className="form-control" defaultValue={String(en.fecha_entrevista||'').slice(0,10)} onBlur={e=>guardarFechaEntrevista(en.id,String(en.fecha_entrevista||'').slice(0,10),e.target.value)}/></td>
+                <td><select value={en.tipificacion||''} onChange={e=>guardarTipifEntrevista(en.id,e.target.value)} style={estiloTipifEntrevista(en.tipificacion)}><option value="">— Pendiente —</option>{TIPIF_ENTREVISTA_OPCIONES.map(t=><option key={t} value={t}>{t}</option>)}</select></td>
+                <td><input className="form-control" defaultValue={en.observacion||''} onBlur={e=>guardarObservacionEntrevista(en.id,en.observacion||'',e.target.value.trim())}/></td>
+              </tr>)}
             </tbody></table></div>
           </section>
 
