@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, Component } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { leerSesionActual, useAuth } from './hooks/useAuth'
 import { cargosDeUsuario } from './utils/roles'
@@ -41,6 +41,29 @@ const Backdatareclutamiento = lazyConRecarga(() => import('./pages/Backdatareclu
 const DashboardReclutamiento = lazyConRecarga(() => import('./pages/dashboardreclutamiento'))
 const MarketingLeads = lazyConRecarga(() => import('./pages/MarketingLeads'))
 
+// Sin esto, un error de render en cualquier pantalla (bug real o modulo que
+// no cargo) deja la pagina completamente en blanco y sin ningun aviso —
+// como paso con el bucle de redireccion de PrivateRoute. Muestra el error y
+// un boton para recargar en vez de quedar en silencio.
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ minHeight:'100vh', display:'grid', placeItems:'center', background:'#f5f6fa', color:'#334155', fontFamily:"'DM Sans', sans-serif", padding:20, textAlign:'center' }}>
+          <div>
+            <p style={{ fontWeight:700, marginBottom:8 }}>Ocurrió un error al cargar la página.</p>
+            <p style={{ fontSize:12, color:'#64748b', marginBottom:16, maxWidth:480 }}>{String(this.state.error?.message || this.state.error)}</p>
+            <button onClick={() => window.location.reload()} style={{ padding:'8px 18px', borderRadius:8, border:'none', background:'#ea580c', color:'#fff', fontWeight:700, cursor:'pointer' }}>Recargar</button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 function RouteLoader() {
   return (
     <div style={{ minHeight:'100vh', display:'grid', placeItems:'center', background:'#f5f6fa', color:'#64748b', fontFamily:"'DM Sans', sans-serif" }}>
@@ -59,7 +82,8 @@ function PrivateRoute({ children, cargo }) {
   useAuth() // mantiene este componente reactivo ante login/logout/cambio de vista
   const sesion = leerSesionActual()
   if (!sesion) return <Navigate to="/login" replace />
-  if (cargo && !cargosDeUsuario(sesion).includes(cargo)) {
+  const cargosPermitidos = Array.isArray(cargo) ? cargo : cargo ? [cargo] : null
+  if (cargosPermitidos && !cargosPermitidos.some(c => cargosDeUsuario(sesion).includes(c))) {
     return <Navigate to={rutaInicialAutorizada(sesion)} replace />
   }
   return children
@@ -73,6 +97,7 @@ function InicioAutorizado() {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <Suspense fallback={<RouteLoader />}>
       <Routes>
       <Route path="/login" element={<Login />} />
@@ -96,5 +121,6 @@ export default function App() {
       <Route path="*" element={<InicioAutorizado />} />
       </Routes>
     </Suspense>
+    </ErrorBoundary>
   )
 }
