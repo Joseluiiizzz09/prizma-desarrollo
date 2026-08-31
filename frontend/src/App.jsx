@@ -4,21 +4,42 @@ import { leerSesionActual, useAuth } from './hooks/useAuth'
 import { cargosDeUsuario } from './utils/roles'
 import { RUTAS } from './utils/rutas'
 
-const Login = lazy(() => import('./pages/Login'))
-const Dashboard = lazy(() => import('./pages/Dashboard'))
-const Backoffice = lazy(() => import('./pages/Backoffice'))
-const Supervisor = lazy(() => import('./pages/Supervisor'))
-const Validacion = lazy(() => import('./pages/Validacion'))
-const Seguimiento = lazy(() => import('./pages/Seguimiento'))
-const Grabaciones = lazy(() => import('./pages/Grabaciones'))
-const Cobranzas = lazy(() => import('./pages/Cobranzas'))
-const Calidad = lazy(() => import('./pages/Calidad'))
-const SupCalidad = lazy(() => import('./pages/SupCalidad'))
-const Jefatura = lazy(() => import('./pages/Jefatura'))
-const Usuarios = lazy(() => import('./pages/Usuarios'))
-const Backdatareclutamiento = lazy(() => import('./pages/Backdatareclutamiento'))
-const DashboardReclutamiento = lazy(() => import('./pages/dashboardreclutamiento'))
-const MarketingLeads = lazy(() => import('./pages/MarketingLeads'))
+// Cada despliegue genera archivos con nombre distinto (hash de contenido).
+// Una pestaña que ya estaba abierta desde antes del despliegue sigue
+// referenciando el archivo viejo, que ya no existe en el servidor — al
+// navegar a un modulo que no se habia cargado aun, el import() falla y la
+// pantalla se queda en blanco sin ningun aviso. Esto detecta esa falla
+// puntual y recarga la pagina una sola vez (evita bucle con sessionStorage)
+// en vez de dejarla en blanco.
+function lazyConRecarga(cargar) {
+  return lazy(() =>
+    cargar().catch(err => {
+      const yaRecargo = sessionStorage.getItem('nc_recarga_por_chunk')
+      if (!yaRecargo) {
+        sessionStorage.setItem('nc_recarga_por_chunk', '1')
+        window.location.reload()
+        return new Promise(() => {})
+      }
+      throw err
+    })
+  )
+}
+
+const Login = lazyConRecarga(() => import('./pages/Login'))
+const Dashboard = lazyConRecarga(() => import('./pages/Dashboard'))
+const Backoffice = lazyConRecarga(() => import('./pages/Backoffice'))
+const Supervisor = lazyConRecarga(() => import('./pages/Supervisor'))
+const Validacion = lazyConRecarga(() => import('./pages/Validacion'))
+const Seguimiento = lazyConRecarga(() => import('./pages/Seguimiento'))
+const Grabaciones = lazyConRecarga(() => import('./pages/Grabaciones'))
+const Cobranzas = lazyConRecarga(() => import('./pages/Cobranzas'))
+const Calidad = lazyConRecarga(() => import('./pages/Calidad'))
+const SupCalidad = lazyConRecarga(() => import('./pages/SupCalidad'))
+const Jefatura = lazyConRecarga(() => import('./pages/Jefatura'))
+const Usuarios = lazyConRecarga(() => import('./pages/Usuarios'))
+const Backdatareclutamiento = lazyConRecarga(() => import('./pages/Backdatareclutamiento'))
+const DashboardReclutamiento = lazyConRecarga(() => import('./pages/dashboardreclutamiento'))
+const MarketingLeads = lazyConRecarga(() => import('./pages/MarketingLeads'))
 
 function RouteLoader() {
   return (
