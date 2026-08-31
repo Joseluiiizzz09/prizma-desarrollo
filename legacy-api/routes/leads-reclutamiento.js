@@ -118,6 +118,23 @@ async function esAsesorReclutamientoValido(usuarioId) {
   catch { return false; }
 }
 
+// La carga Legacy solo trae el primer nombre del asesor (ej. "ALONDRA"). Esto
+// lo resuelve contra usuarios activos con cargo backreclutamiento/
+// asesorreclutamiento cuyo primer nombre coincide, en vez de guardarlo como
+// texto libre sin cuenta real.
+async function resolverAsesorReclutamientoPorNombreCorto(nombreCorto) {
+  const texto = String(nombreCorto || '').trim();
+  if (!texto) return null;
+  const [rows] = await db.query(`
+    SELECT id, nombre FROM usuarios
+    WHERE activo = 1
+      AND cargo IN ('backreclutamiento', 'asesorreclutamiento')
+      AND UPPER(SUBSTRING_INDEX(TRIM(nombre), ' ', 1)) = UPPER(?)
+    ORDER BY id ASC
+  `, [texto]);
+  return rows.length ? rows[0] : null;
+}
+
 // GET /api/leads-reclutamiento
 router.get('/', auth(ROLES_ALL), async (req, res) => {
   try {
@@ -169,9 +186,15 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
 
     const fechaHoy  = fechaPeruHoy();
     const horaAhora = horaPeruAhora();
-    let creados = 0;
+    const esLote = items.length > 1;
+    let creados = 0, omitidos = 0;
     const ids = [];
+    const erroresDetalle = [];
 
+    // En un solo alta (no lote), un dato invalido sigue rechazando toda la
+    // peticion tal cual antes. En un lote (import masivo/legacy), una fila
+    // invalida o con error de base de datos ya NO debe tumbar el resto —
+    // se omite esa fila y se sigue con las demas, reportando el conteo real.
     for (const l of items) {
       const n1Normalizado = normalizarN1(l.n1);
       const usuarioWhatsapp = normalizarUsuarioWhatsapp(l.usuario_whatsapp);
@@ -180,74 +203,75 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
         errorTexto(l.n1, 'n1', { max: 30 }),
         errorTexto(usuarioWhatsapp, 'usuario_whatsapp', { max: 100 }),
         errorTexto(l.tipif_back, 'tipif_back', { max: 100 }),
-        errorTexto(l.tipif_vend, 'tipif_vend', { max: 100 }),
+        errorTexto(l.tipif_vend, 'tipif_vend', { max: 200 }),
+        errorHora(l.tipif_hora, 'tipif_hora'),
         errorTexto(l.obs_asesor, 'obs_asesor', { max: 2000 }),
       ]);
-      if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
-      if (!n1Normalizado && !usuarioWhatsapp) {
-        return res.status(400).json({ ok: false, mensaje: 'Ingresa un N1 o un usuario de WhatsApp' });
+      const sinContacto = !n1Normalizado && !usuarioWhatsapp;
+      if (errores || sinContacto) {
+        const mensajeError = errores ? errores[0] : 'Ingresa un N1 o un usuario de WhatsApp';
+        if (!esLote) return res.status(400).json({ ok: false, mensaje: mensajeError });
+        omitidos++; erroresDetalle.push(mensajeError);
+        continue;
       }
-    }
 
-    for (const l of items) {
-      const n1Normalizado = normalizarN1(l.n1);
-      const usuarioWhatsapp = normalizarUsuarioWhatsapp(l.usuario_whatsapp);
-      if (!n1Normalizado && !usuarioWhatsapp) continue;
       const fechaLead = l.fecha || fechaHoy;
-
       let asesorId = null;
       let asesorNombre = '';
-      const nombreBuscar = l.asesor_nombre || l.asesor;
-      if (nombreBuscar) {
-        const [uRows] = await db.query(`SELECT id, nombre, cargo, permisos, activo FROM usuarios WHERE nombre = ?`, [nombreBuscar]);
-        if (uRows.length && await esAsesorReclutamientoValido(uRows[0].id)) {
-          asesorId = uRows[0].id; asesorNombre = uRows[0].nombre;
+      const nombreOriginal = String(l.asesor_nombre || l.asesor || '').trim();
+      if (nombreOriginal) {
+        if (l.importacion_legacy) {
+          const encontrado = await resolverAsesorReclutamientoPorNombreCorto(nombreOriginal);
+          if (encontrado) { asesorId = encontrado.id; asesorNombre = encontrado.nombre; }
+          else asesorNombre = nombreOriginal; // se conserva el nombre historico sin cuenta activa
         } else {
-          // Nombre sin cuenta real de asesorreclutamiento en PRIZMA (ej.
-          // importación de un sistema anterior con gente que aún no se dio de
-          // alta). Se guarda el nombre tal cual como referencia, sin asesor_id:
-          // nadie puede gestionarlo desde su sesión hasta que exista la cuenta.
-          asesorNombre = nombreBuscar;
+          const [uRows] = await db.query(`SELECT id, nombre FROM usuarios WHERE nombre = ?`, [nombreOriginal]);
+          if (uRows.length && await esAsesorReclutamientoValido(uRows[0].id)) {
+            asesorId = uRows[0].id; asesorNombre = uRows[0].nombre;
+          } else {
+            // Nombre sin cuenta real de asesorreclutamiento en PRIZMA (alta
+            // normal, no legacy). Se guarda el nombre tal cual como
+            // referencia, sin asesor_id: nadie puede gestionarlo desde su
+            // sesión hasta que exista la cuenta.
+            asesorNombre = nombreOriginal;
+          }
         }
       }
-
       // hora_asig/historial: si vienen explicitos (ej. importacion Legacy con
       // fecha/hora reales del sistema anterior) se respetan tal cual, en vez de
       // sobreescribirlos con la hora actual como hacia el alta normal.
-      // hora_asig es VARCHAR(10) en la tabla. Una carga Legacy con columnas
-      // desalineadas puede traer texto largo (ej. una tipificacion) en vez de
-      // una hora real; sin este recorte, esa fila tumbaba el INSERT completo
-      // con ER_DATA_TOO_LONG y todo el lote (hasta 400 filas) se perdia.
-      const horaFinal = String(l.hora_asig || (asesorId ? horaAhora : '')).substring(0, 10);
+      const horaFinal = l.hora_asig || (asesorId ? horaAhora : '');
       const historial = Array.isArray(l.historial) && l.historial.length
         ? JSON.stringify(l.historial)
         : (asesorId
             ? JSON.stringify([{ asesor: asesorNombre, hora: horaFinal, fecha: fechaHoy, motivo: 'Asignacion inicial' }])
             : '[]');
 
-      // tipif_vend/tipif_hora: solo se aceptan aquí en el alta cuando vienen
-      // explícitos (importación Legacy con la tipificación ya conocida del
-      // sistema anterior) — el alta normal desde el formulario deja esto
-      // vacío y el asesor lo completa después vía PATCH /:id/tipif.
-      const tipifVendInicial = String(l.tipif_vend || '').trim().toUpperCase();
-      const tipifHoraInicial = tipifVendInicial ? String(l.tipif_hora || horaFinal || horaAhora).substring(0, 10) : '';
-
-      const [result] = await db.query(`
-        INSERT INTO leads_reclutamiento
-          (campana, departamento, provincia, distrito, n1, n2, usuario_whatsapp, tipif_back, obs_asesor, asesor_id, asesor_nombre,
-           fecha, hora_asig, sin_asignar, historial, usuario_back_id, tipif_vend, tipif_hora)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-      `, [
-        l.campana||'', l.departamento||'', l.provincia||'', l.distrito||'', l.n1||null, l.n2||null, usuarioWhatsapp||null,
-        l.tipif_back||null, l.obs_asesor||null,
-        asesorId, asesorNombre, fechaLead, horaFinal, asesorId?0:1, historial, req.user.id,
-        tipifVendInicial, tipifHoraInicial,
-      ]);
-      ids.push(result.insertId);
-      creados++;
+      try {
+        const [result] = await db.query(`
+          INSERT INTO leads_reclutamiento
+            (campana, departamento, provincia, distrito, n1, n2, usuario_whatsapp, tipif_back, tipif_vend, tipif_hora,
+             obs_asesor, asesor_id, asesor_nombre, fecha, hora_asig, sin_asignar, historial, rotaciones, usuario_back_id)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        `, [
+          l.campana||'', l.departamento||'', l.provincia||'', l.distrito||'', n1Normalizado||null, l.n2||null, usuarioWhatsapp||null,
+          l.tipif_back||null, l.tipif_vend||null, l.tipif_hora||null, l.obs_asesor||null,
+          asesorId, asesorNombre, fechaLead, horaFinal, asesorId?0:1, historial, Math.max(0, parseInt(l.rotaciones, 10) || 0), req.user.id,
+        ]);
+        ids.push(result.insertId);
+        creados++;
+      } catch (errFila) {
+        if (!esLote) throw errFila;
+        console.error('[LEADS-RECLUTAMIENTO] Fila de lote omitida por error:', errFila.message);
+        omitidos++; erroresDetalle.push(errFila.message);
+      }
     }
 
-    res.json({ ok: true, creados, ids, mensaje: `${creados} candidato(s) creado(s)` });
+    res.json({
+      ok: true, creados, omitidos, ids,
+      mensaje: omitidos ? `${creados} candidato(s) creado(s), ${omitidos} omitido(s)` : `${creados} candidato(s) creado(s)`,
+      erroresDetalle: erroresDetalle.slice(0, 20),
+    });
   } catch(e) {
     console.error(e);
     res.status(500).json({ ok: false, mensaje: 'Error al crear candidatos' });
@@ -452,11 +476,13 @@ router.get('/entrevistas', auth(ROLES_ENTREVISTAS), async (req, res) => {
 router.patch('/entrevistas/:entrevistaId', auth(ROLES_ENTREVISTAS), async (req, res) => {
   try {
     await asegurarTablaEntrevistas();
-    const { tipificacion, observacion, fecha_entrevista } = req.body;
+    const { tipificacion, observacion, fecha_entrevista, fecha_agendamiento, turno } = req.body;
     const errores = validar([
       errorEnum(tipificacion, 'tipificacion', TIPIFICACIONES_ENTREVISTA),
       errorTexto(observacion, 'observacion', { max: 2000 }),
       errorFecha(fecha_entrevista, 'fecha_entrevista'),
+      errorFecha(fecha_agendamiento, 'fecha_agendamiento'),
+      errorEnum(turno, 'turno', TURNOS_ENTREVISTA),
     ]);
     if (errores) return res.status(400).json({ ok: false, mensaje: errores[0] });
     const [rows] = await db.query(`SELECT id FROM reclutamiento_entrevistas WHERE id = ?`, [req.params.entrevistaId]);
@@ -466,6 +492,8 @@ router.patch('/entrevistas/:entrevistaId', auth(ROLES_ENTREVISTAS), async (req, 
     if (tipificacion !== undefined) { campos.push('tipificacion = ?'); valores.push(tipificacion || null); }
     if (observacion !== undefined) { campos.push('observacion = ?'); valores.push((observacion||'').trim() || null); }
     if (fecha_entrevista !== undefined) { campos.push('fecha_entrevista = ?'); valores.push(fecha_entrevista || null); }
+    if (fecha_agendamiento !== undefined) { campos.push('fecha_agendamiento = ?'); valores.push(fecha_agendamiento || null); }
+    if (turno !== undefined) { campos.push('turno = ?'); valores.push(turno || null); }
     if (!campos.length) return res.status(400).json({ ok: false, mensaje: 'Nada que actualizar' });
     valores.push(req.params.entrevistaId);
     await db.query(`UPDATE reclutamiento_entrevistas SET ${campos.join(', ')} WHERE id = ?`, valores);
@@ -473,6 +501,32 @@ router.patch('/entrevistas/:entrevistaId', auth(ROLES_ENTREVISTAS), async (req, 
   } catch(e) {
     console.error(e);
     res.status(500).json({ ok: false, mensaje: 'Error al actualizar la entrevista' });
+  }
+});
+
+// DELETE /api/leads-reclutamiento/entrevistas/:entrevistaId — deja constancia
+// en `eliminaciones` con un snapshot completo del registro borrado.
+router.delete('/entrevistas/:entrevistaId', auth(ROLES_BACK), async (req, res) => {
+  try {
+    await asegurarTablaEntrevistas();
+    const [rows] = await db.query(`SELECT * FROM reclutamiento_entrevistas WHERE id = ?`, [req.params.entrevistaId]);
+    if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Entrevista no encontrada' });
+    const entrevista = rows[0];
+    const [actores] = await db.query(`SELECT nombre, cargo FROM usuarios WHERE id = ? LIMIT 1`, [req.user.id]);
+    const actor = actores[0] || {};
+    await db.query(`DELETE FROM reclutamiento_entrevistas WHERE id = ?`, [req.params.entrevistaId]);
+    await db.query(
+      `INSERT INTO eliminaciones
+        (actor_id, actor_nombre, actor_cargo, tipo, registro_id, detalle, snapshot_json)
+       VALUES (?, ?, ?, 'ENTREVISTA', ?, ?, ?)`,
+      [req.user.id, actor.nombre || 'Usuario', actor.cargo || req.user.cargo || '', String(req.params.entrevistaId),
+        `${entrevista.nombre_postulante || 'Sin nombre'} · ${entrevista.numero || entrevista.numero_ref || '—'} · Agendado por ${entrevista.creado_por_nombre || '—'}`,
+        JSON.stringify(entrevista)]
+    );
+    res.json({ ok: true, mensaje: 'Entrevista eliminada' });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ ok: false, mensaje: 'Error al eliminar la entrevista' });
   }
 });
 

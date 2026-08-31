@@ -234,7 +234,7 @@ function normalizarTipifVendSelect(valor) {
   const texto = String(valor || '').trim().toUpperCase()
   return texto === 'ACEPTA PROPUESTA' ? 'VENTA CERRADA' : texto
 }
-const TIPIF_PROHIBIDAS_ROTACION = new Set(['NO TOCAR','FRAUDE','SH NO ROTAR'])
+const TIPIF_PROHIBIDAS_ROTACION = new Set(['VENTA CERRADA','NO CUMPLE EL PERFIL','FRAUDE','SH NO ROTAR'])
 const LIMA_DISTRITOS = [
   'Ancón','Ate','Barranco','Breña','Carabayllo','Cercado de Lima','Chaclacayo','Chorrillos',
   'Cieneguilla','Comas','El Agustino','Independencia','Jesús María','La Molina','La Victoria',
@@ -412,10 +412,12 @@ export default function Backdatareclutamiento() {
   const [filtrosEntrevistas, setFiltrosEntrevistas] = useState({ turno:'', desde:'', hasta:'', busqueda:'' })
   const [entSort, setEntSort] = useState({ col:'', dir:'asc' })
   const [modalEntrevista, setModalEntrevista] = useState({ open:false, regId:null, nombrePostulante:'', numero:'', numeroRef:'', turno:'', fechaAgendamiento:'', observacion:'', guardando:false, error:'' })
+  const [modalComentarioTipif, setModalComentarioTipif] = useState({ open:false, regId:null, comentario:'', guardando:false, error:'' })
   const [capacitaciones, setCapacitaciones] = useState([])
   const [cargandoCapacitaciones, setCargandoCapacitaciones] = useState(false)
   const [filtrosCapacitacion, setFiltrosCapacitacion] = useState({ busqueda:'', desde:'', hasta:'' })
   const [modalCapacitacion, setModalCapacitacion] = useState({ open:false, entrevistaId:null, nombrePostulante:'', numero:'', fechaInicio:'', guardando:false, error:'' })
+  const [modalReprogramar, setModalReprogramar] = useState({ open:false, entrevistaId:null, fechaAgendamiento:'', turno:'', guardando:false, error:'' })
   const [rotModalAsesor,setRotModalAsesor]= useState('')
   const [rotBusqueda,   setRotBusqueda]   = useState('')
   const [rotModalMotivo,setRotModalMotivo]= useState('')
@@ -711,6 +713,7 @@ export default function Backdatareclutamiento() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar la tipificación')
       if (valor === 'ASISTE') abrirModalCapacitacion(id)
+      if (valor === 'REPROGRAMA') abrirModalReprogramar(id)
     } catch(e) {
       actualizarEntrevistaLocal(id, { tipificacion: anterior })
       mostrarToast(e.message || 'No se pudo guardar la tipificación')
@@ -743,6 +746,30 @@ export default function Backdatareclutamiento() {
       if (seccion === 'capacitacion') cargarCapacitaciones()
     } catch (e) {
       setModalCapacitacion(p=>({...p, guardando:false, error:e.message || 'No se pudo registrar la capacitación'}))
+    }
+  }
+
+  // ── Modal reprogramar (al tipificar REPROGRAMA, actualiza la fecha de agendamiento) ──
+  function abrirModalReprogramar(entrevistaId) {
+    const en = entrevistas.find(e => e.id === entrevistaId)
+    if (!en) return
+    setModalReprogramar({ open:true, entrevistaId, fechaAgendamiento:String(en.fecha_agendamiento||'').slice(0,10), turno:en.turno||'TURNO 1', guardando:false, error:'' })
+  }
+
+  async function guardarReprogramar() {
+    const fechaAgendamiento = modalReprogramar.fechaAgendamiento
+    const turno = modalReprogramar.turno
+    if (!fechaAgendamiento) { setModalReprogramar(p=>({...p, error:'Selecciona la nueva fecha de agendamiento'})); return }
+    setModalReprogramar(p=>({...p, guardando:true, error:''}))
+    try {
+      const res = await fetch(`${API}/leads-reclutamiento/entrevistas/${modalReprogramar.entrevistaId}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ fecha_agendamiento:fechaAgendamiento, turno }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo actualizar la fecha de agendamiento')
+      actualizarEntrevistaLocal(modalReprogramar.entrevistaId, { fecha_agendamiento: fechaAgendamiento, turno })
+      setModalReprogramar({ open:false, entrevistaId:null, fechaAgendamiento:'', turno:'', guardando:false, error:'' })
+      mostrarToast('Entrevista reprogramada')
+    } catch (e) {
+      setModalReprogramar(p=>({...p, guardando:false, error:e.message || 'No se pudo actualizar la fecha de agendamiento'}))
     }
   }
 
@@ -936,28 +963,30 @@ export default function Backdatareclutamiento() {
       return
     }
     if (!nuevoAsesor) {
-      updateReg(id, { asesor:'', horaAsig:'', sinAsignar:true })
+      const nuevoHist = [...reg.historial, { tipo:'QUITAR_ASIGNACION', asesorQuitado:reg.asesor, quitadoPor:sesion?.nombre||'Usuario', hora, fecha:fechaHoy() }]
+      updateReg(id, { asesor:'', horaAsig:'', sinAsignar:true, historial:nuevoHist })
       if (reg._backendId) {
         try {
-          const res = await fetch(`${API}/leads-reclutamiento/${reg._backendId}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ asesor_nombre:'', hora_asig:'' }) })
+          const res = await fetch(`${API}/leads-reclutamiento/${reg._backendId}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ asesor_nombre:'', hora_asig:'', historial:nuevoHist }) })
           const data = await res.json().catch(() => ({}))
           if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo quitar la asignación')
         } catch (e) {
-          updateReg(id, { asesor:reg.asesor, horaAsig:reg.horaAsig, sinAsignar:reg.sinAsignar })
+          updateReg(id, { asesor:reg.asesor, horaAsig:reg.horaAsig, sinAsignar:reg.sinAsignar, historial:reg.historial })
           mostrarToast(e.message || 'No se pudo quitar la asignación')
         }
       }
       return
     }
+    const esReasignacion = !!reg.asesor
     const newHist = [...reg.historial, { asesor:nuevoAsesor, asesorAnterior:reg.asesor||'', reasignadoPor:sesion?.nombre||'', hora, fecha:fechaHoy(), motivo:'Reasignacion directa' }]
-    updateReg(id, { asesor:nuevoAsesor, horaAsig:hora, sinAsignar:false, historial:newHist })
+    updateReg(id, { asesor:nuevoAsesor, horaAsig:hora, sinAsignar:false, historial:newHist, rotaciones: esReasignacion ? reg.rotaciones+1 : reg.rotaciones })
     if (reg._backendId) {
       try {
-        const res = await fetch(`${API}/leads-reclutamiento/${reg._backendId}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ asesor_nombre:nuevoAsesor, hora_asig:hora, historial:newHist }) })
+        const res = await fetch(`${API}/leads-reclutamiento/${reg._backendId}`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ asesor_nombre:nuevoAsesor, hora_asig:hora, historial:newHist, sumarRotacion:esReasignacion }) })
         const data = await res.json().catch(() => ({}))
         if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo reasignar el lead')
       } catch (e) {
-        updateReg(id, { asesor:reg.asesor, horaAsig:reg.horaAsig, sinAsignar:reg.sinAsignar, historial:reg.historial })
+        updateReg(id, { asesor:reg.asesor, horaAsig:reg.horaAsig, sinAsignar:reg.sinAsignar, historial:reg.historial, rotaciones:reg.rotaciones })
         mostrarToast(e.message || 'No se pudo reasignar el lead')
       }
     }
@@ -996,10 +1025,40 @@ export default function Backdatareclutamiento() {
         if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar la tipificación')
         if (Array.isArray(data.historial)) updateReg(id, { historial:data.historial })
         if (valor === 'VENTA CERRADA') abrirModalEntrevista(id)
+        if (['NO CUMPLE EL PERFIL','FRAUDE','NO INTERESADO'].includes(valor)) abrirModalComentarioTipif(id)
       } catch (e) {
         updateReg(id, { _tipifVend:reg._tipifVend, _tipifHora:reg._tipifHora })
         mostrarToast(e.message || 'No se pudo guardar la tipificación')
       }
+    }
+  }
+
+  // ── Modal comentario al tipificar No cumple el perfil / Provincia / No interesado ──
+  function abrirModalComentarioTipif(id) {
+    const found = findReg(id)
+    if (!found) return
+    const { reg } = found
+    setModalComentarioTipif({ open:true, regId:id, comentario:reg.obsAsesor||'', guardando:false, error:'' })
+  }
+
+  async function guardarComentarioTipif() {
+    const comentario = modalComentarioTipif.comentario.trim()
+    setModalComentarioTipif(p=>({...p, guardando:true, error:''}))
+    const found = findReg(modalComentarioTipif.regId)
+    if (!found) { setModalComentarioTipif(p=>({...p, guardando:false})); return }
+    const { reg } = found
+    const anterior = reg.obsAsesor||''
+    updateReg(modalComentarioTipif.regId, { obsAsesor: comentario })
+    try {
+      if (reg._backendId) {
+        const res = await fetch(`${API}/leads-reclutamiento/${reg._backendId}/obs`, { method:'PATCH', headers:ncHeaders(), body:JSON.stringify({ obs:comentario }) })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar el comentario')
+      }
+      setModalComentarioTipif({ open:false, regId:null, comentario:'', guardando:false, error:'' })
+    } catch(e) {
+      updateReg(modalComentarioTipif.regId, { obsAsesor: anterior })
+      setModalComentarioTipif(p=>({...p, guardando:false, error:e.message || 'No se pudo guardar el comentario'}))
     }
   }
 
@@ -1431,7 +1490,7 @@ export default function Backdatareclutamiento() {
           campana:r.campana, distrito:r.distrito, n1:r.n1, n2:r.n2,
           tipif_back:r.tipifBack, tipif_vend:r.tipifVend, obs_asesor:r.comentario,
           asesor_nombre:asesorFinal, fecha:r.fecha, hora_asig:r.hora,
-          historial,
+          historial, importacion_legacy:true,
         }
       })
       try {
@@ -2322,6 +2381,21 @@ export default function Backdatareclutamiento() {
         {modalEntrevista.error&&<p style={{color:'#dc2626'}}>{modalEntrevista.error}</p>}<div className="modal-btns"><button className="btn-cancelar-modal" onClick={()=>setModalEntrevista(p=>({...p,open:false}))}>Cancelar</button><button className="btn-confirmar-modal" onClick={guardarEntrevista} disabled={modalEntrevista.guardando}>{modalEntrevista.guardando?'Guardando…':'Agendar'}</button></div>
       </div></div>}
 
+      {/* ══ MODAL COMENTARIO (No cumple el perfil / Provincia / No interesado) ══ */}
+      {modalComentarioTipif.open && (
+        <div className="modal-overlay open" onClick={e=>{ if(e.target===e.currentTarget && !modalComentarioTipif.guardando) setModalComentarioTipif(p=>({...p,open:false})) }}>
+          <div className="modal-box">
+            <h3>Comentario</h3>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Comentario</label><textarea className="form-control" rows={3} value={modalComentarioTipif.comentario} onChange={e=>setModalComentarioTipif(p=>({...p,comentario:e.target.value}))} placeholder="Motivo de la tipificación…" /></div>
+            {modalComentarioTipif.error && <p style={{color:'#dc2626',fontSize:12,margin:'0 0 10px'}}>{modalComentarioTipif.error}</p>}
+            <div className="modal-btns">
+              <button className="btn-cancelar-modal" onClick={()=>setModalComentarioTipif(p=>({...p,open:false}))} disabled={modalComentarioTipif.guardando}>Cancelar</button>
+              <button className="btn-confirmar-modal" onClick={guardarComentarioTipif} disabled={modalComentarioTipif.guardando}>{modalComentarioTipif.guardando?'Guardando…':'Guardar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ══ MODAL ROTACIÓN MANUAL ════════════════════════════════════════════ */}
       {modalRotar.open && (
         <div className="modal-overlay open" onClick={e=>{ if(e.target===e.currentTarget) setModalRotar(p=>({...p,open:false})) }}>
@@ -2404,18 +2478,22 @@ export default function Backdatareclutamiento() {
         </div>
       )}
 
-      {/* ══ MODAL REGISTRAR CAPACITACIÓN ═════════════════════════════════════ */}
-      {modalCapacitacion.open && (
-        <div className="modal-overlay open" onClick={e=>{ if(e.target===e.currentTarget && !modalCapacitacion.guardando) setModalCapacitacion(p=>({...p,open:false})) }}>
+      {/* ══ MODAL REPROGRAMAR (actualiza fecha de agendamiento) ══════════════ */}
+      {modalReprogramar.open && (
+        <div className="modal-overlay open" onClick={e=>{ if(e.target===e.currentTarget && !modalReprogramar.guardando) setModalReprogramar(p=>({...p,open:false})) }}>
           <div className="modal-box">
-            <h3>Registrar en capacitación</h3>
-            <div className="bo-input-group" style={{marginBottom:10}}><label>Nombre del postulante</label><input className="form-control" value={modalCapacitacion.nombrePostulante} onChange={e=>setModalCapacitacion(p=>({...p,nombrePostulante:e.target.value}))} placeholder="Nombre y apellidos" /></div>
-            <div className="bo-input-group" style={{marginBottom:10}}><label>Número (el del lead, o cambia por uno de referencia)</label><input className="form-control" value={modalCapacitacion.numero} onChange={e=>setModalCapacitacion(p=>({...p,numero:e.target.value}))} placeholder="Número de contacto" style={{fontFamily:'monospace'}} /></div>
-            <div className="bo-input-group" style={{marginBottom:10}}><label>Fecha de inicio de capacitación</label><input type="date" className="form-control" value={modalCapacitacion.fechaInicio} onChange={e=>setModalCapacitacion(p=>({...p,fechaInicio:e.target.value}))} /></div>
-            {modalCapacitacion.error && <p style={{color:'#dc2626',fontSize:12,margin:'0 0 10px'}}>{modalCapacitacion.error}</p>}
+            <h3>Reprogramar entrevista</h3>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Nueva fecha de agendamiento</label><input type="date" className="form-control" value={modalReprogramar.fechaAgendamiento} onChange={e=>setModalReprogramar(p=>({...p,fechaAgendamiento:e.target.value}))} /></div>
+            <div className="bo-input-group" style={{marginBottom:10}}><label>Turno</label>
+              <select className="form-select" value={modalReprogramar.turno} onChange={e=>setModalReprogramar(p=>({...p,turno:e.target.value}))}>
+                <option value="TURNO 1">TURNO 1</option>
+                <option value="TURNO 2">TURNO 2</option>
+              </select>
+            </div>
+            {modalReprogramar.error && <p style={{color:'#dc2626',fontSize:12,margin:'0 0 10px'}}>{modalReprogramar.error}</p>}
             <div className="modal-btns">
-              <button className="btn-cancelar-modal" onClick={()=>setModalCapacitacion(p=>({...p,open:false}))} disabled={modalCapacitacion.guardando}>Cancelar</button>
-              <button className="btn-confirmar-modal" onClick={guardarCapacitacion} disabled={modalCapacitacion.guardando}>{modalCapacitacion.guardando?'Guardando…':'Registrar'}</button>
+              <button className="btn-cancelar-modal" onClick={()=>setModalReprogramar(p=>({...p,open:false}))} disabled={modalReprogramar.guardando}>Cancelar</button>
+              <button className="btn-confirmar-modal" onClick={guardarReprogramar} disabled={modalReprogramar.guardando}>{modalReprogramar.guardando?'Guardando…':'Guardar'}</button>
             </div>
           </div>
         </div>
