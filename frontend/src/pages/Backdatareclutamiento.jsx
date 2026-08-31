@@ -89,7 +89,9 @@ function AsesorBuscador({ value, asesores, disabled, onChange, title, className,
 // Encabezado de tabla con menú desplegable de filtro (▼), en vez de solo
 // ordenar — mismo patrón de portal que AsesorBuscador, usado para Campaña /
 // Asesor asignado / Tipif. Vendedor (igual que KRONO).
-function HeaderFiltroDropdown({ label, valor, onChange, opciones, buscable }) {
+// Multi-seleccion (checklist) con opcion especial "Pendiente" para filtrar
+// registros sin tipificar — igual comportamiento que FiltroEncabezado en KRONO.
+function HeaderFiltroDropdown({ label, valor, onChange, opciones, buscable, pending }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [pos, setPos] = useState({ top: 0, left: 0 })
@@ -109,34 +111,35 @@ function HeaderFiltroDropdown({ label, valor, onChange, opciones, buscable }) {
     setPos({ top: r.bottom + 4, left: r.left })
     setQ(''); setOpen(true)
   }
-  function elegir(v) { onChange(v); setOpen(false) }
+  function alternar(v) { onChange(valor.includes(v) ? valor.filter(x=>x!==v) : [...valor, v]) }
+  const base = [...new Set(opciones.map(o => o.value ?? o))]
+  const opcionesConPendiente = pending ? ['__pendiente__', ...base] : base
+  const etiquetaDe = v => v === '__pendiente__' ? 'Pendiente' : (opciones.find(o=>(o.value ?? o) === v)?.label ?? v)
   const lista = (buscable && q.trim())
-    ? opciones.filter(o => (o.label ?? o).toLowerCase().includes(q.trim().toLowerCase()))
-    : opciones
+    ? opcionesConPendiente.filter(v => etiquetaDe(v).toLowerCase().includes(q.trim().toLowerCase()))
+    : opcionesConPendiente
+  const resumen = valor.length === 0 ? label : valor.length === 1 ? etiquetaDe(valor[0]) : `${label} (${valor.length})`
   return (
     <th style={{ whiteSpace:'nowrap' }}>
       <span ref={btnRef} onClick={toggle} title="Filtrar" style={{ display:'inline-flex', alignItems:'center', gap:3, cursor:'pointer', userSelect:'none' }}>
-        {label}
-        <span style={{ fontSize:9, lineHeight:1, color: valor ? '#6d28d9' : '#cbd5e1' }}>▼</span>
+        {resumen}
+        <span style={{ fontSize:9, lineHeight:1, color: valor.length ? '#6d28d9' : '#cbd5e1' }}>▼</span>
       </span>
       {open && createPortal(
-        <div ref={boxRef} style={{ position:'fixed', top:pos.top, left:pos.left, minWidth:190, zIndex:9999, background:'#fff', border:'1px solid #e5e7eb', borderRadius:10, boxShadow:'0 10px 30px rgba(0,0,0,.16)', padding:8 }}>
+        <div ref={boxRef} style={{ position:'fixed', top:pos.top, left:pos.left, minWidth:190, zIndex:9999, background:'#fff', border:'1px solid #e5e7eb', borderRadius:10, boxShadow:'0 10px 30px rgba(0,0,0,.16)', padding:8, color:'#111827' }}>
           {buscable && (
             <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar…"
               style={{ width:'100%', padding:'6px 8px', border:'1px solid #e5e7eb', borderRadius:7, outline:'none', fontSize:12, marginBottom:6, boxSizing:'border-box', fontFamily:'inherit' }} />
           )}
-          <div style={{ maxHeight:220, overflowY:'auto' }}>
-            <div onMouseDown={e=>e.preventDefault()} onClick={()=>elegir('')}
-              style={{ padding:'6px 8px', cursor:'pointer', fontSize:12, borderRadius:6, fontWeight: !valor?700:400, background: !valor?'#fff7ed':'transparent', color: !valor?'#c2410c':'#6b7280' }}>Todas</div>
-            {lista.map(o => {
-              const v = o.value ?? o, l = o.label ?? o
-              return (
-                <div key={v} onMouseDown={e=>e.preventDefault()} onClick={()=>elegir(v)}
-                  style={{ padding:'6px 8px', cursor:'pointer', fontSize:12, borderRadius:6, fontWeight: v===valor?700:400, background: v===valor?'#fff7ed':'transparent', color: v===valor?'#c2410c':'#111827' }}>
-                  {l}
-                </div>
-              )
-            })}
+          <label onMouseDown={e=>e.preventDefault()} style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 8px 8px', fontSize:12, fontWeight:700, borderBottom:'1px solid #e5e7eb', cursor:'pointer' }}>
+            <input type="checkbox" checked={valor.length===0} onChange={()=>onChange([])} /> Todas
+          </label>
+          <div style={{ maxHeight:220, overflowY:'auto', paddingTop:4 }}>
+            {lista.map(v => (
+              <label key={v} onMouseDown={e=>e.preventDefault()} style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 8px', cursor:'pointer', fontSize:12, borderRadius:6, fontWeight: valor.includes(v)?700:400, background: valor.includes(v)?'#fff7ed':'transparent', color: valor.includes(v)?'#c2410c':'#111827' }}>
+                <input type="checkbox" checked={valor.includes(v)} onChange={()=>alternar(v)} /> {etiquetaDe(v)}
+              </label>
+            ))}
             {lista.length===0 && <div style={{ padding:'8px 9px', fontSize:12, color:'#9ca3af' }}>Sin resultados</div>}
           </div>
         </div>, document.body)}
@@ -387,8 +390,12 @@ export default function Backdatareclutamiento() {
   const [cmCalPicker, setCmCalPicker] = useState('')
 
   // ── Filtros base ──
-  const [filtros, setFiltros] = useState({ tip:'', tipVend:'', asesor:'', campana:'', numero:'', verTipVend:true, global:false, duplicados:false, desde:'', hasta:'' })
+  const [filtros, setFiltros] = useState({ tip:'', tipVend:[], asesor:[], campana:[], numero:'', verTipVend:true, global:false, duplicados:false, desde:'', hasta:'' })
   const [baseSort, setBaseSort] = useState({ col:null, dir:'asc' })
+  const [ordenDiarioActivo, setOrdenDiarioActivo] = useState(false)
+  const [basePage, setBasePage] = useState(1)
+  const [basePageSize, setBasePageSize] = useState(25)
+  const [grupoAceptaVisible, setGrupoAceptaVisible] = useState(false)
   const [modalEditarContacto, setModalEditarContacto] = useState({ open:false, regId:null, campana:'', n1:'', n2:'', usuarioWhatsapp:'', guardando:false })
 
   // ── Historial ──
@@ -1547,11 +1554,20 @@ export default function Backdatareclutamiento() {
     return Array.from(set).sort()
   }, [todosLosRegistros])
 
-  const registrosFiltrados0 = registrosActivos.filter(r => {
+  // "Acepta propuesta" (VENTA CERRADA) se puede ver por separado, sin que
+  // participe de los demas filtros — igual que los grupos protegidos de
+  // Backoffice (SIN COBERTURA, NO TOCAR, etc.), pero aca solo hace falta este uno.
+  const grupoAceptaPropuesta = registrosActivos.filter(r => String(r._tipifVend||'').trim().toUpperCase() === 'VENTA CERRADA')
+  const registrosFiltrados0 = (grupoAceptaVisible ? grupoAceptaPropuesta : registrosActivos).filter(r => {
     if (filtros.tip    && !(r.tipifBack||'').toUpperCase().includes(filtros.tip.toUpperCase())) return false
-    if (filtros.tipVend&& normalizarTipifVendSelect(r._tipifVend) !== filtros.tipVend.toUpperCase())  return false
-    if (filtros.asesor && !(r.asesor||'').toUpperCase().includes(filtros.asesor.toUpperCase())) return false
-    if (filtros.campana&& r.campana !== filtros.campana) return false
+    if (filtros.tipVend.length) {
+      const actual = String(r._tipifVend||'').trim().toUpperCase()
+      const coincidePendiente = !actual && filtros.tipVend.includes('__pendiente__')
+      const coincideTipif = filtros.tipVend.some(v=>v!=='__pendiente__' && v.toUpperCase()===actual)
+      if (!coincidePendiente && !coincideTipif) return false
+    }
+    if (filtros.asesor.length && !filtros.asesor.some(v=>v.toUpperCase()===String(r.asesor||'').trim().toUpperCase())) return false
+    if (filtros.campana.length && !filtros.campana.some(v=>v.toUpperCase()===String(r.campana||'').trim().toUpperCase())) return false
     if (filtros.numero && !r.n1.includes(filtros.numero) && !(r.n2||'').includes(filtros.numero) && !(r.usuarioWhatsapp||'').toUpperCase().includes(filtros.numero.toUpperCase())) return false
     if (filtros.duplicados && !n1Duplicados.has((r.n1||'').trim())) return false
     return true
@@ -1567,18 +1583,39 @@ export default function Backdatareclutamiento() {
       default: return 0
     }
   }
-  const registrosFiltrados = baseSort.col
+  // Orden diario: sin asignar primero, luego sin tipificar, luego tipificados;
+  // dentro de cada bloque, menos rotado y mas antiguo primero.
+  function bloquePrioridadReg(r) {
+    if (!String(r.asesor||'').trim() || r.sinAsignar) return 0
+    if (!String(r._tipifVend||'').trim()) return 1
+    return 2
+  }
+  const registrosFiltrados = ordenDiarioActivo
+    ? [...registrosFiltrados0].sort((a,b) => {
+        const bloqueA = bloquePrioridadReg(a), bloqueB = bloquePrioridadReg(b)
+        if (bloqueA !== bloqueB) return bloqueA - bloqueB
+        const rotA = a.rotaciones||0, rotB = b.rotaciones||0
+        if (rotA !== rotB) return rotA - rotB
+        return String(a.horaAsig||'').localeCompare(String(b.horaAsig||''))
+      })
+    : baseSort.col
     ? [...registrosFiltrados0].sort((a,b) => {
         const va = baseSortVal(a, baseSort.col), vb = baseSortVal(b, baseSort.col)
         const cmp = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'es', { numeric:true })
         return baseSort.dir === 'desc' ? -cmp : cmp
       })
     : registrosFiltrados0
+  // Paginacion de la tabla Base — evita renderizar cientos de filas de una vez.
+  const baseTotalPages = Math.max(1, Math.ceil(registrosFiltrados.length / basePageSize))
+  const basePageSafe = Math.min(basePage, baseTotalPages)
+  const baseDesde = (basePageSafe - 1) * basePageSize
+  const registrosPagina = registrosFiltrados.slice(baseDesde, baseDesde + basePageSize)
+  useEffect(() => { setBasePage(1) }, [fechaActiva, filtros.tip, filtros.tipVend, filtros.asesor, filtros.campana, filtros.numero, filtros.desde, filtros.hasta, filtros.global, filtros.duplicados, baseSort.col, baseSort.dir, basePageSize, grupoAceptaVisible, ordenDiarioActivo])
   function toggleBaseSort(col) {
     setBaseSort(prev => prev.col === col ? { col, dir: prev.dir==='asc'?'desc':'asc' } : { col, dir:'asc' })
   }
   function ordenarBaseDelDia() {
-    setBaseSort(prev => prev.col === 'hora' ? { col:'hora', dir: prev.dir==='asc'?'desc':'asc' } : { col:'hora', dir:'desc' })
+    setOrdenDiarioActivo(v => !v)
   }
   function baseTh(col, label, thStyle) {
     const activo = baseSort.col === col
@@ -1911,8 +1948,13 @@ export default function Backdatareclutamiento() {
                 <input type="checkbox" checked={filtros.verTipVend} onChange={e=>setFiltros(p=>({...p,verTipVend:e.target.checked}))} />
                 <span>Ver tipif. vendedor</span>
               </label>
-              <button className="bo-btn-limpiar btn btn-sm base-filtro-limpiar" onClick={()=>{ setFiltros({tip:'',tipVend:'',asesor:'',campana:'',numero:'',verTipVend:true,global:false,duplicados:false,desde:'',hasta:''}); setBaseSort({col:null,dir:'asc'}) }}>Limpiar filtros</button>
-              <button className="btn-rotar-masivo" onClick={ordenarBaseDelDia} type="button">Ordenar base del día</button>
+              <button className="bo-btn-limpiar btn btn-sm base-filtro-limpiar" onClick={()=>{ setFiltros({tip:'',tipVend:[],asesor:[],campana:[],numero:'',verTipVend:true,global:false,duplicados:false,desde:'',hasta:''}); setBaseSort({col:null,dir:'asc'}) }}>Limpiar filtros</button>
+              <button className="btn-rotar-masivo" onClick={ordenarBaseDelDia} type="button" style={ordenDiarioActivo?{background:'#16a34a'}:undefined}>{ordenDiarioActivo?'✓ Orden diario activo':'Ordenar base del día'}</button>
+              <button type="button" onClick={()=>setGrupoAceptaVisible(v=>!v)}
+                style={{border:'1px solid #16a34a',color:grupoAceptaVisible?'#fff':'#16a34a',background:grupoAceptaVisible?'#16a34a':'#fff',borderRadius:8,padding:'7px 11px',fontSize:11,fontWeight:800,cursor:'pointer'}}>
+                {grupoAceptaVisible?'Ocultar':'Ver'} ACEPTA PROPUESTA ({grupoAceptaPropuesta.length})
+              </button>
+              {grupoAceptaVisible && <button type="button" onClick={()=>setGrupoAceptaVisible(false)} className="bo-btn-limpiar btn btn-sm">Volver a la base</button>}
             </div>
 
 
@@ -1931,7 +1973,7 @@ export default function Backdatareclutamiento() {
                     <HeaderFiltroDropdown label="Asesor asignado" valor={filtros.asesor} onChange={v=>setFiltros(p=>({...p,asesor:v}))} opciones={asesores.map(a=>a.nombre)} buscable />
                     {baseTh('hora','Hora / Fecha asign.')}
                     {filtros.verTipVend && (
-                      <HeaderFiltroDropdown label="Tipif. Vendedor" valor={filtros.tipVend} onChange={v=>setFiltros(p=>({...p,tipVend:v}))} opciones={TIPIF_VEND_OPCIONES} />
+                      <HeaderFiltroDropdown label="Tipif. Vendedor" valor={filtros.tipVend} onChange={v=>setFiltros(p=>({...p,tipVend:v}))} opciones={TIPIF_VEND_OPCIONES} pending />
                     )}
                     <th>Comentario</th>{baseTh('rotac','Rotaciones')}<th>Acciones</th>
                   </tr>
@@ -1939,7 +1981,7 @@ export default function Backdatareclutamiento() {
                 <tbody>
                   {registrosFiltrados.length === 0
                     ? <tr><td colSpan={filtros.verTipVend?10:9} className="bo-empty">Sin registros en {formatFecha(fechaActiva)}.</td></tr>
-                    : registrosFiltrados.map((r,i) => {
+                    : registrosPagina.map((r,i) => {
                         const esExclusiva = esLeadProhibido(r)
                         return [
                           <tr key={r.id} id={`fila-${r.id}`}>
@@ -2052,6 +2094,19 @@ export default function Backdatareclutamiento() {
                   }
                 </tbody>
               </table>
+            </div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,padding:'10px 2px'}}>
+              <div className="paginacion-info">
+                Mostrando {registrosFiltrados.length ? baseDesde + 1 : 0}–{Math.min(baseDesde + basePageSize, registrosFiltrados.length)} de {registrosFiltrados.length}
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <select className="select-por-pagina" value={basePageSize} onChange={e=>setBasePageSize(Number(e.target.value))} aria-label="Registros por página">
+                  {[10,25,50,100].map(n=><option key={n} value={n}>{n} / pág.</option>)}
+                </select>
+                <button className="fnav-btn" disabled={basePageSafe<=1} onClick={()=>setBasePage(p=>Math.max(1,p-1))}>‹</button>
+                <span className="paginacion-info">Página {basePageSafe} de {baseTotalPages}</span>
+                <button className="fnav-btn" disabled={basePageSafe>=baseTotalPages} onClick={()=>setBasePage(p=>Math.min(baseTotalPages,p+1))}>›</button>
+              </div>
             </div>
           </section>
 
