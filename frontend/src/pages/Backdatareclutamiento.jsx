@@ -8,6 +8,7 @@ import { API, ncHeaders } from '../services/api'
 import { responseChanged, setVisibleInterval, clearVisibleInterval } from '../utils/polling'
 import { usuarioTieneCargo } from '../utils/roles'
 import { CAMPANAS_RECLUTAMIENTO } from '../utils/campanas'
+import * as XLSX from 'xlsx'
 import '../styles/Backdatareclutamiento.css'
 
 // ── Selector de campaña (lista + opción "Otro" para escribir a mano) ───────
@@ -1473,69 +1474,204 @@ export default function Backdatareclutamiento() {
   // normal: primero se ve la vista previa, despues se ajusta la fecha), el
   // cambio no se reflejaba y todo se subia con la fecha vieja (o con hoy,
   // el valor por defecto de legacyFecha).
-  function procesarLegacy(file) {
-    setLegacyStatus(`Leyendo ${file.name}...`)
-    const reader = new FileReader()
-    reader.onload = e => {
-      const text   = e.target.result
-      const lineas = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0)
-      if (!lineas.length) { setLegacyStatus('Archivo vacio'); return }
-      const sep   = lineas[0].includes('\t')?'\t':lineas[0].includes(';')?';':','
-      const prim  = lineas[0].split(sep)
-      const cab   = isNaN((prim[3]||'').replace(/\s/g,''))||(prim[3]||'').length<6
-      const datos = cab ? lineas.slice(1) : lineas
-      // Formato original: CAMPAÑA·DISTRITO·N2·N1·TIPIF.BACK·COMENTARIO·TIPIFICACIÓN·HORA·ASESOR1..6
-      // Formato "corregido": CAMPAÑA·FECHA·CONTACTO·OBSERVACIONES·TIPIFICACIÓN·HORA·ASESOR1..6
-      // (sin DISTRITO/N2/TIPIF.BACK, con una columna FECHA real por fila).
-      // Se detecta por los nombres del encabezado para no romper el formato ya usado.
-      const encabezados = cab ? prim.map(c=>c.trim().toUpperCase()) : []
-      const esFormatoCorregido = encabezados.includes('CONTACTO') && encabezados.includes('FECHA') && !encabezados.includes('DISTRITO')
-      const rows   = []
-      datos.forEach(linea => {
-        const c = linea.split(sep).map(x=>x.trim().replace(/^["']|["']$/g,''))
-        const campana = c[0]||'—'
-        let n1, distrito, n2, tipifBack, comentario, tipifVend, hora, asesorInicio, fechaFilaRaw
-        if (esFormatoCorregido) {
-          fechaFilaRaw = c[1]||''
-          n1 = c[2]||''
-          distrito = '—'; n2 = ''; tipifBack = ''
-          comentario = c[3]||''
-          tipifVend  = c[4]||''
-          hora       = c[5]||''
-          asesorInicio = 6
-        } else {
-          fechaFilaRaw = ''
-          n1 = c[3]||c[0]||''
-          distrito = c[1]||'—'; n2 = c[2]||''; tipifBack = c[4]||''
-          comentario = c[5]||''
-          tipifVend  = c[6]||''
-          hora       = c[7]||''
-          asesorInicio = 8
-        }
-        if (!n1||n1.length<6) return
-        const asesoresHist = []
-        for (let i=asesorInicio;i<=asesorInicio+5;i++) { const a=(c[i]||'').trim(); if(a&&a.length>1) asesoresHist.push(a) }
-        // Fecha propia de la fila (formato "corregido"): siempre es la real,
-        // sin importar el selector.
-        let fechaPropia = ''
-        if (esFormatoCorregido && fechaFilaRaw) {
-          const m = fechaFilaRaw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
-          if (m) fechaPropia = `${m[3]}-${m[2]}-${m[1]}`
-          else if (/^\d{4}-\d{2}-\d{2}$/.test(fechaFilaRaw)) fechaPropia = fechaFilaRaw
-        }
-        // Fecha detectada en cualquier celda de la fila (formato original con
-        // "Usar fecha de la fila"): se detecta siempre, se aplica solo si el
-        // selector correspondiente esta en "si" al momento de resolver.
-        let fechaDetectada = ''
-        if (!esFormatoCorregido) {
-          for (let i=0;i<c.length;i++) { const m=c[i].match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m){fechaDetectada=`${m[3]}-${m[2]}-${m[1]}`;break;} if(/^\d{4}-\d{2}-\d{2}$/.test(c[i])){fechaDetectada=c[i];break;} }
-        }
-        rows.push({ campana, distrito, n2, n1, tipifBack, comentario, tipifVend, hora, asesores:asesoresHist, _fechaPropia:fechaPropia, _fechaDetectada:fechaDetectada })
-      })
-      if (!rows.length) { setLegacyStatus('No se encontraron filas validas'); return }
-      setLegacyRows(rows); setLegacyInfo(`${rows.length} registros desde "${file.name}"`); setLegacyStatus('')
+  const MESES_ABREV_EN = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 }
+
+  // Convierte números seriales de Excel, DD/MM/YYYY (con o sin ceros), DD-MM-YYYY
+  // o YYYY-MM-DD a 'YYYY-MM-DD'; null si no reconoce el formato. Necesario
+  // porque una celda FECHA real de Excel no siempre llega como texto plano.
+  function parseFechaLegacyRecl(raw) {
+    if (!raw) return null
+    const s = String(raw).trim()
+    const mDMY = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    if (mDMY) return `${mDMY[3]}-${mDMY[2].padStart(2,'0')}-${mDMY[1].padStart(2,'0')}`
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+    const mDash = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+    if (mDash) return `${mDash[3]}-${mDash[2].padStart(2,'0')}-${mDash[1].padStart(2,'0')}`
+    // Excel a veces exporta la fecha como "1-Aug" o "1-Aug-26" (formato corto
+    // con mes en inglés) al convertir vía SheetJS — cubre ambos casos.
+    const mMonY = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/)
+    if (mMonY) {
+      const mes = MESES_ABREV_EN[mMonY[2].toLowerCase()]
+      if (mes) {
+        let anio = mMonY[3]
+        if (anio.length === 2) anio = (Number(anio) < 70 ? '20' : '19') + anio
+        return `${anio}-${String(mes).padStart(2,'0')}-${mMonY[1].padStart(2,'0')}`
+      }
     }
-    reader.readAsText(file, 'UTF-8')
+    const mMon = s.match(/^(\d{1,2})-([A-Za-z]{3})$/)
+    if (mMon) {
+      const mes = MESES_ABREV_EN[mMon[2].toLowerCase()]
+      if (mes) return `${new Date().getFullYear()}-${String(mes).padStart(2,'0')}-${mMon[1].padStart(2,'0')}`
+    }
+    const n = Number(s)
+    if (!isNaN(n) && n > 40000 && n < 60000) {
+      const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000)
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`
+    }
+    return null
+  }
+
+  // Si el archivo es .xlsx/.xls, lo convierte a CSV vía SheetJS antes de
+  // parsearlo como texto — antes esto se leía como texto plano y con un
+  // .xlsx real salía basura.
+  async function leerArchivoComoTextoRecl(file) {
+    const ext = (file.name.split('.').pop() || '').toLowerCase()
+    if (ext === 'xlsx' || ext === 'xls') {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = e => {
+          try {
+            const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array', cellDates:true })
+            const ws = wb.Sheets[wb.SheetNames[0]]
+            resolve(XLSX.utils.sheet_to_csv(ws))
+          } catch(err) { reject(err) }
+        }
+        reader.onerror = reject
+        reader.readAsArrayBuffer(file)
+      })
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = e => resolve(e.target.result)
+      reader.onerror = reject
+      reader.readAsText(file, 'UTF-8')
+    })
+  }
+
+  // Split de una linea CSV respetando comillas: una COMENTARIO con coma
+  // adentro (ej. "johan, falta confirmar turno") no debe correr las columnas
+  // siguientes (TIPIFICACION/HORA/ASESOR) — un split() ingenuo si lo hacia.
+  function splitCSVLine(linea, sep) {
+    const out = []
+    let cur = '', enComillas = false
+    for (let i=0;i<linea.length;i++) {
+      const ch = linea[i]
+      if (ch === '"') {
+        if (enComillas && linea[i+1] === '"') { cur += '"'; i++; continue }
+        enComillas = !enComillas; continue
+      }
+      if (ch === sep && !enComillas) { out.push(cur); cur=''; continue }
+      cur += ch
+    }
+    out.push(cur)
+    return out.map(x=>x.trim())
+  }
+
+  // Excel exporta horas de un solo digito sin cero a la izquierda ("8:32"),
+  // pero el backend exige HH:MM exacto — sin esto, esas filas se rechazaban
+  // silenciosamente en el import por lote.
+  function normalizarHoraLegacy(raw) {
+    const m = String(raw||'').trim().match(/^(\d{1,2}):(\d{2})/)
+    if (!m) return String(raw||'').trim()
+    return `${m[1].padStart(2,'0')}:${m[2]}`
+  }
+
+  async function procesarLegacy(file) {
+    setLegacyStatus(`Leyendo ${file.name}...`)
+    let text
+    try { text = await leerArchivoComoTextoRecl(file) }
+    catch(e) { setLegacyStatus('Error leyendo el archivo'); return }
+    const lineas = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0)
+    if (!lineas.length) { setLegacyStatus('Archivo vacio'); return }
+    const sep   = lineas[0].includes('\t')?'\t':lineas[0].includes(';')?';':','
+    const prim  = splitCSVLine(lineas[0], sep)
+    const cab   = isNaN((prim[3]||'').replace(/\s/g,''))||(prim[3]||'').length<6
+    const datos = cab ? lineas.slice(1) : lineas
+    // Formato original: CAMPAÑA·DISTRITO·N2·N1·TIPIF.BACK·COMENTARIO·TIPIFICACIÓN·HORA·ASESOR1..6
+    // Formato "corregido": CAMPAÑA·FECHA·CONTACTO·OBSERVACIONES·TIPIFICACIÓN·HORA·ASESOR1..6
+    // (sin DISTRITO/N2/TIPIF.BACK, con una columna FECHA real por fila).
+    // Se detecta por los nombres del encabezado para no romper el formato ya usado.
+    const encabezados = cab ? prim.map(c=>c.trim().toUpperCase()) : []
+    const esFormatoCorregido = encabezados.includes('CONTACTO') && encabezados.includes('FECHA') && !encabezados.includes('DISTRITO')
+    const rows   = []
+    datos.forEach(linea => {
+      const c = splitCSVLine(linea, sep).map(x=>x.replace(/^["']|["']$/g,''))
+      const campana = c[0]||'—'
+      let n1, distrito, n2, tipifBack, comentario, tipifVend, hora, asesorInicio, fechaFilaRaw
+      if (esFormatoCorregido) {
+        fechaFilaRaw = c[1]||''
+        n1 = c[2]||''
+        distrito = '—'; n2 = ''; tipifBack = ''
+        comentario = c[3]||''
+        tipifVend  = c[4]||''
+        hora       = normalizarHoraLegacy(c[5])
+        asesorInicio = 6
+      } else {
+        fechaFilaRaw = ''
+        n1 = c[3]||c[0]||''
+        distrito = c[1]||'—'; n2 = c[2]||''; tipifBack = c[4]||''
+        comentario = c[5]||''
+        tipifVend  = c[6]||''
+        hora       = normalizarHoraLegacy(c[7])
+        asesorInicio = 8
+      }
+      if (!n1||n1.length<6) return
+      const asesoresHist = []
+      for (let i=asesorInicio;i<=asesorInicio+5;i++) { const a=(c[i]||'').trim(); if(a&&a.length>1) asesoresHist.push(a) }
+      // Fecha propia de la fila (formato "corregido"): siempre es la real,
+      // sin importar el selector.
+      const fechaPropia = (esFormatoCorregido && fechaFilaRaw) ? (parseFechaLegacyRecl(fechaFilaRaw) || '') : ''
+      // Fecha detectada en cualquier celda de la fila (formato original con
+      // "Usar fecha de la fila"): se detecta siempre, se aplica solo si el
+      // selector correspondiente esta en "si" al momento de resolver.
+      let fechaDetectada = ''
+      if (!esFormatoCorregido) {
+        for (let i=0;i<c.length;i++) { const parsed = parseFechaLegacyRecl(c[i]); if (parsed) { fechaDetectada = parsed; break } }
+      }
+      rows.push({ campana, distrito, n2, n1, tipifBack, comentario, tipifVend, hora, asesores:asesoresHist, _fechaPropia:fechaPropia, _fechaDetectada:fechaDetectada })
+    })
+    if (!rows.length) { setLegacyStatus('No se encontraron filas validas'); return }
+    setLegacyRows(rows); setLegacyInfo(`${rows.length} registros desde "${file.name}"`); setLegacyStatus('')
+  }
+
+  // Adaptado al formato real de Sistema Antiguo de Reclutamiento que ya usa
+  // PRIZMA (CAMPAÑA · DISTRITO · N2 · N1 · TIPIF.BACK · COMENTARIO ·
+  // TIPIFICACIÓN · HORA · ASESOR 1..6).
+  function descargarFormatoLegacy() {
+    const wb = XLSX.utils.book_new()
+    const HDR = ['CAMPAÑA','DISTRITO','N2','N1','TIPIF.BACK','COMENTARIO','TIPIFICACIÓN','HORA','ASESOR 1','ASESOR 2','ASESOR 3','ASESOR 4','ASESOR 5','ASESOR 6']
+    const COLS = HDR.map((_,i)=>({ wch: i===0?12 : i===1?14 : i===3?14 : i===4?14 : i===5?26 : i===6?16 : i===7?9 : 16 }))
+    const ws1 = XLSX.utils.aoa_to_sheet([HDR])
+    ws1['!cols'] = COLS
+    ws1['!freeze'] = { xSplit: 0, ySplit: 1 }
+    ws1['!autofilter'] = { ref: `A1:${XLSX.utils.encode_col(HDR.length-1)}1` }
+    XLSX.utils.book_append_sheet(wb, ws1, 'CARGA SISTEMA ANTIGUO')
+    const ws2 = XLSX.utils.aoa_to_sheet([
+      HDR,
+      ['R4','—','','987654321','','Llamó y cortó','CORTA LLAMADA','17:11','DIEGO ALTAMINARO','ARELIS IBAÑEZ','','','',''],
+      ['R6','—','','976543210','','','BUZON','11:45','CARLOS VEGA','PEDRO LUNA','','','',''],
+      ['REFERIDOS','—','','945612378','','Pidió volver a llamar','AGENDADO','14:00','ANA TORRES','','','','',''],
+    ])
+    ws2['!cols'] = COLS
+    ws2['!freeze'] = { xSplit: 0, ySplit: 1 }
+    XLSX.utils.book_append_sheet(wb, ws2, 'EJEMPLO')
+    const INSTR = [
+      ['INSTRUCCIONES — CARGA SISTEMA ANTIGUO (RECLUTAMIENTO)'],
+      [''],
+      ['IMPORTANTE: No modifique el nombre ni el orden de las columnas.'],
+      [''],
+      ['Columna','Descripción','Obligatorio','Notas'],
+      ['CAMPAÑA', 'Campaña de reclutamiento', 'No', `Usar exactamente: ${CAMPANAS_RECLUTAMIENTO.join(' · ')}`],
+      ['DISTRITO','Distrito del contacto','No','Se deja "—" si no aplica'],
+      ['N2','Número secundario','No','Opcional'],
+      ['N1','Número principal','SÍ','7+ dígitos'],
+      ['TIPIF.BACK','Tipificación del back office','No','Texto libre'],
+      ['COMENTARIO','Comentario libre del asesor','No','Texto libre, no se tipifica'],
+      ['TIPIFICACIÓN',`Tipificación del asesor`,'No', TIPIF_VEND_OPCIONES.map(t=>t.label).join(' · ')],
+      ['HORA','Hora de la última gestión','No','Formato HH:MM — ejemplo: 17:11'],
+      ['ASESOR 1 … ASESOR 6','Historial de asesores que tuvieron este contacto','No','Nombre completo tal como aparece en el sistema'],
+      [''],
+      ['NOTAS ADICIONALES'],
+      ['— Use la hoja "CARGA SISTEMA ANTIGUO" para pegar sus datos.'],
+      ['— Use la hoja "EJEMPLO" como referencia.'],
+      ['— N1 es el único campo siempre obligatorio.'],
+      ['— Formatos de archivo aceptados al importar: .csv · .txt · .xlsx · .xls'],
+    ]
+    const ws3 = XLSX.utils.aoa_to_sheet(INSTR)
+    ws3['!cols'] = [{ wch:22 },{ wch:36 },{ wch:14 },{ wch:70 }]
+    ws3['!rows'] = [{ hpt:18 }]
+    XLSX.utils.book_append_sheet(wb, ws3, 'INSTRUCCIONES')
+    XLSX.writeFile(wb, 'FORMATO_CARGA_SISTEMA_ANTIGUO_RECLUTAMIENTO.xlsx')
   }
   // Resuelve la fecha final de una fila leyendo el estado actual de los
   // selectores — se llama tanto para la vista previa como para el envio,
@@ -2398,11 +2534,14 @@ export default function Backdatareclutamiento() {
               {/* TAB: Legacy */}
               {cargaTab === 'legacy' && (
                 <div>
-                  <div style={{background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:10,padding:14,marginBottom:14}}>
-                    <div style={{fontSize:12,fontWeight:700,color:'#c2410c',marginBottom:4}}>Importación de sistema antiguo</div>
-                    <div style={{fontSize:11,color:'#92400e',lineHeight:1.6}}>
-                      Formato: <strong>CAMPAÑA · DISTRITO · N2 · N1 · TIPIF.BACK · COMENTARIO · TIPIFICACIÓN · HORA · ASESOR 1 · ... · ASESOR 6</strong>
+                  <div style={{background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:10,padding:14,marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,flexWrap:'wrap'}}>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:'#c2410c',marginBottom:4}}>Importación de sistema antiguo</div>
+                      <div style={{fontSize:11,color:'#92400e',lineHeight:1.6}}>
+                        Formato: <strong>CAMPAÑA · DISTRITO · N2 · N1 · TIPIF.BACK · COMENTARIO · TIPIFICACIÓN · HORA · ASESOR 1 · ... · ASESOR 6</strong>
+                      </div>
                     </div>
+                    <button type="button" className="btn-masiva-preview" onClick={descargarFormatoLegacy} style={{whiteSpace:'nowrap'}}>⇩ Descargar plantilla Excel</button>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 180px',gap:12,marginBottom:12}}>
                     <div
@@ -2413,8 +2552,8 @@ export default function Backdatareclutamiento() {
                       style={{border:`2px dashed ${legacyDragOver?'#c2410c':'#fed7aa'}`,borderRadius:10,padding:28,textAlign:'center',cursor:'pointer',background:legacyDragOver?'#fff7ed':'#fff'}}
                     >
                       <div style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:3}}>Arrastra tu base o haz clic</div>
-                      <div style={{fontSize:11,color:'#9ca3af'}}>CSV exportado desde tu sistema anterior</div>
-                      <input ref={legacyInputRef} type="file" accept=".csv,.txt" style={{display:'none'}} onChange={e=>{ if(e.target.files.length) procesarLegacy(e.target.files[0]) }} />
+                      <div style={{fontSize:11,color:'#9ca3af'}}>CSV, TXT o Excel (.xlsx) exportado desde tu sistema anterior</div>
+                      <input ref={legacyInputRef} type="file" accept=".csv,.txt,.xlsx,.xls" style={{display:'none'}} onChange={e=>{ if(e.target.files.length) procesarLegacy(e.target.files[0]) }} />
                     </div>
                     <div style={{display:'flex',flexDirection:'column',gap:8}}>
                       <div className="bo-input-group" style={{margin:0}}><label>Fecha destino</label>
