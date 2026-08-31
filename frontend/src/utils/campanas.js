@@ -3,18 +3,7 @@
 // array (respeta el orden que quieras que aparezca en el desplegable).
 // Se usa en el formulario de registro individual y en la carga masiva.
 export const CAMPANAS = [
-  'FABI',
-  'M5',
-  'MAFER',
-  'NICOLE',
-  'PAO',
-  'SANTI',
-  'MESSENGER',
+  'R4',
+  'R6',
   'REFERIDOS',
-  'DIEGO',
-  'JOSS',
-  'YOPI',
-  'MASIVO',
-  'CAIDAS CLARO',
-  'LEAD CRM',
 ]
