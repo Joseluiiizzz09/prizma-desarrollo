@@ -11,7 +11,7 @@ const auth    = require('../middleware/auth');
 const { validar, errorTexto, errorFecha, errorHora, errorHistorial, errorEnum } = require('../middleware/validar');
 
 const ROLES_BACK = ['backreclutamiento', 'jefatura', 'usuarios'];
-const ROLES_ALL  = ['backreclutamiento', 'jefatura', 'usuarios', 'asesorreclutamiento'];
+const ROLES_ALL  = ['backreclutamiento', 'jefatura', 'usuarios'];
 const ROLES_ENTREVISTAS = ['entrevistas', 'backreclutamiento', 'jefatura', 'usuarios'];
 const ROLES_CAPACITACION = ['capacitador', 'backreclutamiento', 'jefatura', 'usuarios'];
 const TURNOS_ENTREVISTA = ['TURNO 1', 'TURNO 2'];
@@ -149,13 +149,16 @@ function horaPeruAhora() {
   return String(peru.getHours()).padStart(2,'0')+':'+String(peru.getMinutes()).padStart(2,'0');
 }
 
-// Verifica que el usuario destino realmente tenga el cargo asesorreclutamiento
+// Verifica que el usuario destino realmente tenga el cargo backreclutamiento
 // (principal o delegado vía permisos) antes de dejarlo recibir asignaciones.
+// Back Data Reclutamiento ahora es el unico rol operativo: administra la
+// base Y recibe las asignaciones (el rol separado asesorreclutamiento se
+// dejo de usar).
 async function esAsesorReclutamientoValido(usuarioId) {
   const [rows] = await db.query(`SELECT cargo, permisos, activo FROM usuarios WHERE id = ?`, [usuarioId]);
   if (!rows.length || !rows[0].activo) return false;
-  if (rows[0].cargo === 'asesorreclutamiento') return true;
-  try { return (JSON.parse(rows[0].permisos || '[]')).includes('asesorreclutamiento'); }
+  if (rows[0].cargo === 'backreclutamiento') return true;
+  try { return (JSON.parse(rows[0].permisos || '[]')).includes('backreclutamiento'); }
   catch { return false; }
 }
 

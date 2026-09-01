@@ -38,7 +38,6 @@ const SupCalidad = lazyConRecarga(() => import('./pages/SupCalidad'))
 const Jefatura = lazyConRecarga(() => import('./pages/Jefatura'))
 const Usuarios = lazyConRecarga(() => import('./pages/Usuarios'))
 const Backdatareclutamiento = lazyConRecarga(() => import('./pages/Backdatareclutamiento'))
-const DashboardReclutamiento = lazyConRecarga(() => import('./pages/dashboardreclutamiento'))
 const MarketingLeads = lazyConRecarga(() => import('./pages/MarketingLeads'))
 
 // Sin esto, un error de render en cualquier pantalla (bug real o modulo que
@@ -115,7 +114,6 @@ export default function App() {
       <Route path="/jefatura"      element={<PrivateRoute cargo="jefatura"><Jefatura /></PrivateRoute>} />
       <Route path="/usuarios"      element={<PrivateRoute cargo="usuarios"><Usuarios /></PrivateRoute>} />
       <Route path="/backdata-reclutamiento" element={<PrivateRoute cargo={['backreclutamiento','entrevistas','capacitador']}><Backdatareclutamiento /></PrivateRoute>} />
-      <Route path="/reclutamiento"          element={<PrivateRoute cargo="asesorreclutamiento"><DashboardReclutamiento /></PrivateRoute>} />
       <Route path="/marketing-leads"        element={<PrivateRoute cargo="marketing"><MarketingLeads /></PrivateRoute>} />
 
       <Route path="*" element={<InicioAutorizado />} />

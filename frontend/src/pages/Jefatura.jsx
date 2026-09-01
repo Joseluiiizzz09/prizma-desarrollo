@@ -110,7 +110,6 @@ const ACCESOS_MODS = [
   { nombre:'Calidad',          desc:'Control de clientes instalados',   icon:'quality',   path:'/calidad',         color:'#fb923c', cargo:'calidad' },
   { nombre:'Super de Calidad', desc:'Supervisión del equipo de Calidad',icon:'quality',   path:'/sup-calidad',     color:'#f97316', cargo:'supcalidad' },
   { nombre:'Back Data Reclutaminto',        desc:'Gestión y asignación de candidatos', icon:'clipboard', path:'/backdata-reclutamiento', color:'#4338ca', cargo:'backreclutamiento' },
-  { nombre:'Sistema de Llamadas Reclutamiento', desc:'Contacto y seguimiento de postulantes', icon:'chart', path:'/reclutamiento', color:'#0e7490', cargo:'asesorreclutamiento' },
 ]
 
 function ModuloIcon({ tipo, size = 24 }) {

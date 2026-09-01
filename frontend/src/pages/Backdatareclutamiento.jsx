@@ -625,7 +625,7 @@ export default function Backdatareclutamiento() {
       const res  = await fetch(`${API}/usuarios`, { headers: ncHeaders() })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar el registro')
-      if (data.ok) setAsesores(data.data.filter(u => usuarioTieneCargo(u, 'asesorreclutamiento') && u.activo).map(u => ({ id:u.id, nombre:u.nombre, usuario:u.usuario, sala:u.sala })))
+      if (data.ok) setAsesores(data.data.filter(u => usuarioTieneCargo(u, 'backreclutamiento') && u.activo).map(u => ({ id:u.id, nombre:u.nombre, usuario:u.usuario, sala:u.sala })))
     } catch(e) { console.error('Error cargando asesores:', e) }
   }, [])
 
