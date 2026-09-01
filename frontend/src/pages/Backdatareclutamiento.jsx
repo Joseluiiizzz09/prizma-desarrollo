@@ -1383,6 +1383,7 @@ export default function Backdatareclutamiento() {
     const pendientes = lista.filter(n1 => !(baseData[fecha]||[]).find(r=>r.n1===n1))
     const CHUNK = 400
     let importados = 0
+    let omitidos = 0
     let errorMsg = ''
     for (let i = 0; i < pendientes.length; i += CHUNK) {
       const lote = pendientes.slice(i, i + CHUNK)
@@ -1391,21 +1392,22 @@ export default function Backdatareclutamiento() {
         const res  = await fetch(`${API}/leads-reclutamiento`, { method:'POST', headers:ncHeaders(), body:JSON.stringify(leadsParaBackend) })
         const data = await res.json().catch(() => ({}))
         if (!res.ok || !data.ok) { errorMsg = data.mensaje || `Error del servidor (${res.status})`; break }
-        const nuevosRegs = lote.map(n1 => ({ id:idCntRef.current++, _backendId:null, campana, distrito:'—', n1, n2:'', tipifBack:'', asesor, horaAsig:hora, sinAsignar:!asesor, rotaciones:0, _tipifVend:'', _tipifHora:'', historial:asesor?[{asesor,hora,fecha,motivo:'Carga masiva'}]:[] }))
-        setBaseData(prev => {
-          const arr = [...(prev[fecha]||[]), ...nuevosRegs]
-          const off = arr.length - nuevosRegs.length
-          if (Array.isArray(data.ids)) data.ids.forEach((bid,i) => { if(arr[off+i]) arr[off+i]={...arr[off+i],_backendId:bid} })
-          return { ...prev, [fecha]:arr }
-        })
-        setFechaPestanas(prev => prev.includes(fecha) ? prev : [...prev, fecha].sort().reverse())
-        importados += lote.length
+        importados += data.creados || 0
+        omitidos += data.omitidos || 0
       } catch (e) {
         errorMsg = 'Error de conexión con el servidor'
         break
       }
     }
+    // El backend puede omitir filas sueltas del lote (fila invalida o error de
+    // BD) sin avisar por indice — construir los registros locales a partir de
+    // la posicion en `lote` ya no corresponde 1 a 1 con los ids devueltos.
+    // Recargar desde el servidor evita registros "fantasma" que solo viven en
+    // memoria y desaparecen en el proximo refresco/poll.
+    await cargarLeads()
+    setFechaPestanas(prev => prev.includes(fecha) ? prev : [...prev, fecha].sort().reverse())
     if (errorMsg) mostrarToast(`Se importaron ${importados} de ${pendientes.length}. ${errorMsg}`)
+    else if (omitidos) mostrarToast(`${importados} registro(s) importado(s), ${omitidos} omitido(s) por error`)
     else if (importados) mostrarToast(`${importados} registro(s) importado(s) correctamente`)
     setMasivaNums(''); setMasivaFilas([]); setInclDup(false)
   }
