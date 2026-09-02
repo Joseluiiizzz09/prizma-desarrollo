@@ -2277,10 +2277,10 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
       filtros.tipBack1.length || filtros.tipBack2.length || filtros.tipVend.length || filtros.asesor.length || filtros.campana.length || filtros.sala.length || filtros.numero ||
       filtros.desde || filtros.hasta || filtros.global || filtros.duplicados
     )
-    const fuente = ordenDiarioActivo
-      ? (filtros.tipVend.length ? registrosBusquedaGlobal : registrosOperativos)
-      : grupoProtegidoVisible
+    const fuente = grupoProtegidoVisible
       ? (gruposProtegidos[grupoProtegidoVisible] || [])
+      : ordenDiarioActivo
+      ? (filtros.tipVend.length ? registrosBusquedaGlobal : registrosOperativos)
       : (hayFiltroConsulta ? registrosBusquedaGlobal : registrosOperativos)
     const filtered = fuente.filter(r => {
       if (filtros.duplicados && (conteoDuplicadosAlcance.get(normalizarNumero(r.n1)) || 0) < 2) return false
