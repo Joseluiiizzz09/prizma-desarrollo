@@ -1768,7 +1768,7 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
     } = req.body;
 
     const [rows] = await conn.query(`
-      SELECT id, asesor_id, estado, obs_backoffice, observacion,
+      SELECT id, lead_id, asesor_id, estado, obs_backoffice, observacion,
              obs_programacion, sot, fecha_programada, obs_validacion, obs_supgrab,
              estado_supgrab, estado_grab, audio_path, obs_seguimiento,
              tramo_seguimiento, motivo_seguimiento, seguimiento_ingresado_at,
@@ -1975,6 +1975,34 @@ router.patch('/:id', auth(ROLES_VENTAS), async (req, res) => {
     const actorDelArea = actor ? { ...actor, cargo: cargoEfectivo } : actor;
     for (const cambio of cambios) {
       await registrarHistorial(conn, req.params.id, actorDelArea, cambio);
+    }
+    // Sincronizar de vuelta al lead de Backoffice: una vez que Seguimiento
+    // confirma el desenlace final (se instalo o se cayo), esa tipificacion
+    // debe reemplazar el "VENTA CERRADA" original -- si no, el lead se queda
+    // marcado VENTA CERRADA para siempre en Backoffice aunque ya se sepa que
+    // paso despues, porque tipifEfectiva() bloquea VENTA CERRADA de forma
+    // permanente en cuanto existe el evento ventaCompleta original.
+    const cambioEstado = cambios.find(c => c.campo === 'estado');
+    const tipifDestino = cambioEstado?.valorNuevo === 'EJECUTADA' ? 'EJECUTADA'
+      : cambioEstado?.valorNuevo === 'CAIDA' ? 'VENTA CAIDA'
+      : null;
+    if (tipifDestino && rows[0].lead_id) {
+      const [leadRows] = await conn.query(`SELECT id, historial FROM leads WHERE id = ?`, [rows[0].lead_id]);
+      if (leadRows.length) {
+        const ahora = new Date();
+        const peru  = new Date(ahora.getTime() + ahora.getTimezoneOffset() * 60000 + (-5 * 60 * 60000));
+        const fecha = fechaPeruHoy();
+        const hora  = String(peru.getHours()).padStart(2, '0') + ':' + String(peru.getMinutes()).padStart(2, '0');
+        let historialLead = [];
+        try { historialLead = JSON.parse(leadRows[0].historial || '[]'); } catch {}
+        historialLead.push({
+          tipo: 'TIPIF_VEND', tipif: tipifDestino, ts: Date.now(), hora, fecha,
+          esFinal: true, origen: 'seguimiento', ventaId: Number(req.params.id),
+        });
+        await conn.query(`UPDATE leads SET tipif_vend=?, tipif_hora=?, historial=? WHERE id=?`, [
+          tipifDestino, hora, JSON.stringify(historialLead), rows[0].lead_id,
+        ]);
+      }
     }
     await conn.commit();
     res.json({ ok: true, mensaje: 'Venta actualizada' });

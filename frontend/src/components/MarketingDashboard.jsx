@@ -27,7 +27,7 @@ function labelTipifVendRecl(valor) { return TIPIF_VEND_RECL_LABELS[String(valor|
 // TIPIF_VEND_OPCIONES en Backoffice.jsx) — el reporte de Marketing solo debe
 // ofrecer estas para filtrar, no cualquier texto libre historico que haya
 // quedado guardado en tipif_vend/tipif_back/tipif_back_2.
-const TIPIF_VEND_VENTAS_ACTUALES = ['VENTA CERRADA','PREVENTA','AGENDADO','EN EJECUCION','INSTALADO','NO CONTESTA','BUZON DE VOZ','CORTA LLAMADA','NO DESEA','NO CALIFICA','SIN COBERTURA','CONTACTO CON TERCEROS','EDIFICIO NO LIBERADO','DESEA MOVIL','SERVICIO ACTIVO','NO ROTAR','SIN TIPIFICAR']
+const TIPIF_VEND_VENTAS_ACTUALES = ['VENTA CERRADA','PREVENTA','AGENDADO','EN EJECUCION','INSTALADO','EJECUTADA','NO CONTESTA','BUZON DE VOZ','CORTA LLAMADA','NO DESEA','NO CALIFICA','SIN COBERTURA','CONTACTO CON TERCEROS','EDIFICIO NO LIBERADO','DESEA MOVIL','SERVICIO ACTIVO','NO ROTAR','VENTA CAIDA','SIN TIPIFICAR']
 // OJO: "hoy" debe ser el dia calendario de Lima, no el del reloj/zona
 // horaria del dispositivo del que mira el reporte — si no, este dashboard
 // y la pestana "Base" de Backdatareclutamiento (que si usa America/Lima)
@@ -105,7 +105,7 @@ export default function MarketingDashboard() {
   // Una venta cerrada, en cualquiera de sus 3 estados posteriores, sigue
   // siendo una venta: VENTA CERRADA (recien cerrada), INSTALADO (se completo)
   // o VENTA CAIDA (se cayo despues) — las 3 cuentan para el total de ventas.
-  const TIPIF_CONJUNTO_VENTA = new Set(['VENTA CERRADA','VENTA CAIDA','INSTALADO'])
+  const TIPIF_CONJUNTO_VENTA = new Set(['VENTA CERRADA','VENTA CAIDA','INSTALADO','EJECUTADA'])
   const resumenMarketing = useMemo(() => {
     const porCampana = new Map()
     let total = 0, sinTipificar = 0

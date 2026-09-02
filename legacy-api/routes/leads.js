@@ -697,10 +697,10 @@ router.get('/ventas-cerradas', auth(['asesor', 'jefatura', 'usuarios']), async (
 // SELECT DISTINCT sobre la tabla, para que datos sucios historicos (texto
 // libre de una carga vieja, coordenadas, etc.) nunca aparezcan como opcion.
 const TIPIFICACIONES_MARKETING = [
-  'VENTA CERRADA','PREVENTA','AGENDADO','EN EJECUCION','INSTALADO','NO CONTESTA',
+  'VENTA CERRADA','PREVENTA','AGENDADO','EN EJECUCION','INSTALADO','EJECUTADA','NO CONTESTA',
   'BUZON DE VOZ','CORTA LLAMADA','NO DESEA','NO CALIFICA','SIN COBERTURA',
   'CONTACTO CON TERCEROS','EDIFICIO NO LIBERADO','DESEA MOVIL','SERVICIO ACTIVO',
-  'NO ROTAR','SIN TIPIFICAR',
+  'NO ROTAR','VENTA CAIDA','SIN TIPIFICAR',
 ];
 
 // GET /api/leads/marketing-resumen

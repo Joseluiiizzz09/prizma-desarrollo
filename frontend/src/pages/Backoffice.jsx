@@ -124,11 +124,11 @@ function claseTipifBack(valor) {
   return `bo-sel-compact tipif-back-color tipif-back-${clave || 'VACIA'}`
 }
 const TIPIF_VEND_OPCIONES = ['VENTA CERRADA','PREVENTA','AGENDADO','EN EJECUCION','INSTALADO','NO CONTESTA','BUZON DE VOZ','CORTA LLAMADA','NO DESEA','NO CALIFICA','SIN COBERTURA','CONTACTO CON TERCEROS','EDIFICIO NO LIBERADO','DESEA MOVIL','SERVICIO ACTIVO','NO ROTAR']
-const TIPIF_FILTRO_OPCIONES = [...TIPIF_VEND_OPCIONES, 'INSTALADO', 'VENTA CAIDA']
+const TIPIF_FILTRO_OPCIONES = [...TIPIF_VEND_OPCIONES, 'INSTALADO', 'VENTA CAIDA', 'EJECUTADA']
 // Para rotación sólo existen tres cierres definitivos. Cualquier otra
 // tipificación vigente puede volver a trabajarse después de 2 horas.
 const TIPIF_PROHIBIDAS_ROTACION = new Set(['VENTA CERRADA','NO TOCAR','SH NO TOCAR','NO ROTAR','SH NO ROTAR'])
-const TIPIF_EXCLUIDAS_ROTACION  = new Set(['VENTA CERRADA','NO TOCAR','SH NO TOCAR','NO ROTAR','SH NO ROTAR','INSTALADO'])
+const TIPIF_EXCLUIDAS_ROTACION  = new Set(['VENTA CERRADA','NO TOCAR','SH NO TOCAR','NO ROTAR','SH NO ROTAR','INSTALADO','EJECUTADA'])
 const ESTADOS_AMARILLOS_VENTA = new Set(['RECHAZO_CAMPO','RECHAZADA','RECHAZADO','CORTA_LLAMADA','FRAUDE','NO_DESEA','NO_CONTESTA','BUZON_VOZ','SERVICIO_ACTIVO','MALA_OFERTA','CORREGIR'])
 const ESTADOS_AMARILLOS_GRAB  = new Set(['CORTA_LLAMADA','SUPLANTACION','NO_DESEA','NO_CONTESTA','BUZON','BUZON_VOZ'])
 const ESTADOS_AMARILLOS_SUPGRAB = new Set(['RECHAZADO','NO_CONFORME','OBSERVADO'])
@@ -209,7 +209,7 @@ function grupoPrioridadLead(reg) {
   const tipif = String(tipifEfectiva(reg) || '').trim().toUpperCase()
   if (tipif === 'VENTA CERRADA') return 2
   if (tipif === 'VENTA CAIDA') return 3
-  if (tipif === 'INSTALADO') return 4
+  if (tipif === 'INSTALADO' || tipif === 'EJECUTADA') return 4
   if (tipif === 'SIN COBERTURA') return 1
   return 0
 }
@@ -268,6 +268,12 @@ function tipifEfectiva(reg) {
   const hist = Array.isArray(reg?.historial) ? reg.historial : []
   if (String(reg?.tipifInterna || '').trim()) return String(reg.tipifInterna).trim()
   const eventos = hist.filter(h => h?.tipo === 'TIPIF_VEND' && h.ts != null)
+  // Un desenlace final confirmado por Seguimiento (EJECUTADA/instalado o
+  // CAIDA) es más autoritativo que el "venta completa" original de abajo —
+  // sin este check, esa venta se quedaría marcada VENTA CERRADA para
+  // siempre en Backoffice aunque Seguimiento ya supiera qué pasó después.
+  const eventoFinal = eventos.filter(h => h?.esFinal).sort((a, b) => b.ts - a.ts)[0]
+  if (eventoFinal) return normalizarTipifVend(eventoFinal.tipif)
   // Una venta realmente creada tiene prioridad definitiva. No basta con haber
   // pulsado la tipificación en el Dashboard: debe existir la venta en la API.
   if (Number(reg?.venta_confirmada) === 1 || eventos.some(h => h?.tipif === 'VENTA CERRADA' && h?.ventaCompleta)) {
@@ -296,14 +302,14 @@ const TIPIF_VEND_STYLES = {
   'NO DESEA':['#f8e9dc','#713707'],'CONTACTO CON TERCEROS':['#e1f4ed','#10684c'],'EDIFICIO NO LIBERADO':['#ffedd5','#9a3412'],
   'DESEA MOVIL':['#f8e9dc','#713707'],'SERVICIO ACTIVO':['#444444','#ffffff'],
   'NC':['#fefce8','#854d0e'],'DERIVADO':['#ede9fe','#5b21b6'],'NO TOCAR':['#fff7ed','#ea580c'],'FRAUDE':['#ffedd5','#9a3412'],
-  'INSTALADO':['#dcfce7','#14532d'],'NO ROTAR':['#ffedd5','#980000'],'SH NO ROTAR':['#ffedd5','#980000'],'SH NO TOCAR':['#ffedd5','#980000'],
+  'INSTALADO':['#dcfce7','#14532d'],'EJECUTADA':['#dcfce7','#14532d'],'NO ROTAR':['#ffedd5','#980000'],'SH NO ROTAR':['#ffedd5','#980000'],'SH NO TOCAR':['#ffedd5','#980000'],
 }
 const BL_TIPIF_COLORS = {
   'VENTA CERRADA':'#16a34a','PREVENTA':'#2563eb','AGENDADO':'#c2410c','NO CONTESTA':'#854d0e',
   'CORTA LLAMADA':'#c2410c','NO DESEA':'#92400e','BUZON DE VOZ':'#78350f','SERVICIO ACTIVO':'#4b5563',
   'SIN COBERTURA':'#c2410c','NO CALIFICA':'#9a3412','CONTACTO CON TERCEROS':'#047857','EDIFICIO NO LIBERADO':'#9a3412',
   'DESEA MOVIL':'#92400e','EN EJECUCION':'#4b5563','NO TOCAR':'#980000','FRAUDE':'#9a3412','INSTALADO':'#15803d',
-  'NO ROTAR':'#980000','SH NO ROTAR':'#980000','SH NO TOCAR':'#980000',
+  'NO ROTAR':'#980000','SH NO ROTAR':'#980000','SH NO TOCAR':'#980000','EJECUTADA':'#15803d',
 }
 
 // Colores fuertes/vistosos para el selector de Tipif. Vendedor (texto blanco encima)
@@ -2223,7 +2229,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
     no_tocar: registrosBusquedaGlobal.filter(r => ['NO TOCAR','SH NO TOCAR','NO ROTAR','SH NO ROTAR'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())),
     venta_cerrada: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'VENTA CERRADA'),
     venta_caida: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'VENTA CAIDA'),
-    instalado: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'INSTALADO'),
+    instalado: registrosBusquedaGlobal.filter(r => ['INSTALADO','EJECUTADA'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())),
   }
   const todosLosRegistrosBase = Object.values(baseData).flat()
   const campanasFiltroBase = [...new Set([
@@ -2363,7 +2369,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
 
   const statsBase = {
     total:      registrosBusquedaGlobal.length,
-    ventas:     registrosBusquedaGlobal.filter(r=>['VENTA CERRADA','INSTALADO'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())).length,
+    ventas:     registrosBusquedaGlobal.filter(r=>['VENTA CERRADA','INSTALADO','EJECUTADA'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())).length,
     asignados:  registrosBusquedaGlobal.filter(r=>r.asesor&&r.asesor!=='').length,
     sinAsignar: registrosBusquedaGlobal.filter(r=>r.sinAsignar).length,
     rotaciones: registrosBusquedaGlobal.reduce((s,r)=>s+r.rotaciones,0),
@@ -3110,7 +3116,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                     ['no_tocar','NO TOCAR',gruposProtegidos.no_tocar.length,'#9a3412'],
                     ['venta_cerrada','VENTA CERRADA',gruposProtegidos.venta_cerrada.length,'#16a34a'],
                     ['venta_caida','VENTA CAIDA',gruposProtegidos.venta_caida.length,'#a64d79'],
-                    ['instalado','INSTALADO',gruposProtegidos.instalado.length,'#0369a1'],
+                    ['instalado','INSTALADO / EJECUTADA',gruposProtegidos.instalado.length,'#0369a1'],
                   ].map(([id,label,total,color]) => (
                     <button key={id} type="button" onClick={()=>setGrupoProtegidoVisible(prev=>prev===id?'':id)}
                       style={{border:`1px solid ${color}`,color:grupoProtegidoVisible===id?'#fff':color,background:grupoProtegidoVisible===id?color:'#fff',borderRadius:8,padding:'7px 11px',fontSize:11,fontWeight:800,cursor:'pointer'}}>
