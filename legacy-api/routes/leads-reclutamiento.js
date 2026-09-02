@@ -298,7 +298,7 @@ router.post('/', auth(ROLES_BACK), async (req, res) => {
              obs_asesor, asesor_id, asesor_nombre, fecha, hora_asig, sin_asignar, historial, rotaciones, usuario_back_id)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         `, [
-          l.campana||'', l.departamento||'', l.provincia||'', l.distrito||'', n1Normalizado||null, l.n2||null, usuarioWhatsapp||null,
+          l.campana||'', l.departamento||'', l.provincia||'', l.distrito||'', n1Normalizado||'', l.n2||null, usuarioWhatsapp||null,
           l.tipif_back||null, l.tipif_vend||null, l.tipif_hora||null, l.obs_asesor||null,
           asesorId, asesorNombre, fechaLead, horaFinal, asesorId?0:1, historial, Math.max(0, parseInt(l.rotaciones, 10) || 0), req.user.id,
         ]);
@@ -419,7 +419,7 @@ router.patch('/:id/datos-back', auth(ROLES_BACK), async (req, res) => {
     if (!rows.length) return res.status(404).json({ ok: false, mensaje: 'Candidato no encontrado' });
     await db.query(`
       UPDATE leads_reclutamiento SET campana=?, n1=?, n2=?, usuario_whatsapp=? WHERE id=?
-    `, [req.body.campana||'', req.body.n1||null, req.body.n2||null, usuarioWhatsapp||null, req.params.id]);
+    `, [req.body.campana||'', n1Normalizado||'', req.body.n2||null, usuarioWhatsapp||null, req.params.id]);
     res.json({ ok: true, mensaje: 'Candidato actualizado' });
   } catch(e) {
     console.error(e);

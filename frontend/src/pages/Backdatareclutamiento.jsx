@@ -367,6 +367,13 @@ function BlBadge({ tipif }) {
   return <span style={{background:`${color}22`,color,border:`1px solid ${color}44`,padding:'2px 8px',borderRadius:99,fontSize:10,fontWeight:700}}>{raw}</span>
 }
 
+function claseCampana(campana) {
+  const clave = String(campana || '').trim().toUpperCase()
+  if (['R1', 'R2', 'R4', 'R6'].includes(clave)) return `campana-${clave.toLowerCase()}`
+  if (clave === 'REFERIDOS') return 'campana-referidos'
+  return 'campana-otra'
+}
+
 function BoNavIcon({ tipo }) {
   if (tipo === 'base') return (
     <svg className="bo-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5M9 21v-7h6v7"/></svg>
@@ -1020,7 +1027,8 @@ export default function Backdatareclutamiento() {
     setFechaPestanas(prev => prev.includes(fecha) ? prev : [...prev, fecha].sort().reverse())
     try {
       const res  = await fetch(`${API}/leads-reclutamiento`, { method:'POST', headers:ncHeaders(), body:JSON.stringify({ campana, departamento:'Lima', provincia:'Lima', distrito, n1, n2, usuario_whatsapp:usuarioWhatsapp, asesor_nombre:asesor, fecha, hora_asig:hora }) })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar el registro')
       const bid  = data.ids?.[0] || data.id
       if (bid) {
         setBaseData(prev => {
@@ -2168,9 +2176,9 @@ export default function Backdatareclutamiento() {
                 <span>Ver tipif. vendedor</span>
               </label>
               <button className="bo-btn-limpiar btn btn-sm base-filtro-limpiar" onClick={()=>{ setFiltros({tip:'',tipVend:[],asesor:[],campana:[],numero:'',verTipVend:true,global:false,duplicados:false,desde:'',hasta:''}); setBaseSort({col:null,dir:'asc'}) }}>Limpiar filtros</button>
-              <button className="btn-rotar-masivo" onClick={ordenarBaseDelDia} type="button" style={ordenDiarioActivo?{background:'#16a34a'}:undefined}>{ordenDiarioActivo?'✓ Orden diario activo':'Ordenar base del día'}</button>
+              <button className={`btn-rotar-masivo base-order-btn${ordenDiarioActivo?' activo':''}`} onClick={ordenarBaseDelDia} type="button">{ordenDiarioActivo?'✓ Orden diario activo':'Ordenar base del día'}</button>
               <button type="button" onClick={()=>setGrupoAceptaVisible(v=>!v)}
-                style={{border:'1px solid #16a34a',color:grupoAceptaVisible?'#fff':'#16a34a',background:grupoAceptaVisible?'#16a34a':'#fff',borderRadius:8,padding:'7px 11px',fontSize:11,fontWeight:800,cursor:'pointer'}}>
+                className={`base-acepta-btn${grupoAceptaVisible?' activo':''}`}>
                 {grupoAceptaVisible?'Ocultar':'Ver'} ACEPTA PROPUESTA ({grupoAceptaPropuesta.length})
               </button>
               {grupoAceptaVisible && <button type="button" onClick={()=>setGrupoAceptaVisible(false)} className="bo-btn-limpiar btn btn-sm">Volver a la base</button>}
@@ -2205,14 +2213,18 @@ export default function Backdatareclutamiento() {
                         return [
                           <tr key={r.id} id={`fila-${r.id}`}>
                             <td style={{color:'#9ca3af',fontSize:10}}>{i+1}</td>
-                            <td><strong>{r.campana}</strong></td>
+                            <td>
+                              <div className="campana-cell">
+                                <span className={`campana-badge ${claseCampana(r.campana)}`}>{r.campana}</span>
+                                <button type="button" className="campana-edit-btn" onClick={()=>abrirModalEditarContacto(r.id)} title="Editar campaña y contacto" aria-label={`Editar campaña y contacto de ${r.n1 || r.usuarioWhatsapp || 'este registro'}`}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                                </button>
+                              </div>
+                            </td>
                             <td>
                               <div className="numero-copiar">
                                 <span>{r.n1 ? r.n1 : (r.usuarioWhatsapp ? `@${r.usuarioWhatsapp}` : '—')}</span>
                                 {(r.n1 || r.usuarioWhatsapp) && <button type="button" onClick={()=>copiarNumero(r.n1 || r.usuarioWhatsapp)} title="Copiar" aria-label="Copiar"><CopyIcon /></button>}
-                                <button type="button" onClick={()=>abrirModalEditarContacto(r.id)} title="Editar contacto" aria-label="Editar contacto" style={{border:'none',background:'transparent',cursor:'pointer',color:'#9ca3af',padding:0,marginLeft:2,display:'inline-flex'}}>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-                                </button>
                               </div>
                             </td>
                             <td>{r.n2 ? <div className="numero-copiar secundario"><span>{r.n2}</span><button type="button" onClick={()=>copiarNumero(r.n2)} title="Copiar N2" aria-label={`Copiar ${r.n2}`}><CopyIcon /></button></div> : <span style={{color:'#ccc'}}>—</span>}</td>
@@ -2250,9 +2262,8 @@ export default function Backdatareclutamiento() {
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                                   {esExclusiva?'Prohibido':'Rotar'}
                                 </button>
-                                <button className="btn-hist" onClick={()=>setHistOpen(p=>({...p,[r.id]:!p[r.id]}))}>
-                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                  Historial
+                                <button type="button" className={`btn-hist btn-hist-icon${histOpen[r.id]?' activo':''}`} onClick={()=>setHistOpen(p=>({...p,[r.id]:!p[r.id]}))} title={histOpen[r.id]?'Cerrar historial':'Ver historial'} aria-label={`${histOpen[r.id]?'Cerrar':'Ver'} historial de ${r.n1 || r.usuarioWhatsapp || `registro ${i+1}`}`} aria-expanded={!!histOpen[r.id]} aria-controls={`historial-${r.id}`}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h6"/></svg>
                                 </button>
                                 <button className="btn-del" onClick={()=>eliminarReg(r.id)} title="Eliminar">
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -2260,7 +2271,7 @@ export default function Backdatareclutamiento() {
                               </div>
                             </td>
                           </tr>,
-                          <tr key={`hist-${r.id}`} className={`historial-row${histOpen[r.id]?' open':''}`}>
+                          <tr key={`hist-${r.id}`} id={`historial-${r.id}`} className={`historial-row${histOpen[r.id]?' open':''}`}>
                             <td colSpan={filtros.verTipVend?10:9}>
                               <div className="historial-inner">
                                 <div className="hist-label">Historial de asignaciones — N1: {r.n1}</div>
