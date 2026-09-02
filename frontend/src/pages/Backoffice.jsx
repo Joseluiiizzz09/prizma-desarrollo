@@ -2361,15 +2361,12 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
 
   useEffect(() => { setBasePage(1) }, [fechaActiva, filtros.tipBack1, filtros.tipBack2, filtros.tipVend, filtros.asesor, filtros.campana, filtros.sala, filtros.numero, filtros.desde, filtros.hasta, filtros.global, filtros.duplicados, tableSort.col, tableSort.dir, basePageSize, grupoProtegidoVisible, ordenDiarioActivo])
 
-  // VENTA CAIDA no participa del conteo del KPI, igual que ya no aparece en
-  // la base operativa principal.
-  const registrosParaConteo = registrosBusquedaGlobal.filter(r => !['VENTA CAIDA','INSTALADO'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase()))
   const statsBase = {
-    total:      registrosParaConteo.length,
-    ventas:     registrosParaConteo.filter(r=>(r.tipifBack||'').toUpperCase().includes('VENTA')).length,
-    asignados:  registrosParaConteo.filter(r=>r.asesor&&r.asesor!=='').length,
-    sinAsignar: registrosParaConteo.filter(r=>r.sinAsignar).length,
-    rotaciones: registrosParaConteo.reduce((s,r)=>s+r.rotaciones,0),
+    total:      registrosBusquedaGlobal.length,
+    ventas:     registrosBusquedaGlobal.filter(r=>['VENTA CERRADA','INSTALADO'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())).length,
+    asignados:  registrosBusquedaGlobal.filter(r=>r.asesor&&r.asesor!=='').length,
+    sinAsignar: registrosBusquedaGlobal.filter(r=>r.sinAsignar).length,
+    rotaciones: registrosBusquedaGlobal.reduce((s,r)=>s+r.rotaciones,0),
   }
 
   const rendData = useMemo(() => {
