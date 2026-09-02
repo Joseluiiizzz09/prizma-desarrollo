@@ -7,6 +7,12 @@ function formatFechaDDMMYYYY(f) {
   return `${p[2]}/${p[1]}/${p[0]}`
 }
 
+// "Hoy" debe ser el dia calendario de Lima, no el del reloj/zona horaria
+// del dispositivo que abre el reporte — si no, el boton puede seleccionar
+// un dia distinto al que muestra la pestana "Base" de Backdatareclutamiento.
+const PERU_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', { timeZone:'America/Lima', year:'numeric', month:'2-digit', day:'2-digit' })
+function fechaHoyLima() { return PERU_DATE_FORMATTER.format(new Date()) }
+
 // Selector de rango de fechas en un solo control — un calendario donde se
 // elige inicio y fin (primer clic = desde, segundo clic = hasta), en vez de
 // dos campos separados.
@@ -82,7 +88,7 @@ export default function RangoFechasPicker({ desde, hasta, onChange }) {
           </div>
           <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
             <button type="button" onClick={()=>{onChange({desde:'',hasta:''}); setOpen(false)}} style={{fontSize:11,color:'#6b7280',border:'none',background:'none',cursor:'pointer'}}>Limpiar</button>
-            <button type="button" onClick={()=>{const d=new Date(); const hoy = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; onChange({desde:hoy,hasta:hoy}); setOpen(false)}} style={{fontSize:11,color:'#dc2626',border:'none',background:'none',cursor:'pointer',fontWeight:700}}>Hoy</button>
+            <button type="button" onClick={()=>{const hoy = fechaHoyLima(); onChange({desde:hoy,hasta:hoy}); setOpen(false)}} style={{fontSize:11,color:'#dc2626',border:'none',background:'none',cursor:'pointer',fontWeight:700}}>Hoy</button>
           </div>
         </div>, document.body)}
     </>
