@@ -2182,8 +2182,12 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
   }
 
   // ── Computed values ───────────────────────────────────────────────────────
-  const registrosActivos = baseData[fechaActiva] || []
-  const ocurrenciaDiariaPorId = (() => {
+  // Memoizadas: baseData puede acumular meses de leads (sobre todo con
+  // "Buscar global"), y sin useMemo todo esto se recalculaba en cada render
+  // -- incluyendo cada tecla escrita en el buscador de numero -- haciendo
+  // que la pantalla se sintiera lenta.
+  const registrosActivos = useMemo(() => baseData[fechaActiva] || [], [baseData, fechaActiva])
+  const ocurrenciaDiariaPorId = useMemo(() => {
     const conteoPorNumero = new Map()
     const ocurrencias = new Map()
     // La API entrega los registros mas recientes primero. Se recorre al reves
@@ -2196,8 +2200,8 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
       ocurrencias.set(registrosActivos[i].id, ocurrencia)
     }
     return ocurrencias
-  })()
-  const idsReingresados = (() => {
+  }, [registrosActivos])
+  const idsReingresados = useMemo(() => {
     const vistos = new Set()
     const reingresados = new Set()
     Object.keys(baseData).sort().forEach(fecha => {
@@ -2209,33 +2213,34 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
       })
     })
     return reingresados
-  })()
+  }, [baseData])
 
   // Todo número resaltado por duplicidad o por encontrarse en el flujo de ventas
   // queda protegido automáticamente. Se conserva su historial y solo cambia la
   // tipificación vigente a NO ROTAR.
-  const registrosBusquedaGlobal = filtros.global
+  const registrosBusquedaGlobal = useMemo(() => filtros.global
     ? Object.entries(baseData)
         .filter(([fecha]) => (!filtros.desde || fecha >= filtros.desde) && (!filtros.hasta || fecha <= filtros.hasta))
         .flatMap(([fecha, regs]) => (regs || []).map(r => ({ ...r, _fechaBase:fecha })))
-    : registrosActivos.map(r => ({ ...r, _fechaBase:fechaActiva }))
-  const conteoDuplicadosAlcance = registrosBusquedaGlobal.reduce((conteo, reg) => {
+    : registrosActivos.map(r => ({ ...r, _fechaBase:fechaActiva })),
+  [filtros.global, filtros.desde, filtros.hasta, baseData, registrosActivos, fechaActiva])
+  const conteoDuplicadosAlcance = useMemo(() => registrosBusquedaGlobal.reduce((conteo, reg) => {
     const numero = normalizarNumero(reg.n1)
     if (numero) conteo.set(numero, (conteo.get(numero) || 0) + 1)
     return conteo
-  }, new Map())
-  const gruposProtegidos = {
+  }, new Map()), [registrosBusquedaGlobal])
+  const gruposProtegidos = useMemo(() => ({
     sin_cobertura: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'SIN COBERTURA'),
     no_tocar: registrosBusquedaGlobal.filter(r => ['NO TOCAR','SH NO TOCAR','NO ROTAR','SH NO ROTAR'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())),
     venta_cerrada: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'VENTA CERRADA'),
     venta_caida: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'VENTA CAIDA'),
     instalado: registrosBusquedaGlobal.filter(r => ['INSTALADO','EJECUTADA'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())),
-  }
-  const todosLosRegistrosBase = Object.values(baseData).flat()
-  const campanasFiltroBase = [...new Set([
+  }), [registrosBusquedaGlobal])
+  const todosLosRegistrosBase = useMemo(() => Object.values(baseData).flat(), [baseData])
+  const campanasFiltroBase = useMemo(() => [...new Set([
     ...CAMPANAS,
     ...todosLosRegistrosBase.map(r=>String(r.campana||'').trim()).filter(Boolean),
-  ])].sort((a,b)=>a.localeCompare(b,'es'))
+  ])].sort((a,b)=>a.localeCompare(b,'es')), [todosLosRegistrosBase])
   const salaDeRegistro = reg => {
     const asesorNorm = String(reg?.asesor || '').trim().toUpperCase()
     if (!asesorNorm) return 'SIN ASIGNAR'
@@ -2261,10 +2266,10 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
       }
     }
   }
-  const registrosOperativos = registrosBusquedaGlobal.filter(r =>
+  const registrosOperativos = useMemo(() => registrosBusquedaGlobal.filter(r =>
     grupoPrioridadLead(r) === 0 &&
     !['NO TOCAR','SH NO TOCAR','NO ROTAR','SH NO ROTAR'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())
-  )
+  ), [registrosBusquedaGlobal])
   const n1FormularioNormalizado = normalizarNumero(form.n1)
   const altasPreviasN1 = n1FormularioNormalizado
     ? Object.entries(baseData)
