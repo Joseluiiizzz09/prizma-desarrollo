@@ -302,19 +302,19 @@ const TIPIF_VEND_STYLES = {
   'NO DESEA':['#f8e9dc','#713707'],'CONTACTO CON TERCEROS':['#e1f4ed','#10684c'],'EDIFICIO NO LIBERADO':['#ffedd5','#9a3412'],
   'DESEA MOVIL':['#f8e9dc','#713707'],'SERVICIO ACTIVO':['#444444','#ffffff'],
   'NC':['#fefce8','#854d0e'],'DERIVADO':['#ede9fe','#5b21b6'],'NO TOCAR':['#fff7ed','#ea580c'],'FRAUDE':['#ffedd5','#9a3412'],
-  'INSTALADO':['#dcfce7','#14532d'],'EJECUTADA':['#dcfce7','#14532d'],'NO ROTAR':['#ffedd5','#980000'],'SH NO ROTAR':['#ffedd5','#980000'],'SH NO TOCAR':['#ffedd5','#980000'],
+  'INSTALADO':['#e0f2fe','#0369a1'],'EJECUTADA':['#e0f2fe','#0369a1'],'NO ROTAR':['#ffedd5','#980000'],'SH NO ROTAR':['#ffedd5','#980000'],'SH NO TOCAR':['#ffedd5','#980000'],
 }
 const BL_TIPIF_COLORS = {
   'VENTA CERRADA':'#16a34a','PREVENTA':'#2563eb','AGENDADO':'#c2410c','NO CONTESTA':'#854d0e',
   'CORTA LLAMADA':'#c2410c','NO DESEA':'#92400e','BUZON DE VOZ':'#78350f','SERVICIO ACTIVO':'#4b5563',
   'SIN COBERTURA':'#c2410c','NO CALIFICA':'#9a3412','CONTACTO CON TERCEROS':'#047857','EDIFICIO NO LIBERADO':'#9a3412',
-  'DESEA MOVIL':'#92400e','EN EJECUCION':'#4b5563','NO TOCAR':'#980000','FRAUDE':'#9a3412','INSTALADO':'#15803d',
-  'NO ROTAR':'#980000','SH NO ROTAR':'#980000','SH NO TOCAR':'#980000','EJECUTADA':'#15803d',
+  'DESEA MOVIL':'#92400e','EN EJECUCION':'#4b5563','NO TOCAR':'#980000','FRAUDE':'#9a3412','INSTALADO':'#0369a1',
+  'NO ROTAR':'#980000','SH NO ROTAR':'#980000','SH NO TOCAR':'#980000','EJECUTADA':'#0369a1',
 }
 
 // Colores fuertes/vistosos para el selector de Tipif. Vendedor (texto blanco encima)
 const TIPIF_VEND_FUERTE = {
-  'VENTA CERRADA':['#dcfce7','#166534','#86efac'], 'INSTALADO':['#dcfce7','#14532d','#86efac'],
+  'VENTA CERRADA':['#dcfce7','#166534','#86efac'], 'INSTALADO':['#e0f2fe','#0369a1','#7dd3fc'], 'EJECUTADA':['#e0f2fe','#0369a1','#7dd3fc'],
   'CONTACTO CON TERCEROS':['#d1fae5','#065f46','#6ee7b7'], 'SERVICIO ACTIVO':['#e5e7eb','#374151','#9ca3af'], 'PREVENTA':['#dbeafe','#1d4ed8','#93c5fd'],
   'CORTA LLAMADA':['#ffedd5','#c2410c','#fdba74'], 'AGENDADO':['#ffedd5','#c2410c','#fdba74'], 'BUZON DE VOZ':['#f3e8d4','#78350f','#d6a96c'],
   'NO DESEA':['#fef3c7','#92400e','#fbbf24'], 'NO CONTESTA':['#fef9c3','#854d0e','#fde047'], 'NC':['#fef9c3','#854d0e','#fde047'],
@@ -3116,7 +3116,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                     ['no_tocar','NO TOCAR',gruposProtegidos.no_tocar.length,'#9a3412'],
                     ['venta_cerrada','VENTA CERRADA',gruposProtegidos.venta_cerrada.length,'#16a34a'],
                     ['venta_caida','VENTA CAIDA',gruposProtegidos.venta_caida.length,'#a64d79'],
-                    ['instalado','INSTALADO / EJECUTADA',gruposProtegidos.instalado.length,'#0369a1'],
+                    ['instalado','EJECUTADA',gruposProtegidos.instalado.length,'#0369a1'],
                   ].map(([id,label,total,color]) => (
                     <button key={id} type="button" onClick={()=>setGrupoProtegidoVisible(prev=>prev===id?'':id)}
                       style={{border:`1px solid ${color}`,color:grupoProtegidoVisible===id?'#fff':color,background:grupoProtegidoVisible===id?color:'#fff',borderRadius:8,padding:'7px 11px',fontSize:11,fontWeight:800,cursor:'pointer'}}>
