@@ -2910,6 +2910,12 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                                   ? <span className="tipif-interna-badge" style={estiloInterno} title={tooltipTipificacionInterna(r)}>{r.tipifInterna}</span>
                                   : esSinCoberturaFija
                                   ? <span className="tipif-interna-badge" style={estiloInterno} title="SIN COBERTURA — se mantiene fija hasta que exista una venta real">SIN COBERTURA</span>
+                                  // EJECUTADA/VENTA CAIDA los pone Seguimiento, no el asesor -- por
+                                  // eso no estan en TIPIF_VEND_OPCIONES. Un <select> sin <option> que
+                                  // calce con el valor actual se ve en blanco/"Pendiente" aunque el
+                                  // dato sea correcto, asi que se muestran como insignia fija.
+                                  : ['EJECUTADA','VENTA CAIDA'].includes(tipifEfectiva(r))
+                                  ? <span className="tipif-interna-badge" style={estiloTipifVend(tipifEfectiva(r))} title="Desenlace final confirmado por Seguimiento">{tipifEfectiva(r)}</span>
                                   : <select className="bo-sel-compact sel-tipif-vend" value={tipifEfectiva(r)} onChange={e=>guardarTipif(r.id,e.target.value)}
                                       style={estiloTipifVend(tipifEfectiva(r))}>
                                       <option value="" style={{background:'#fff',color:'#111827',fontWeight:400}}>— Pendiente —</option>
