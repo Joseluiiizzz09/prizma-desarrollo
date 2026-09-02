@@ -2214,12 +2214,7 @@ export default function Backdatareclutamiento() {
                           <tr key={r.id} id={`fila-${r.id}`}>
                             <td style={{color:'#9ca3af',fontSize:10}}>{i+1}</td>
                             <td>
-                              <div className="campana-cell">
-                                <span className={`campana-badge ${claseCampana(r.campana)}`}>{r.campana}</span>
-                                <button type="button" className="campana-edit-btn" onClick={()=>abrirModalEditarContacto(r.id)} title="Editar campaña y contacto" aria-label={`Editar campaña y contacto de ${r.n1 || r.usuarioWhatsapp || 'este registro'}`}>
-                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-                                </button>
-                              </div>
+                              <span className={`campana-badge ${claseCampana(r.campana)}`}>{r.campana}</span>
                             </td>
                             <td>
                               <div className="numero-copiar">
@@ -2257,10 +2252,12 @@ export default function Backdatareclutamiento() {
                                 : <span style={{color:'#d1d5db',fontSize:11}}>0</span>}
                             </td>
                             <td>
-                              <div className="acciones-cell">
-                                <button className="btn-rotar" disabled={esExclusiva} title={esExclusiva?`Número prohibido: ${r._tipifVend}`:'Rotar'} onClick={()=>abrirModalRotar(r.id)}>
+                              <div className="acciones-cell acc-cell-compact">
+                                <button type="button" className="campana-edit-btn" onClick={()=>abrirModalEditarContacto(r.id)} title="Editar campaña y contacto" aria-label={`Editar campaña y contacto de ${r.n1 || r.usuarioWhatsapp || 'este registro'}`}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                                </button>
+                                <button className="btn-rotar btn-rotar-icon" disabled={esExclusiva} title={esExclusiva?`Número prohibido: ${r._tipifVend}`:'Rotar'} onClick={()=>abrirModalRotar(r.id)}>
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                                  {esExclusiva?'Prohibido':'Rotar'}
                                 </button>
                                 <button type="button" className={`btn-hist btn-hist-icon${histOpen[r.id]?' activo':''}`} onClick={()=>setHistOpen(p=>({...p,[r.id]:!p[r.id]}))} title={histOpen[r.id]?'Cerrar historial':'Ver historial'} aria-label={`${histOpen[r.id]?'Cerrar':'Ver'} historial de ${r.n1 || r.usuarioWhatsapp || `registro ${i+1}`}`} aria-expanded={!!histOpen[r.id]} aria-controls={`historial-${r.id}`}>
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h6"/></svg>
