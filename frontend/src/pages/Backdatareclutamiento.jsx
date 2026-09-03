@@ -333,7 +333,7 @@ function estiloTipifEntrevista(v) {
 const TIPIF_DIA_CAPACITACION_OPCIONES = ['DESISTE','ASISTE','FALTA']
 
 // Mismas salas ya usadas en Jefatura.
-const SALAS_CAPACITACION = ['SALA 1','SALA 2','SALA 3','SALA 4','SALA CHANCAY','SALA 5','SALA 6']
+const SALAS_CAPACITACION = ['SALA 1','SALA 2']
 
 // Etiquetas legibles para el historial/trazabilidad de Capacitación.
 const CAMPOS_CAPACITACION_LABELS = {
