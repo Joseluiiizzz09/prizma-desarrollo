@@ -264,16 +264,6 @@ function tipifPrevioHistorial(historial) {
 }
 // Tipificación efectiva a mostrar en la base principal: la del asesor actual si ya
 // tipificó; de lo contrario, la que dejó el asesor anterior (derivada del historial).
-// Si alguna vez se creo una venta real para este lead, eso no deja de ser
-// cierto cuando Seguimiento marca despues EJECUTADA o CAIDA -- por eso el
-// conteo de "Ventas"/"Ver VENTA CERRADA" usa este flag permanente en vez de
-// tipifEfectiva() (que muestra el desenlace mas reciente): un lead que llego
-// a ejecutarse debe seguir contando como venta cerrada, no desaparecer de
-// ahi para aparecer solo en "Ver EJECUTADA".
-function fueVentaReal(reg) {
-  const hist = Array.isArray(reg?.historial) ? reg.historial : []
-  return Number(reg?.venta_confirmada) === 1 || hist.some(h => h?.tipo === 'TIPIF_VEND' && h?.tipif === 'VENTA CERRADA' && h?.ventaCompleta)
-}
 function tipifEfectiva(reg) {
   const hist = Array.isArray(reg?.historial) ? reg.historial : []
   if (String(reg?.tipifInterna || '').trim()) return String(reg.tipifInterna).trim()
@@ -2242,7 +2232,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
   const gruposProtegidos = useMemo(() => ({
     sin_cobertura: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'SIN COBERTURA'),
     no_tocar: registrosBusquedaGlobal.filter(r => ['NO TOCAR','SH NO TOCAR','NO ROTAR','SH NO ROTAR'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())),
-    venta_cerrada: registrosBusquedaGlobal.filter(fueVentaReal),
+    venta_cerrada: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'VENTA CERRADA'),
     venta_caida: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'VENTA CAIDA'),
     // Un solo boton para ambos: INSTALADO (texto suelto historico) y
     // EJECUTADA (lo que sincroniza Seguimiento contra una venta real) se
@@ -2387,7 +2377,7 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
 
   const statsBase = {
     total:      registrosBusquedaGlobal.length,
-    ventas:     registrosBusquedaGlobal.filter(fueVentaReal).length,
+    ventas:     registrosBusquedaGlobal.filter(r=>['VENTA CERRADA','EJECUTADA'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())).length,
     asignados:  registrosBusquedaGlobal.filter(r=>r.asesor&&r.asesor!=='').length,
     sinAsignar: registrosBusquedaGlobal.filter(r=>r.sinAsignar).length,
     rotaciones: registrosBusquedaGlobal.reduce((s,r)=>s+r.rotaciones,0),
