@@ -102,10 +102,9 @@ export default function MarketingDashboard() {
 
   useEffect(() => { cargarMarketing(); cargarMarketingRecl() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Una venta cerrada, en cualquiera de sus 3 estados posteriores, sigue
-  // siendo una venta: VENTA CERRADA (recien cerrada), INSTALADO (se completo)
-  // o VENTA CAIDA (se cayo despues) — las 3 cuentan para el total de ventas.
-  const TIPIF_CONJUNTO_VENTA = new Set(['VENTA CERRADA','VENTA CAIDA','INSTALADO','EJECUTADA'])
+  // La métrica comercial de ventas conserva el origen de cada cierre aunque
+  // luego haya pasado a caída o ejecución.
+  const TIPIF_CONJUNTO_VENTA = new Set(['VENTA CERRADA','VENTA CAIDA','EJECUTADA'])
   const resumenMarketing = useMemo(() => {
     const porCampana = new Map()
     let total = 0, sinTipificar = 0
