@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import JefaturaViewControls from '../components/JefaturaViewControls'
@@ -112,15 +113,33 @@ function Paginacion({ total, pagina, porPagina, onChange }) {
 
 function FiltroEstadoMultiple({ opciones, seleccionados, onChange }) {
   const [abierto, setAbierto] = useState(false)
-  const boxRef = useRef(null)
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 240 })
+  const btnRef = useRef(null)
+  const panelRef = useRef(null)
 
   useEffect(() => {
     function onClickFuera(e) {
-      if (boxRef.current && !boxRef.current.contains(e.target)) setAbierto(false)
+      if (
+        panelRef.current && !panelRef.current.contains(e.target) &&
+        btnRef.current && !btnRef.current.contains(e.target)
+      ) setAbierto(false)
     }
     document.addEventListener('mousedown', onClickFuera)
     return () => document.removeEventListener('mousedown', onClickFuera)
   }, [])
+
+  // El panel se renderiza en un portal (document.body) en vez de inline: la
+  // tabla de abajo tiene su propio encabezado fijo con contexto de
+  // apilamiento propio, asi que ningun z-index del panel logra superarlo
+  // mientras siga dentro de ese arbol -- por eso se sacaba a la mitad,
+  // detras del encabezado "ACCIÓN".
+  function abrirOCerrar() {
+    if (!abierto && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.left, width: Math.max(240, r.width) })
+    }
+    setAbierto(o => !o)
+  }
 
   const todos = seleccionados.length === 0
   function toggleUno(id) {
@@ -134,13 +153,13 @@ function FiltroEstadoMultiple({ opciones, seleccionados, onChange }) {
       : `${seleccionados.length} estados seleccionados`
 
   return (
-    <div ref={boxRef} style={{ position: 'relative' }}>
-      <button type="button" className="filtro-estado-btn" onClick={() => setAbierto(o => !o)}>
+    <div style={{ position: 'relative' }}>
+      <button ref={btnRef} type="button" className="filtro-estado-btn" onClick={abrirOCerrar}>
         <span>{label}</span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 6, opacity: .6, flexShrink: 0 }}><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      {abierto && (
-        <div className="filtro-estado-panel">
+      {abierto && createPortal(
+        <div ref={panelRef} className="filtro-estado-panel" style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}>
           <label className="filtro-estado-item filtro-estado-todos">
             <input type="checkbox" checked={todos} onChange={() => onChange([])} />
             <span>Todos los estados</span>
@@ -152,7 +171,7 @@ function FiltroEstadoMultiple({ opciones, seleccionados, onChange }) {
               <span>{o.label}</span>
             </label>
           ))}
-        </div>
+        </div>, document.body
       )}
     </div>
   )

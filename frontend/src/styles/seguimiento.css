@@ -243,10 +243,10 @@ body{
 }
 .filtro-estado-btn:hover{border-color:var(--brand);}
 .filtro-estado-panel{
-  position:absolute;top:calc(100% + 4px);left:0;width:240px;max-height:280px;
+  max-height:280px;
   overflow-y:auto;overflow-x:hidden;box-sizing:border-box;
   background:var(--surf-0);border:1px solid var(--line);border-radius:9px;
-  box-shadow:var(--sh);padding:6px;z-index:200;
+  box-shadow:var(--sh);padding:6px;z-index:1000;
 }
 .filtro-estado-item{
   display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;
