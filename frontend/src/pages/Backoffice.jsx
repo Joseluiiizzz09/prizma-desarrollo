@@ -2244,13 +2244,10 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
     no_tocar: registrosBusquedaGlobal.filter(r => ['NO TOCAR','SH NO TOCAR','NO ROTAR','SH NO ROTAR'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())),
     venta_cerrada: registrosBusquedaGlobal.filter(fueVentaReal),
     venta_caida: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'VENTA CAIDA'),
-    // INSTALADO es texto suelto que puede venir de importaciones de otro
-    // sistema, sin ninguna venta real detras que lo respalde. EJECUTADA solo
-    // lo pone la sincronizacion con Seguimiento (ver PATCH /ventas/:id),
-    // validado contra una venta real -- por eso van en botones separados y
-    // no se mezclan en el mismo conteo.
-    instalado: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'INSTALADO'),
-    ejecutada: registrosBusquedaGlobal.filter(r => String(tipifEfectiva(r)||'').trim().toUpperCase() === 'EJECUTADA'),
+    // Un solo boton para ambos: INSTALADO (texto suelto historico) y
+    // EJECUTADA (lo que sincroniza Seguimiento contra una venta real) se
+    // muestran juntos bajo "EJECUTADA".
+    ejecutada: registrosBusquedaGlobal.filter(r => ['INSTALADO','EJECUTADA'].includes(String(tipifEfectiva(r)||'').trim().toUpperCase())),
   }), [registrosBusquedaGlobal])
   const todosLosRegistrosBase = useMemo(() => Object.values(baseData).flat(), [baseData])
   const campanasFiltroBase = useMemo(() => [...new Set([
@@ -3143,7 +3140,6 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                     ['no_tocar','NO TOCAR',gruposProtegidos.no_tocar.length,'#9a3412'],
                     ['venta_cerrada','VENTA CERRADA',gruposProtegidos.venta_cerrada.length,'#16a34a'],
                     ['venta_caida','VENTA CAIDA',gruposProtegidos.venta_caida.length,'#a64d79'],
-                    ['instalado','INSTALADO',gruposProtegidos.instalado.length,'#6b7280'],
                     ['ejecutada','EJECUTADA',gruposProtegidos.ejecutada.length,'#0369a1'],
                   ].map(([id,label,total,color]) => (
                     <button key={id} type="button" onClick={()=>setGrupoProtegidoVisible(prev=>prev===id?'':id)}
