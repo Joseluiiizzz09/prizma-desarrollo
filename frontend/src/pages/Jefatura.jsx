@@ -311,6 +311,24 @@ function soloFecha(v) {
   return String(v || '').split(' ')[0].split('T')[0]
 }
 
+// Opciones de mes para un <select>, limitadas a los meses con datos reales en `lista`.
+function mesesDisponibles(lista, getFecha) {
+  const mes = mesActual()
+  const meses = new Set()
+  lista.forEach(item => {
+    const f = soloFecha(getFecha(item))
+    if (f) meses.add(f.slice(0, 7))
+  })
+  meses.delete(mes)
+  const arr = [{ value: '', label: 'Mes actual' }]
+  ;[...meses].sort((a, b) => b.localeCompare(a)).forEach(m => {
+    const [y, mo] = m.split('-')
+    const label = new Date(Number(y), Number(mo) - 1, 1).toLocaleString('es-PE', { month: 'long', year: 'numeric' })
+    arr.push({ value: m, label })
+  })
+  return arr
+}
+
 function snapshotEliminado(item) {
   if (!item?.snapshot_json) return null
   if (typeof item.snapshot_json === 'object') return item.snapshot_json
@@ -456,8 +474,8 @@ export default function Jefatura() {
   const [fsSala,      setFsSala]      = useState('')
   const [fsDistrito,  setFsDistrito]  = useState('')
   const [fsPlan,      setFsPlan]      = useState('')
-  const [fsDesde,     setFsDesde]     = useState('')
-  const [fsHasta,     setFsHasta]     = useState('')
+  const [fsFecha,     setFsFecha]     = useState('')
+  const [mesSeg,      setMesSeg]      = useState('')
   const [fsBusqueda,  setFsBusqueda]  = useState('')
 
   /* logs */
@@ -823,20 +841,19 @@ export default function Jefatura() {
       (SEG_ORD[a[0]] ?? 99) - (SEG_ORD[b[0]] ?? 99) || a[1].localeCompare(b[1]))
   }, [ventasSeg])
 
+  const ventasSegMes = useMemo(() => {
+    const mesUsar = mesSeg || mesActual()
+    return ventasSeg.filter(v => soloFecha(v._fecha).startsWith(mesUsar))
+  }, [ventasSeg, mesSeg])
+
   const ventasSegFiltradas = useMemo(() => {
-    let lista = filtroSeg ? ventasSeg.filter(v=>v._seg===filtroSeg) : [...ventasSeg]
+    let lista = filtroSeg ? ventasSegMes.filter(v=>v._seg===filtroSeg) : [...ventasSegMes]
     if (fsAsesor)   lista = lista.filter(v => String(v.asesor_nombre || v.vendedor || '').toLowerCase().includes(fsAsesor.trim().toLowerCase()))
     if (fsSala)     lista = lista.filter(v => String(v.sala || '').toLowerCase().includes(fsSala.trim().toLowerCase()))
     if (fsDistrito) lista = lista.filter(v => String(v.distrito || '').toLowerCase().includes(fsDistrito.trim().toLowerCase()))
     if (fsPlan)     lista = lista.filter(v => String(v.paquete || '').toLowerCase().includes(fsPlan.trim().toLowerCase()))
-    if (fsDesde || fsHasta) {
-      lista = lista.filter(v => {
-        const f = soloFecha(v._fecha)
-        if (!f) return false
-        if (fsDesde && f < fsDesde) return false
-        if (fsHasta && f > fsHasta) return false
-        return true
-      })
+    if (fsFecha) {
+      lista = lista.filter(v => soloFecha(v._fecha) === fsFecha)
     }
     const b = fsBusqueda.trim().toLowerCase()
     if (b) {
@@ -844,12 +861,12 @@ export default function Jefatura() {
         .some(x => String(x || '').toLowerCase().includes(b)))
     }
     return lista.sort((a,b) => (SEG_ORD[a._seg]??5) - (SEG_ORD[b._seg]??5))
-  }, [ventasSeg, filtroSeg, fsAsesor, fsSala, fsDistrito, fsPlan, fsDesde, fsHasta, fsBusqueda])
+  }, [ventasSegMes, filtroSeg, fsAsesor, fsSala, fsDistrito, fsPlan, fsFecha, fsBusqueda])
 
   function limpiarFiltrosSeg() {
     setFiltroSeg(''); try { sessionStorage.setItem(JEF_SEG_FILTRO_KEY, '') } catch {}
     setFsAsesor(''); setFsSala(''); setFsDistrito(''); setFsPlan('')
-    setFsDesde(''); setFsHasta(''); setFsBusqueda('')
+    setFsFecha(''); setFsBusqueda('')
   }
 
   function exportarSeguimientoExcel() {
@@ -874,12 +891,12 @@ export default function Jefatura() {
   }
 
   const kpisSeg = useMemo(() => ({
-    ejecucion: ventasSeg.filter(v=>v._seg==='en_progreso').length,
-    instalado: ventasSeg.filter(v=>v._seg==='programada'||v._seg==='ejecutada').length,
-    rechazo:   ventasSeg.filter(v=>v._seg==='rechazo'||v._seg==='rechazo_mesa').length,
-    caida:     ventasSeg.filter(v=>v._seg==='caida').length,
-    tecnico:   ventasSeg.filter(v=>v._seg==='tecnico').length,
-  }), [ventasSeg])
+    ejecucion: ventasSegMes.filter(v=>v._seg==='en_progreso').length,
+    instalado: ventasSegMes.filter(v=>v._seg==='programada'||v._seg==='ejecutada').length,
+    rechazo:   ventasSegMes.filter(v=>v._seg==='rechazo'||v._seg==='rechazo_mesa').length,
+    caida:     ventasSegMes.filter(v=>v._seg==='caida').length,
+    tecnico:   ventasSegMes.filter(v=>v._seg==='tecnico').length,
+  }), [ventasSegMes])
 
   /* ── flujo general de ventas ── */
   const ventasFlujoMes = useMemo(() => {
@@ -1125,23 +1142,9 @@ export default function Jefatura() {
     try { localStorage.removeItem('jef_logs') } catch {}
   }
 
-  /* ── meses para select: solo los meses con ventas reales ── */
-  const MESES_SALAS = useMemo(() => {
-    const mes = mesActual()
-    const meses = new Set()
-    ventasCache.forEach(v => {
-      const f = soloFecha(v._fecha || v.fecha_ingreso || v.fecha || v.created_at)
-      if (f) meses.add(f.slice(0,7))
-    })
-    meses.delete(mes)
-    const arr = [{ value:'', label:'Mes actual' }]
-    ;[...meses].sort((a,b)=>b.localeCompare(a)).forEach(m => {
-      const [y, mo] = m.split('-')
-      const label = new Date(Number(y), Number(mo)-1, 1).toLocaleString('es-PE',{month:'long',year:'numeric'})
-      arr.push({ value:m, label })
-    })
-    return arr
-  }, [ventasCache])
+  /* ── meses para select: solo los meses con datos reales ── */
+  const MESES_SALAS = useMemo(() => mesesDisponibles(ventasCache, v => v._fecha || v.fecha_ingreso || v.fecha || v.created_at), [ventasCache])
+  const MESES_SEG   = useMemo(() => mesesDisponibles(ventasSeg,   v => v._fecha || v.fecha_ingreso || v.fecha || v.created_at), [ventasSeg])
 
   function salir() { logout(); navigate('/login') }
 
@@ -1292,7 +1295,13 @@ export default function Jefatura() {
           <section className={`section${seccion==='seguimiento'?' active':''}`}>
             <div className="sec-header">
               <div><h2>Seguimiento en campo</h2><p>Estado actual de todas las ventas — se actualiza automáticamente</p></div>
-              <button className="btn-nuevo" style={{background:'#ea580c'}} onClick={cargarSeguimiento}>↻ Actualizar</button>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <select value={mesSeg} onChange={e=>setMesSeg(e.target.value)}
+                  style={{padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:'7px',fontSize:'12px',fontFamily:'inherit',outline:'none',color:'#374151',cursor:'pointer'}}>
+                  {MESES_SEG.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+                <button className="btn-nuevo" style={{background:'#ea580c'}} onClick={cargarSeguimiento}>↻ Actualizar</button>
+              </div>
             </div>
             <div className="kpi-grid seguimiento-kpi-grid">
               <div className="kpi-card k-teal">  <div className="kpi-num">{kpisSeg.ejecucion}</div><div className="kpi-label">En ejecución</div></div>
@@ -1322,8 +1331,7 @@ export default function Jefatura() {
                 <label><span>Sala</span><input value={fsSala} onChange={e=>setFsSala(e.target.value)} placeholder="Escribir sala..."/></label>
                 <label><span>Distrito</span><input value={fsDistrito} onChange={e=>setFsDistrito(e.target.value)} placeholder="Escribir distrito..."/></label>
                 <label><span>Plan</span><input value={fsPlan} onChange={e=>setFsPlan(e.target.value)} placeholder="Escribir plan..."/></label>
-                <label><span>Fecha desde</span><input type="date" value={fsDesde} onChange={e=>setFsDesde(e.target.value)}/></label>
-                <label><span>Fecha hasta</span><input type="date" value={fsHasta} onChange={e=>setFsHasta(e.target.value)}/></label>
+                <label><span>Fecha del día</span><input type="date" value={fsFecha} onChange={e=>setFsFecha(e.target.value)}/></label>
                 <label className="filtro-busqueda"><span>Búsqueda general</span><input value={fsBusqueda} onChange={e=>setFsBusqueda(e.target.value)} placeholder="Cliente, DNI, asesor, distrito, sala, plan"/></label>
                 <button type="button" className="flujo-clear filtro-limpiar" onClick={limpiarFiltrosSeg}>Limpiar</button>
               </div>
