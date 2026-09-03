@@ -289,7 +289,10 @@ export default function Supervisor() {
 
   const ventasTabla = useMemo(() => {
     let vv = [...todasVentas]
-    if (filtroAsesor) vv = vv.filter(v=>v.asesor===filtroAsesor)
+    if (filtroAsesor) {
+      const busquedaAsesor = filtroAsesor.trim().toLocaleLowerCase('es')
+      vv = vv.filter(v=>String(v.asesor||'').toLocaleLowerCase('es').includes(busquedaAsesor))
+    }
     if (filtroEstado) vv = vv.filter(v=>v._estado===filtroEstado)
     const fechaSegunTipo = v => filtroTipoFecha === 'programacion'
       ? soloFecha(v.fecha_programada)
@@ -302,7 +305,7 @@ export default function Supervisor() {
       vv = vv.filter(v=>v._fecha&&v._fecha.startsWith(mesActual()))
     if (tablaSearch) {
       const q = tablaSearch.toLowerCase()
-      vv = vv.filter(v=>v.n1?.includes(tablaSearch)||(v.asesor||'').toLowerCase().includes(q)||(v.nombre||'').toLowerCase().includes(q)||(v.dni||'').includes(tablaSearch))
+      vv = vv.filter(v=>v.n1?.includes(tablaSearch)||(v.nombre||'').toLowerCase().includes(q)||(v.dni||'').includes(tablaSearch))
     }
     return vv.sort((a,b)=>(fechaSegunTipo(b)+b._hora).localeCompare(fechaSegunTipo(a)+a._hora))
   }, [todasVentas, filtroAsesor, filtroEstado, filtroDesde, filtroHasta, filtroTipoFecha, tablaSearch])
@@ -716,10 +719,7 @@ export default function Supervisor() {
             <div className="filtros-panel">
               <div className="filtros-row">
                 <div className="filtro-group"><label>Asesor</label>
-                  <select className="filtro-select" value={filtroAsesor} onChange={e=>setFiltroAsesor(e.target.value)}>
-                    <option value="">Todos</option>
-                    {asesoresSala.map(a=><option key={a.id} value={a.nombre}>{a.nombre}</option>)}
-                  </select>
+                  <input type="search" className="filtro-input" value={filtroAsesor} onChange={e=>setFiltroAsesor(e.target.value)} placeholder="Escribir asesor..." autoComplete="off" />
                 </div>
                 <div className="filtro-group"><label>Estado de venta</label>
                   <select className="filtro-select" value={filtroEstado} onChange={e=>setFiltroEstado(e.target.value)}>
@@ -738,7 +738,7 @@ export default function Supervisor() {
               <div className="tabla-header">
                 <span className="tabla-title">Lista de ventas</span>
                 <span className="tabla-count">{ventasTabla.length} registros</span>
-                <input type="text" className="tabla-search" value={tablaSearch} onChange={e=>setTablaSearch(e.target.value)} placeholder="Buscar por N1, asesor..." />
+                <input type="text" className="tabla-search" value={tablaSearch} onChange={e=>setTablaSearch(e.target.value)} placeholder="Buscar por N1, cliente o DNI..." />
               </div>
               <div className="tabla-scroll tabla-scroll-ventas">
               <table className="tabla" style={{minWidth:2380}}>
