@@ -266,14 +266,16 @@ function tipifPrevioHistorial(historial) {
 // tipificó; de lo contrario, la que dejó el asesor anterior (derivada del historial).
 function tipifEfectiva(reg) {
   const hist = Array.isArray(reg?.historial) ? reg.historial : []
-  if (String(reg?.tipifInterna || '').trim()) return String(reg.tipifInterna).trim()
   const eventos = hist.filter(h => h?.tipo === 'TIPIF_VEND' && h.ts != null)
   // Un desenlace final confirmado por Seguimiento (EJECUTADA/instalado o
-  // CAIDA) es más autoritativo que el "venta completa" original de abajo —
-  // sin este check, esa venta se quedaría marcada VENTA CERRADA para
-  // siempre en Backoffice aunque Seguimiento ya supiera qué pasó después.
+  // CAIDA) es mas autoritativo que tipifInterna (una foto fija que puso
+  // Grabacion/Calidad al momento de grabar, que ya no se vuelve a tocar) y
+  // que el "venta completa" original de abajo -- sin este check primero,
+  // esa venta se quedaria mostrando lo que dijo Grabacion para siempre en
+  // Backoffice aunque Seguimiento ya supiera que paso despues.
   const eventoFinal = eventos.filter(h => h?.esFinal).sort((a, b) => b.ts - a.ts)[0]
   if (eventoFinal) return normalizarTipifVend(eventoFinal.tipif)
+  if (String(reg?.tipifInterna || '').trim()) return String(reg.tipifInterna).trim()
   // Una venta realmente creada tiene prioridad definitiva. No basta con haber
   // pulsado la tipificación en el Dashboard: debe existir la venta en la API.
   if (Number(reg?.venta_confirmada) === 1 || eventos.some(h => h?.tipif === 'VENTA CERRADA' && h?.ventaCompleta)) {
@@ -2909,16 +2911,17 @@ const cargarLeads = useCallback(async (todasLasFechas = false, fechaSolicitada =
                             {/* Tipif. Vendedor */}
                             <td>
                               <div style={{display:'flex',alignItems:'center',gap:2}}>
-                                {r.tipifInterna
+                                {/* EJECUTADA/VENTA CAIDA (desenlace final de Seguimiento) se revisa
+                                    antes que tipifInterna -- tipifInterna es una foto fija que puso
+                                    Grabacion/Calidad al grabar y ya no se vuelve a tocar, asi que si
+                                    se revisara primero, un lead grabado como VENTA CERRADA se quedaria
+                                    mostrando eso para siempre aunque Seguimiento ya lo haya ejecutado. */}
+                                {['EJECUTADA','VENTA CAIDA'].includes(tipifEfectiva(r))
+                                  ? <span className="tipif-interna-badge" style={estiloTipifVend(tipifEfectiva(r))} title="Desenlace final confirmado por Seguimiento">{tipifEfectiva(r)}</span>
+                                  : r.tipifInterna
                                   ? <span className="tipif-interna-badge" style={estiloInterno} title={tooltipTipificacionInterna(r)}>{r.tipifInterna}</span>
                                   : esSinCoberturaFija
                                   ? <span className="tipif-interna-badge" style={estiloInterno} title="SIN COBERTURA — se mantiene fija hasta que exista una venta real">SIN COBERTURA</span>
-                                  // EJECUTADA/VENTA CAIDA los pone Seguimiento, no el asesor -- por
-                                  // eso no estan en TIPIF_VEND_OPCIONES. Un <select> sin <option> que
-                                  // calce con el valor actual se ve en blanco/"Pendiente" aunque el
-                                  // dato sea correcto, asi que se muestran como insignia fija.
-                                  : ['EJECUTADA','VENTA CAIDA'].includes(tipifEfectiva(r))
-                                  ? <span className="tipif-interna-badge" style={estiloTipifVend(tipifEfectiva(r))} title="Desenlace final confirmado por Seguimiento">{tipifEfectiva(r)}</span>
                                   : <select className="bo-sel-compact sel-tipif-vend" value={tipifEfectiva(r)} onChange={e=>guardarTipif(r.id,e.target.value)}
                                       style={estiloTipifVend(tipifEfectiva(r))}>
                                       <option value="" style={{background:'#fff',color:'#111827',fontWeight:400}}>— Pendiente —</option>
