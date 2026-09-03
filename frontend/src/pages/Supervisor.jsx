@@ -5,8 +5,8 @@ import JefaturaViewControls from '../components/JefaturaViewControls'
 import { ReasignarVentaModal } from '../components/VentaAssignmentModal'
 import { VentaEditarModal } from '../components/VentaEditarModal'
 import ObsSeguimientoCell from '../components/ObsSeguimientoCell'
-import ProgramacionInfoCell from '../components/ProgramacionInfoCell'
 import CambiarAreaMenu from '../components/CambiarAreaMenu'
+import RangoFechasPicker from '../components/RangoFechasPicker'
 import { API, ncHeaders } from '../services/api'
 import { responseChanged, setVisibleInterval, clearVisibleInterval } from '../utils/polling'
 import { usuarioTieneCargo } from '../utils/roles'
@@ -93,6 +93,7 @@ function mesActual() { return fechaHoy().slice(0,7) }
 function getMesLabel(o=0) { const d=new Date(); d.setMonth(d.getMonth()-o); return d.toLocaleString('es-PE',{month:'long',year:'numeric'}) }
 function getMesClave(o=0) { const d=new Date(); d.setMonth(d.getMonth()-o); return d.toISOString().slice(0,7) }
 function formatF(f) { if(!f)return'—'; const p=f.split('-'); return `${p[2]}/${p[1]}/${p[0]}` }
+function soloFecha(f) { return String(f || '').slice(0, 10) }
 function etiquetaFlujo(valor, fallback='PENDIENTE') {
   const texto = String(valor || '').trim()
   return (texto || fallback).replace(/_/g,' ').toUpperCase()
@@ -211,7 +212,9 @@ export default function Supervisor() {
   // â”€â”€ Filtros ventas â”€â”€
   const [filtroAsesor,  setFiltroAsesor]  = useState('')
   const [filtroEstado,  setFiltroEstado]  = useState('')
-  const [filtroFecha,   setFiltroFecha]   = useState('')
+  const [filtroDesde,   setFiltroDesde]   = useState('')
+  const [filtroHasta,   setFiltroHasta]   = useState('')
+  const [filtroTipoFecha, setFiltroTipoFecha] = useState('ingreso')
   const [tablaSearch,   setTablaSearch]   = useState('')
   const [ventasPagina,  setVentasPagina]  = useState(1)
   const ventasPorPagina = 15
@@ -288,29 +291,32 @@ export default function Supervisor() {
     let vv = [...todasVentas]
     if (filtroAsesor) vv = vv.filter(v=>v.asesor===filtroAsesor)
     if (filtroEstado) vv = vv.filter(v=>v._estado===filtroEstado)
-    if (filtroFecha) vv = vv.filter(v=>v._fecha===filtroFecha)
-    if (!filtroFecha&&!filtroAsesor&&!filtroEstado&&!tablaSearch)
+    const fechaSegunTipo = v => filtroTipoFecha === 'programacion'
+      ? soloFecha(v.fecha_programada)
+      : filtroTipoFecha === 'instalacion' ? soloFecha(v.fecha_instalado) : v._fecha
+    if (filtroDesde || filtroHasta) vv = vv.filter(v=>{
+      const fecha = fechaSegunTipo(v)
+      return fecha && (!filtroDesde || fecha >= filtroDesde) && (!filtroHasta || fecha <= filtroHasta)
+    })
+    if (!filtroDesde&&!filtroHasta&&!filtroAsesor&&!filtroEstado&&!tablaSearch)
       vv = vv.filter(v=>v._fecha&&v._fecha.startsWith(mesActual()))
     if (tablaSearch) {
       const q = tablaSearch.toLowerCase()
       vv = vv.filter(v=>v.n1?.includes(tablaSearch)||(v.asesor||'').toLowerCase().includes(q)||(v.nombre||'').toLowerCase().includes(q)||(v.dni||'').includes(tablaSearch))
     }
-    return vv.sort((a,b)=>(b._fecha+b._hora).localeCompare(a._fecha+a._hora))
-  }, [todasVentas, filtroAsesor, filtroEstado, filtroFecha, tablaSearch])
+    return vv.sort((a,b)=>(fechaSegunTipo(b)+b._hora).localeCompare(fechaSegunTipo(a)+a._hora))
+  }, [todasVentas, filtroAsesor, filtroEstado, filtroDesde, filtroHasta, filtroTipoFecha, tablaSearch])
 
   // Sigue la fecha elegida en la tabla; sin fecha seleccionada representa hoy.
   // `cargarDatos` se ejecuta cada segundo, por lo que el valor se actualiza en
   // tiempo real cuando otro usuario registra una venta.
-  const fechaContadorVentas = filtroFecha || fechaHoy()
-  const ventasFechaSala = useMemo(
-    () => todasVentas.filter(v => v._fecha === fechaContadorVentas).length,
-    [todasVentas, fechaContadorVentas]
-  )
+  const hayRangoVentas = Boolean(filtroDesde || filtroHasta)
+  const ventasFechaSala = hayRangoVentas ? ventasTabla.length : todasVentas.filter(v => v._fecha === fechaHoy()).length
 
   const ventasTotalPaginas = Math.max(1, Math.ceil(ventasTabla.length / ventasPorPagina))
   const ventasPaginaSegura = Math.min(ventasPagina, ventasTotalPaginas)
   const ventasPaginaData = ventasTabla.slice((ventasPaginaSegura-1)*ventasPorPagina, ventasPaginaSegura*ventasPorPagina)
-  useEffect(() => { setVentasPagina(1) }, [filtroAsesor, filtroEstado, filtroFecha, tablaSearch])
+  useEffect(() => { setVentasPagina(1) }, [filtroAsesor, filtroEstado, filtroDesde, filtroHasta, filtroTipoFecha, tablaSearch])
 
   const dashRendData = useMemo(() =>
     asesoresSala.map(a => {
@@ -669,8 +675,8 @@ export default function Supervisor() {
             <div className="sec-header">
               <div><h2>Ventas de mi Sala</h2><p>Mes actual por defecto ? usa filtros para ver otros periodos</p></div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <div aria-label={`${ventasFechaSala} ventas registradas el ${formatF(fechaContadorVentas)}`} style={{display:'flex',alignItems:'center',gap:10,background:'#fff',border:'1px solid #fed7aa',borderRadius:12,padding:'8px 14px',boxShadow:'0 4px 14px rgba(234,88,12,.08)'}}>
-                  <span style={{fontSize:11,fontWeight:800,color:'#9a3412',textTransform:'uppercase',letterSpacing:.5}}>{filtroFecha ? `Ventas del ${formatF(filtroFecha)}` : 'Ventas de hoy'}</span>
+                <div aria-label={`${ventasFechaSala} ventas`} style={{display:'flex',alignItems:'center',gap:10,background:'#fff',border:'1px solid #fed7aa',borderRadius:12,padding:'8px 14px',boxShadow:'0 4px 14px rgba(234,88,12,.08)'}}>
+                  <span style={{fontSize:11,fontWeight:800,color:'#9a3412',textTransform:'uppercase',letterSpacing:.5}}>{hayRangoVentas ? 'Registros filtrados' : 'Ventas de hoy'}</span>
                   <strong style={{minWidth:30,textAlign:'center',fontSize:18,lineHeight:1,color:'#fff',background:'#ea580c',borderRadius:9,padding:'7px 9px'}}>{ventasFechaSala}</strong>
                 </div>
               </div>
@@ -721,8 +727,9 @@ export default function Supervisor() {
                     {ESTADOS_VENTA.map(e=><option key={e.id} value={e.id}>{e.label}</option>)}
                   </select>
                 </div>
-                <div className="filtro-group"><label>Fecha</label><input type="date" className="filtro-input" value={filtroFecha} onChange={e=>setFiltroFecha(e.target.value)} /></div>
-                <div className="filtros-acciones"><button className="btn-limpiar" onClick={()=>{ setFiltroAsesor(''); setFiltroEstado(''); setFiltroFecha(''); setTablaSearch('') }}>Limpiar</button></div>
+                <div className="filtro-group supervisor-rango-fechas"><label>Rango de fechas</label><RangoFechasPicker desde={filtroDesde} hasta={filtroHasta} onChange={({desde,hasta})=>{setFiltroDesde(desde);setFiltroHasta(hasta)}} /></div>
+                <div className="filtro-group"><label>Filtrar fecha por</label><select className="filtro-select" value={filtroTipoFecha} onChange={e=>setFiltroTipoFecha(e.target.value)}><option value="ingreso">Ingreso</option><option value="programacion">Programación</option><option value="instalacion">Instalación</option></select></div>
+                <div className="filtros-acciones"><button className="btn-limpiar" onClick={()=>{ setFiltroAsesor(''); setFiltroEstado(''); setFiltroDesde(''); setFiltroHasta(''); setFiltroTipoFecha('ingreso'); setTablaSearch('') }}>Limpiar</button></div>
               </div>
             </div>
 
@@ -734,11 +741,11 @@ export default function Supervisor() {
                 <input type="text" className="tabla-search" value={tablaSearch} onChange={e=>setTablaSearch(e.target.value)} placeholder="Buscar por N1, asesor..." />
               </div>
               <div className="tabla-scroll tabla-scroll-ventas">
-              <table className="tabla" style={{minWidth:2250}}>
-                <thead><tr><th>#</th><th>Estado actual</th><th>Validación</th><th>Grabación</th><th>Programación</th><th>Obs. Seguimiento</th><th>Obs. Validación</th><th>Fecha Programada</th><th>Fecha</th><th>Nombre</th><th>DNI</th><th>N1</th><th>N2</th><th>Depto.</th><th>Distrito</th><th>Paquete</th><th>Asesor</th><th>Hora</th><th>Obs.</th><th>Acción</th></tr></thead>
+              <table className="tabla" style={{minWidth:2380}}>
+                <thead><tr><th>#</th><th>Estado actual</th><th>Validación</th><th>Grabación</th><th>Programación</th><th>Obs. Seguimiento</th><th>Obs. Validación</th><th>Fecha de ingreso</th><th>Fecha de programación</th><th>Fecha de instalación</th><th>Nombre</th><th>DNI</th><th>N1</th><th>N2</th><th>Depto.</th><th>Distrito</th><th>Paquete</th><th>Asesor</th><th>Hora</th><th>Obs.</th><th>Acción</th></tr></thead>
                 <tbody>
                   {ventasTabla.length === 0
-                    ? <tr className="tabla-empty"><td colSpan={20}>Sin ventas con esos filtros.</td></tr>
+                    ? <tr className="tabla-empty"><td colSpan={21}>Sin ventas con esos filtros.</td></tr>
                     : ventasPaginaData.map((v,i)=>(
                         <tr key={v.id}>
                           <td style={{color:'#9ca3af',fontSize:10}}>{(ventasPaginaSegura-1)*ventasPorPagina+i+1}</td>
@@ -759,8 +766,9 @@ export default function Supervisor() {
                             style={{fontSize:11,maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:getObsValidacion(v.obs_validacion)==='—'?'default':'pointer',color:getObsValidacion(v.obs_validacion)==='—'?'#9ca3af':'#374151'}}
                             title={getObsValidacion(v.obs_validacion)==='—'?'':'Presiona para ver el mensaje completo'}
                           >{getObsValidacion(v.obs_validacion)}</td>
-                          <td><ProgramacionInfoCell fecha={(v.estado_supgrab||'').toLowerCase()==='conforme' ? v.fecha_programada : ''} soloFecha /></td>
                           <td style={{fontWeight:700,color:'#185FA5',fontSize:11}}>{formatF(v._fecha)}</td>
+                          <td style={{fontWeight:700,color:'#7c3aed',fontSize:11}}>{formatF(soloFecha(v.fecha_programada))}</td>
+                          <td style={{fontWeight:700,color:'#15803d',fontSize:11}}>{formatF(soloFecha(v.fecha_instalado))}</td>
                           <td style={{fontWeight:600,minWidth:140}}>{v.nombre||'—'}</td>
                           <td style={{fontFamily:'monospace',fontSize:11}}>{v.dni||'—'}</td>
                           <td style={{fontFamily:'monospace',fontWeight:700,color:'#111827'}}>{v.n1||'—'}</td>
