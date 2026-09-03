@@ -77,13 +77,15 @@ export default function MarketingDashboard() {
   const [marketingData, setMarketingData] = useState([])
   const [marketingCatalogos, setMarketingCatalogos] = useState({ campanas:[], tipificaciones:[] })
   const [marketingCarga, setMarketingCarga] = useState({ cargando:false, error:'' })
-  // Gasto de publicidad por campaña (solo pestaña Ventas)
+  // Gasto de publicidad por campaña (compartido entre Ventas y Reclutamiento vía `area`)
   const [marketingCostos, setMarketingCostos] = useState([])
+  const [marketingCostosRecl, setMarketingCostosRecl] = useState([])
   const [costoEditando, setCostoEditando] = useState('')
   const [entradaEditando, setEntradaEditando] = useState(null)
   const [costoForm, setCostoForm] = useState({ fecha:fechaHoy(), monto:'', notas:'' })
   const [guardandoCosto, setGuardandoCosto] = useState(false)
   const costosRequestRef = useRef(0)
+  const costosReclRequestRef = useRef(0)
   // Mismo dashboard, pero para las campañas de Reclutamiento (leads_reclutamiento)
   const [marketingReclFiltros, setMarketingReclFiltros] = useState({ desde:fechaHoy(), hasta:fechaHoy(), campana:'', tipificacion:'' })
   const [marketingReclData, setMarketingReclData] = useState([])
@@ -143,6 +145,7 @@ export default function MarketingDashboard() {
       if (filtros.desde) qs.set('desde', filtros.desde)
       if (filtros.hasta) qs.set('hasta', filtros.hasta)
       if (filtros.campana) qs.set('campana', filtros.campana)
+      qs.set('area', 'ventas')
       const res = await fetch(`${API}/marketing-costos?${qs}`, { headers:ncHeaders() })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo cargar el gasto de campañas')
@@ -154,9 +157,29 @@ export default function MarketingDashboard() {
     }
   }, [])
 
+  const cargarCostosRecl = useCallback(async (filtros) => {
+    const requestId = ++costosReclRequestRef.current
+    try {
+      const qs = new URLSearchParams()
+      if (filtros.desde) qs.set('desde', filtros.desde)
+      if (filtros.hasta) qs.set('hasta', filtros.hasta)
+      if (filtros.campana) qs.set('campana', filtros.campana)
+      qs.set('area', 'reclutamiento')
+      const res = await fetch(`${API}/marketing-costos?${qs}`, { headers:ncHeaders() })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo cargar el gasto de campañas')
+      if (requestId !== costosReclRequestRef.current) return
+      setMarketingCostosRecl(Array.isArray(data.data) ? data.data : [])
+    } catch {
+      if (requestId !== costosReclRequestRef.current) return
+      setMarketingCostosRecl([])
+    }
+  }, [])
+
   useEffect(() => { cargarMarketing(marketingFiltros) }, [marketingFiltros, cargarMarketing])
   useEffect(() => { cargarMarketingRecl(marketingReclFiltros) }, [marketingReclFiltros, cargarMarketingRecl])
   useEffect(() => { cargarCostos(marketingFiltros) }, [marketingFiltros, cargarCostos])
+  useEffect(() => { cargarCostosRecl(marketingReclFiltros) }, [marketingReclFiltros, cargarCostosRecl])
 
   // La métrica comercial de ventas conserva el origen de cada cierre aunque
   // luego haya pasado a caída o ejecución.
@@ -226,7 +249,7 @@ export default function MarketingDashboard() {
     setCostoForm({ fecha:String(entrada.fecha).slice(0,10), monto:String(entrada.monto), notas:entrada.notas || '' })
   }
 
-  async function guardarCosto(campana) {
+  async function guardarCosto(campana, area) {
     if (!costoForm.fecha || !costoForm.monto) return
     setGuardandoCosto(true)
     try {
@@ -234,13 +257,14 @@ export default function MarketingDashboard() {
       const res = await fetch(url, {
         method: entradaEditando ? 'PUT' : 'POST',
         headers:{...ncHeaders(),'Content-Type':'application/json'},
-        body: JSON.stringify({ campana, fecha:costoForm.fecha, monto:costoForm.monto, notas:costoForm.notas }),
+        body: JSON.stringify({ campana, area, fecha:costoForm.fecha, monto:costoForm.monto, notas:costoForm.notas }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo guardar el gasto')
       setCostoForm({ fecha:fechaHoy(), monto:'', notas:'' })
       setEntradaEditando(null)
-      cargarCostos(marketingFiltros)
+      if (area === 'reclutamiento') cargarCostosRecl(marketingReclFiltros)
+      else cargarCostos(marketingFiltros)
     } catch (error) {
       setMarketingCarga(p => ({ ...p, error: error.message || 'Error de conexión' }))
     } finally {
@@ -248,14 +272,15 @@ export default function MarketingDashboard() {
     }
   }
 
-  async function eliminarCosto(entrada) {
+  async function eliminarCosto(entrada, area) {
     if (!window.confirm(`¿Eliminar el gasto de ${formatoSoles(entrada.monto)} del ${entrada.fecha}?`)) return
     try {
       const res = await fetch(`${API}/marketing-costos/${entrada.id}`, { method:'DELETE', headers:ncHeaders() })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo eliminar el gasto')
       if (entradaEditando === entrada.id) { setEntradaEditando(null); setCostoForm({ fecha:fechaHoy(), monto:'', notas:'' }) }
-      cargarCostos(marketingFiltros)
+      if (area === 'reclutamiento') cargarCostosRecl(marketingReclFiltros)
+      else cargarCostos(marketingFiltros)
     } catch (error) {
       setMarketingCarga(p => ({ ...p, error: error.message || 'Error de conexión' }))
     }
@@ -290,6 +315,31 @@ export default function MarketingDashboard() {
       : (b.total-a.total || a.campana.localeCompare(b.campana,'es')))
     return { total, sinTipificar, tipificados:total-sinTipificar, campanas, max:Math.max(1,...campanas.map(c=>c.total)), maxVentas:Math.max(1,...campanas.map(c=>c.ventas)) }
   }, [marketingReclData, ordenCampanas])
+
+  const resumenCostosRecl = useMemo(() => {
+    const gastoPorCampana = new Map()
+    let gastoTotal = 0
+    marketingCostosRecl.forEach(c => {
+      const monto = Number(c.monto || 0)
+      gastoTotal += monto
+      gastoPorCampana.set(c.campana, (gastoPorCampana.get(c.campana) || 0) + monto)
+    })
+    const nombres = new Set([...resumenMarketingRecl.campanas.map(c=>c.campana), ...gastoPorCampana.keys()])
+    const filas = [...nombres].map(campana => {
+      const base = resumenMarketingRecl.campanas.find(c=>c.campana===campana) || { campana, total:0, ventas:0 }
+      const gasto = gastoPorCampana.get(campana) || 0
+      return {
+        campana,
+        leads: base.total,
+        ventas: base.ventas,
+        gasto,
+        costoPorLead: base.total ? gasto/base.total : 0,
+        costoPorVenta: base.ventas ? gasto/base.ventas : 0,
+      }
+    }).sort((a,b) => b.gasto-a.gasto || b.leads-a.leads || a.campana.localeCompare(b.campana,'es'))
+    const ventasTotal = resumenMarketingRecl.campanas.reduce((s,c)=>s+c.ventas, 0)
+    return { filas, gastoTotal, costoPorVenta: ventasTotal ? gastoTotal/ventasTotal : 0 }
+  }, [marketingCostosRecl, resumenMarketingRecl])
 
   function exportarMarketingReclExcel() {
     descargarExcel(marketingReclData, [
@@ -418,7 +468,7 @@ export default function MarketingDashboard() {
                                   <span>Notas (opcional)</span>
                                   <input value={costoForm.notas} onChange={e=>setCostoForm(p=>({...p,notas:e.target.value}))} />
                                 </label>
-                                <button type="button" className="btn-nuevo" disabled={guardandoCosto || !costoForm.fecha || !costoForm.monto} onClick={()=>guardarCosto(c.campana)}>
+                                <button type="button" className="btn-nuevo" disabled={guardandoCosto || !costoForm.fecha || !costoForm.monto} onClick={()=>guardarCosto(c.campana,'ventas')}>
                                   {guardandoCosto ? 'Guardando…' : entradaEditando ? 'Actualizar' : 'Guardar'}
                                 </button>
                                 {entradaEditando && <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{ setEntradaEditando(null); setCostoForm({fecha:fechaHoy(),monto:'',notas:''}) }}>Cancelar edición</button>}
@@ -436,7 +486,7 @@ export default function MarketingDashboard() {
                                         <td>
                                           <div style={{display:'flex',gap:6}}>
                                             <button type="button" className="venta-action-btn" onClick={()=>editarEntradaCosto(en)}>Editar</button>
-                                            <button type="button" className="venta-action-btn delete" onClick={()=>eliminarCosto(en)}>Eliminar</button>
+                                            <button type="button" className="venta-action-btn delete" onClick={()=>eliminarCosto(en,'ventas')}>Eliminar</button>
                                           </div>
                                         </td>
                                       </tr>
@@ -474,6 +524,8 @@ export default function MarketingDashboard() {
         <div className="kpi-card k-purple"><div className="kpi-num">{resumenMarketingRecl.campanas.length}</div><div className="kpi-label">Campañas</div><div className="kpi-sub">con registros</div></div>
         <div className="kpi-card k-green"><div className="kpi-num">{resumenMarketingRecl.tipificados}</div><div className="kpi-label">Tipificados</div><div className="kpi-sub">con resultado</div></div>
         <div className="kpi-card k-yellow"><div className="kpi-num">{resumenMarketingRecl.sinTipificar}</div><div className="kpi-label">Sin tipificar</div><div className="kpi-sub">pendientes</div></div>
+        <div className="kpi-card k-orange"><div className="kpi-num">{formatoSoles(resumenCostosRecl.gastoTotal)}</div><div className="kpi-label">Gasto total</div><div className="kpi-sub">publicidad, según filtros</div></div>
+        <div className="kpi-card k-red"><div className="kpi-num">{formatoSoles(resumenCostosRecl.costoPorVenta)}</div><div className="kpi-label">Costo por venta</div><div className="kpi-sub">promedio del período</div></div>
       </div>
 
       <div className="marketing-grid">
@@ -503,12 +555,81 @@ export default function MarketingDashboard() {
         </div>
 
         <div className="tabla-wrap marketing-tabla-card">
-          <div className="tabla-header"><span className="tabla-title">Detalle para Reclutamiento</span><span className="tabla-count">{marketingReclData.length} grupos</span></div>
+          <div className="tabla-header"><span className="tabla-title">Costos por campaña</span><span className="tabla-count">{resumenCostosRecl.filas.length} campañas</span></div>
           <div style={{overflowX:'auto'}}><table className="tabla marketing-tabla">
-            <thead><tr><th>Campaña</th><th>Tipificación</th><th>Leads</th><th>Primera alta</th><th>Última alta</th></tr></thead>
-            <tbody>{marketingReclData.length===0
-              ? <tr><td colSpan="5" className="tabla-empty">{marketingReclCarga.cargando?'Cargando información…':'Sin resultados.'}</td></tr>
-              : marketingReclData.map((f,i)=><tr key={`${f.campana}-${f.tipificacion}-${i}`}><td><strong>{f.campana}</strong></td><td><span className="marketing-tipif">{labelTipifVendRecl(f.tipificacion)}</span></td><td><strong>{f.cantidad}</strong></td><td>{f.primera_alta?new Date(f.primera_alta).toLocaleString('es-PE',{timeZone:'America/Lima'}):'—'}</td><td>{f.ultima_alta?new Date(f.ultima_alta).toLocaleString('es-PE',{timeZone:'America/Lima'}):'—'}</td></tr>)}</tbody>
+            <thead><tr><th>Campaña</th><th>Leads</th><th>Ventas</th><th>Gasto</th><th>Costo por lead</th><th>Costo por venta</th><th>Acciones</th></tr></thead>
+            <tbody>
+              {resumenCostosRecl.filas.length===0
+                ? <tr><td colSpan="7" className="tabla-empty">Sin campañas para los filtros seleccionados.</td></tr>
+                : resumenCostosRecl.filas.map(c => {
+                  const entradas = marketingCostosRecl.filter(e => e.campana === c.campana)
+                  return (
+                    <Fragment key={c.campana}>
+                      <tr>
+                        <td><strong>{c.campana}</strong></td>
+                        <td>{c.leads}</td>
+                        <td>{c.ventas}</td>
+                        <td>{formatoSoles(c.gasto)}</td>
+                        <td>{formatoSoles(c.costoPorLead)}</td>
+                        <td>{formatoSoles(c.costoPorVenta)}</td>
+                        <td>
+                          <div style={{display:'flex',gap:6}}>
+                            <IconEditar activo={costoEditando===c.campana} onClick={()=>abrirPanelCosto(c.campana)} />
+                            <IconDocumento onClick={()=>abrirPanelCosto(c.campana)} />
+                          </div>
+                        </td>
+                      </tr>
+                      {costoEditando === c.campana && (
+                        <tr>
+                          <td colSpan="7">
+                            <div style={{padding:'8px 0'}}>
+                              <div className="filtros-grid">
+                                <label>
+                                  <span>Fecha</span>
+                                  <input type="date" value={costoForm.fecha} onChange={e=>setCostoForm(p=>({...p,fecha:e.target.value}))} />
+                                </label>
+                                <label>
+                                  <span>Monto (S/)</span>
+                                  <input type="number" min="0" step="0.01" value={costoForm.monto} onChange={e=>setCostoForm(p=>({...p,monto:e.target.value}))} />
+                                </label>
+                                <label className="filtro-busqueda">
+                                  <span>Notas (opcional)</span>
+                                  <input value={costoForm.notas} onChange={e=>setCostoForm(p=>({...p,notas:e.target.value}))} />
+                                </label>
+                                <button type="button" className="btn-nuevo" disabled={guardandoCosto || !costoForm.fecha || !costoForm.monto} onClick={()=>guardarCosto(c.campana,'reclutamiento')}>
+                                  {guardandoCosto ? 'Guardando…' : entradaEditando ? 'Actualizar' : 'Guardar'}
+                                </button>
+                                {entradaEditando && <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{ setEntradaEditando(null); setCostoForm({fecha:fechaHoy(),monto:'',notas:''}) }}>Cancelar edición</button>}
+                              </div>
+                              {entradas.length > 0 && (
+                                <table className="tabla marketing-tabla" style={{marginTop:10}}>
+                                  <thead><tr><th>Fecha</th><th>Monto</th><th>Notas</th><th>Registrado por</th><th></th></tr></thead>
+                                  <tbody>
+                                    {entradas.map(en => (
+                                      <tr key={en.id}>
+                                        <td>{String(en.fecha).slice(0,10)}</td>
+                                        <td>{formatoSoles(en.monto)}</td>
+                                        <td>{en.notas || '—'}</td>
+                                        <td>{en.creado_por || '—'}</td>
+                                        <td>
+                                          <div style={{display:'flex',gap:6}}>
+                                            <button type="button" className="venta-action-btn" onClick={()=>editarEntradaCosto(en)}>Editar</button>
+                                            <button type="button" className="venta-action-btn delete" onClick={()=>eliminarCosto(en,'reclutamiento')}>Eliminar</button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+            </tbody>
           </table></div>
         </div>
       </div>

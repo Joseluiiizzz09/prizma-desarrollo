@@ -7,15 +7,16 @@ const router  = express.Router();
 const db      = require('../database');
 const auth    = require('../middleware/auth');
 
-// GET /api/marketing-costos?desde=&hasta=&campana=
+// GET /api/marketing-costos?desde=&hasta=&campana=&area=
 router.get('/', auth(['jefatura']), async (req, res) => {
   try {
-    const { desde, hasta, campana } = req.query;
-    let sql = `SELECT id, campana, fecha, monto, notas, creado_por, created_at FROM marketing_costos_campana WHERE 1=1`;
+    const { desde, hasta, campana, area } = req.query;
+    let sql = `SELECT id, campana, area, fecha, monto, notas, creado_por, created_at FROM marketing_costos_campana WHERE 1=1`;
     const params = [];
     if (desde)   { sql += ` AND fecha >= ?`; params.push(desde); }
     if (hasta)   { sql += ` AND fecha <= ?`; params.push(hasta); }
     if (campana) { sql += ` AND campana = ?`; params.push(campana); }
+    if (area)    { sql += ` AND area = ?`; params.push(area); }
     sql += ` ORDER BY fecha DESC, id DESC`;
     const [data] = await db.query(sql, params);
     res.json({ ok:true, data });
@@ -27,15 +28,15 @@ router.get('/', auth(['jefatura']), async (req, res) => {
 // POST /api/marketing-costos
 router.post('/', auth(['jefatura']), async (req, res) => {
   try {
-    const { campana, fecha, monto, notas } = req.body;
+    const { campana, area, fecha, monto, notas } = req.body;
     if (!String(campana||'').trim()) return res.status(400).json({ ok:false, mensaje:'La campaña es obligatoria' });
     if (!fecha) return res.status(400).json({ ok:false, mensaje:'La fecha es obligatoria' });
     const montoNum = Number(monto);
     if (!Number.isFinite(montoNum) || montoNum < 0) return res.status(400).json({ ok:false, mensaje:'El monto no es válido' });
 
     const [result] = await db.query(
-      `INSERT INTO marketing_costos_campana (campana, fecha, monto, notas, creado_por) VALUES (?, ?, ?, ?, ?)`,
-      [String(campana).trim(), fecha, montoNum, String(notas||'').trim(), req.user.usuario || '']
+      `INSERT INTO marketing_costos_campana (campana, area, fecha, monto, notas, creado_por) VALUES (?, ?, ?, ?, ?, ?)`,
+      [String(campana).trim(), String(area||'ventas').trim() || 'ventas', fecha, montoNum, String(notas||'').trim(), req.user.usuario || '']
     );
     res.json({ ok:true, id: result.insertId, mensaje:'Gasto registrado' });
   } catch (e) {

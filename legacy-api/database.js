@@ -372,6 +372,7 @@ async function initDB() {
       CREATE TABLE IF NOT EXISTS marketing_costos_campana (
         id          INT AUTO_INCREMENT PRIMARY KEY,
         campana     VARCHAR(100)  NOT NULL,
+        area        VARCHAR(20)   NOT NULL DEFAULT 'ventas',
         fecha       DATE          NOT NULL,
         monto       DECIMAL(10,2) NOT NULL DEFAULT 0,
         notas       VARCHAR(255)  DEFAULT '',
@@ -380,6 +381,8 @@ async function initDB() {
         INDEX idx_costos_campana_fecha (campana, fecha)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    await conn.query(`ALTER TABLE marketing_costos_campana ADD COLUMN area VARCHAR(20) NOT NULL DEFAULT 'ventas'`)
+      .catch(err => { if (err.code !== 'ER_DUP_FIELDNAME') throw err; });
 
     const columnasDerivacionLeads = [
       ['derivado_por_id', 'INT NULL'],
