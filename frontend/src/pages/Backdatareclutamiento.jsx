@@ -469,6 +469,8 @@ export default function Backdatareclutamiento() {
   const [cargandoEntrevistas, setCargandoEntrevistas] = useState(false)
   const [filtrosEntrevistas, setFiltrosEntrevistas] = useState({ turno:'', desde:'', hasta:'', busqueda:'' })
   const [entSort, setEntSort] = useState({ col:'', dir:'asc' })
+  const [entPage, setEntPage] = useState(1)
+  const [entPageSize, setEntPageSize] = useState(10)
   const [modalEntrevista, setModalEntrevista] = useState({ open:false, regId:null, nombrePostulante:'', numero:'', numeroRef:'', turno:'', fechaAgendamiento:'', observacion:'', guardando:false, error:'' })
   const [modalComentarioTipif, setModalComentarioTipif] = useState({ open:false, regId:null, comentario:'', guardando:false, error:'' })
   const [capacitaciones, setCapacitaciones] = useState([])
@@ -930,6 +932,12 @@ export default function Backdatareclutamiento() {
       const cmp = val(a).localeCompare(val(b), 'es', { numeric:true })
       return entSort.dir === 'desc' ? -cmp : cmp
     })
+  const entTotalPages = Math.max(1, Math.ceil(entrevistasFiltradas.length / entPageSize))
+  const entPageSafe = Math.min(entPage, entTotalPages)
+  const entDesde = (entPageSafe - 1) * entPageSize
+  const entrevistasPagina = entrevistasFiltradas.slice(entDesde, entDesde + entPageSize)
+
+  useEffect(() => { setEntPage(1) }, [filtrosEntrevistas, entSort, entPageSize])
 
   const capacitacionesFiltradas = capacitaciones.filter(c => {
     const fecha = String(c.fecha_inicio_capacitacion||'').slice(0,10)
@@ -2633,7 +2641,7 @@ export default function Backdatareclutamiento() {
             <div className="base-tabla-wrap reclutados-tabla-wrap"><table className="base-tabla reclutados-tabla"><thead><tr>
               <th>Fecha de registro</th><th>Campaña</th>{entTh('agendado_por','Agendado por')}<th>Turno</th><th>Postulante</th><th>Número</th><th>Número ref</th><th>Fecha de agendamiento</th><th>Fecha de entrevista</th><th>Tipificación</th><th>Observación</th>
             </tr></thead><tbody>
-              {cargandoEntrevistas ? <tr><td colSpan="11" className="reclutados-empty">Cargando…</td></tr> : entrevistasFiltradas.length===0 ? <tr><td colSpan="11" className="reclutados-empty">Sin registros.</td></tr> : entrevistasFiltradas.map(en=><tr key={en.id}>
+              {cargandoEntrevistas ? <tr><td colSpan="11" className="reclutados-empty">Cargando…</td></tr> : entrevistasFiltradas.length===0 ? <tr><td colSpan="11" className="reclutados-empty">Sin registros.</td></tr> : entrevistasPagina.map(en=><tr key={en.id}>
                 <td>{formatFecha(normalizarFecha(en.created_at))}</td>
                 <td>{en.campana||'—'}</td>
                 <td>{en.creado_por_nombre||'—'}</td>
@@ -2647,6 +2655,19 @@ export default function Backdatareclutamiento() {
                 <td><input className="form-control" defaultValue={en.observacion||''} onBlur={e=>guardarObservacionEntrevista(en.id,en.observacion||'',e.target.value.trim())}/></td>
               </tr>)}
             </tbody></table></div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,padding:'10px 2px'}}>
+              <div className="paginacion-info">
+                Mostrando {entrevistasFiltradas.length ? entDesde + 1 : 0}–{Math.min(entDesde + entPageSize, entrevistasFiltradas.length)} de {entrevistasFiltradas.length}
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <select className="select-por-pagina" value={entPageSize} onChange={e=>setEntPageSize(Number(e.target.value))} aria-label="Entrevistas por página">
+                  {[10,25,50,100].map(n=><option key={n} value={n}>{n} / pág.</option>)}
+                </select>
+                <button className="fnav-btn" disabled={entPageSafe<=1} onClick={()=>setEntPage(p=>Math.max(1,p-1))}>‹</button>
+                <span className="paginacion-info">Página {entPageSafe} de {entTotalPages}</span>
+                <button className="fnav-btn" disabled={entPageSafe>=entTotalPages} onClick={()=>setEntPage(p=>Math.min(entTotalPages,p+1))}>›</button>
+              </div>
+            </div>
           </section>
 
           <section className={`bo-seccion${seccion==='capacitacion'?'':' hidden'}`}>
