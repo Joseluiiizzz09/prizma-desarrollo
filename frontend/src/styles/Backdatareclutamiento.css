@@ -397,6 +397,11 @@ body{
 .bo-root .reclutados-tabla{width:100%!important;min-width:1500px;}
 .reclutados-tabla th{font-size:10px;}
 .reclutados-tabla td{font-size:11px;}
+.bo-root .reclutados-tabla .entrevista-fecha-input{
+  height:34px;min-height:34px;padding:6px 10px;font-family:inherit;
+  font-size:12px;font-weight:400;line-height:1.2;color:#334155;
+  background:#f8fafc;border:1px solid #d8dee8;border-radius:8px;box-shadow:none;
+}
 .reclutados-nombre{min-width:180px;font-weight:700;color:#111827!important;}
 .reclutados-documento{font-family:monospace;}
 .reclutados-reclutador{font-weight:700;color:#7c3aed!important;}

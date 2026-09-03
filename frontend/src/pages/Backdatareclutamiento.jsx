@@ -2650,7 +2650,7 @@ export default function Backdatareclutamiento() {
                 <td>{en.numero}</td>
                 <td>{en.numero_ref||'—'}</td>
                 <td>{formatFecha(String(en.fecha_agendamiento||'').slice(0,10))}</td>
-                <td><input type="date" className="form-control" defaultValue={String(en.fecha_entrevista||'').slice(0,10)} onBlur={e=>guardarFechaEntrevista(en.id,String(en.fecha_entrevista||'').slice(0,10),e.target.value)}/></td>
+                <td><input type="date" className="form-control entrevista-fecha-input" defaultValue={String(en.fecha_entrevista||'').slice(0,10)} onBlur={e=>guardarFechaEntrevista(en.id,String(en.fecha_entrevista||'').slice(0,10),e.target.value)}/></td>
                 <td><select value={en.tipificacion||''} onChange={e=>guardarTipifEntrevista(en.id,e.target.value)} style={estiloTipifEntrevista(en.tipificacion)}><option value="">— Pendiente —</option>{TIPIF_ENTREVISTA_OPCIONES.map(t=><option key={t} value={t}>{t}</option>)}</select></td>
                 <td><input className="form-control" defaultValue={en.observacion||''} onBlur={e=>guardarObservacionEntrevista(en.id,en.observacion||'',e.target.value.trim())}/></td>
               </tr>)}
