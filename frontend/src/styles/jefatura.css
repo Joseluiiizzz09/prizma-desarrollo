@@ -1462,6 +1462,7 @@ button.export-kpi-card:hover {
 /* Dashboard de Leads para Marketing */
 .marketing-filtros{margin-bottom:16px}
 .marketing-filtros .filtros-grid{grid-template-columns:repeat(4,minmax(150px,1fr)) auto}
+.reportes-filtros .filtros-grid{grid-template-columns:minmax(260px,1.4fr) minmax(160px,.7fr) minmax(220px,1fr) auto}
 .marketing-kpis{grid-template-columns:repeat(4,minmax(150px,1fr));margin-bottom:16px}
 .marketing-grid{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(520px,1.4fr);gap:16px;align-items:start}
 .marketing-ranking{min-height:310px}

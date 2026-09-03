@@ -8,6 +8,7 @@ import ObsSeguimientoCell from '../components/ObsSeguimientoCell'
 import ProgramacionInfoCell from '../components/ProgramacionInfoCell'
 import CambiarAreaMenu from '../components/CambiarAreaMenu'
 import MarketingDashboard from '../components/MarketingDashboard'
+import RangoFechasPicker from '../components/RangoFechasPicker'
 import { API, ncHeaders } from '../services/api'
 import { permisosDeUsuario, usuarioTieneCargo } from '../utils/roles'
 import { responseChanged, setVisibleInterval, clearVisibleInterval } from '../utils/polling'
@@ -386,7 +387,11 @@ export default function Jefatura() {
   const [salaReporte, setSalaReporte] = useState(() => {
     try { return sessionStorage.getItem(JEF_SALA_REPORTE_KEY) || 'todas' } catch { return 'todas' }
   })
-  const [mesReporte, setMesReporte] = useState('')
+  const mesReporte = ''
+  const [reporteDesde, setReporteDesde] = useState('')
+  const [reporteHasta, setReporteHasta] = useState('')
+  const [reporteCriterio, setReporteCriterio] = useState('ingreso')
+  const [reporteAsesor, setReporteAsesor] = useState('')
   const [busqUsuarios, setBusqUsuarios] = useState('')
   const [filtroCargoUsuarios, setFiltroCargoUsuarios] = useState('')
   const [filtroSalaUsuarios, setFiltroSalaUsuarios] = useState('')
@@ -924,24 +929,26 @@ export default function Jefatura() {
 
   /* ── reportes ── */
   const { reporteData, repKpis } = useMemo(() => {
-    const ventasDelMes = mesReporte
-      ? ventasCache.filter(v => {
-          const fecha = soloFecha(v._fecha || v.fecha_ingreso || v.fecha || v.created_at)
-          return fecha && String(fecha).slice(0, 7) === mesReporte
-        })
-      : ventasCache
+    const ventasDelRango = ventasCache.filter(v => {
+      const fecha = reporteCriterio === 'instalada'
+        ? soloFecha(v.fecha_instalado)
+        : soloFecha(v._fecha || v.fecha_ingreso || v.fecha || v.created_at)
+      if (!fecha) return false
+      if (reporteDesde && fecha < reporteDesde) return false
+      if (reporteHasta && fecha > reporteHasta) return false
+      return true
+    })
     let asesFilt = usuarios.filter(u=>usuarioTieneCargo(u,'asesor'))
     if (salaReporte !== 'todas') asesFilt = asesFilt.filter(u=>u.sala===salaReporte)
-    let ventasFilt = ventasDelMes
-    if (salaReporte !== 'todas') {
-      const nombres = asesFilt.map(a=>a.nombre)
-      ventasFilt = ventasDelMes.filter(v=>nombres.includes(v.asesor_nombre||''))
-    }
+    if (reporteAsesor) asesFilt = asesFilt.filter(u=>String(u.id)===reporteAsesor)
+    const ids = new Set(asesFilt.map(a=>String(a.id)))
+    const nombres = new Set(asesFilt.map(a=>a.nombre))
+    const ventasFilt = ventasDelRango.filter(v=>ids.has(String(v.asesor_id)) || nombres.has(v.asesor_nombre||''))
     const inst   = ventasFilt.filter(v=>esVentaInstalada(v.estado)).length
     const caidas = ventasFilt.filter(v=>(v.estado||'').toLowerCase()==='caida').length
     const efect  = ventasFilt.length ? Math.round(inst/ventasFilt.length*100) : 0
     const rendData = asesFilt.map(a => {
-      const mis   = ventasDelMes.filter(v=>(v.asesor_nombre||'')===a.nombre)
+      const mis   = ventasFilt.filter(v=>String(v.asesor_id)===String(a.id) || (v.asesor_nombre||'')===a.nombre)
       const inst2 = mis.filter(v=>esVentaInstalada(v.estado)).length
       const caid  = mis.filter(v=>(v.estado||'').toLowerCase()==='caida').length
       const ef    = mis.length ? Math.round(inst2/mis.length*100) : 0
@@ -953,7 +960,7 @@ export default function Jefatura() {
       String(a.nombre||'').localeCompare(String(b.nombre||''))
     )
     return { reporteData:rendData, repKpis:{ total:ventasFilt.length, inst, caidas, efect:efect+'%' } }
-  }, [usuarios, ventasCache, salaReporte, mesReporte])
+  }, [usuarios, ventasCache, salaReporte, reporteDesde, reporteHasta, reporteCriterio, reporteAsesor])
 
   /* ── usuarios filtrados ── */
   const salasUsuariosDisponibles = useMemo(() => {
@@ -1574,18 +1581,14 @@ export default function Jefatura() {
           <section className={`section${seccion==='reportes'?' active':''}`}>
             <div className="sec-header reportes-header">
               <div><h2>Reportes Globales</h2><p>Rendimiento por sala y asesor — solo asesores</p></div>
-              <div className="reporte-periodo">
-                <label htmlFor="mes-reporte">Periodo</label>
-                <div className="reporte-periodo-controls">
-                  <input
-                    id="mes-reporte"
-                    type="month"
-                    value={mesReporte}
-                    onChange={e=>setMesReporte(e.target.value)}
-                    aria-label="Filtrar reportes por mes"
-                  />
-                  {mesReporte && <button type="button" onClick={()=>setMesReporte('')}>Ver todos</button>}
-                </div>
+            </div>
+            <div className="filtros-avanzados marketing-filtros reportes-filtros">
+              <div className="filtros-titulo">Filtros del reporte</div>
+              <div className="filtros-grid">
+                <label><span>Rango de fechas</span><RangoFechasPicker desde={reporteDesde} hasta={reporteHasta} onChange={({desde,hasta})=>{setReporteDesde(desde);setReporteHasta(hasta)}} /></label>
+                <label><span>Fecha de selección</span><select value={reporteCriterio} onChange={e=>setReporteCriterio(e.target.value)}><option value="ingreso">Ingreso</option><option value="instalada">Instalada</option></select></label>
+                <label><span>Vendedor</span><select value={reporteAsesor} onChange={e=>setReporteAsesor(e.target.value)}><option value="">Todos los vendedores</option>{usuarios.filter(u=>usuarioTieneCargo(u,'asesor')).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')).map(u=><option key={u.id} value={String(u.id)}>{u.nombre}</option>)}</select></label>
+                <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{setReporteDesde('');setReporteHasta('');setReporteCriterio('ingreso');setReporteAsesor('')}}>Limpiar</button>
               </div>
             </div>
             <div className="sala-tabs sala-tabs-pro">
@@ -1611,7 +1614,7 @@ export default function Jefatura() {
               <div className="tabla-header ranking-pro-header">
                 <div>
                   <span className="tabla-title">Ranking de Asesores</span>
-                  <span className="ranking-periodo-label">{mesReporte ? `Periodo ${mesReporte.split('-').reverse().join('/')}` : 'Histórico completo'}</span>
+                  <span className="ranking-periodo-label">{reporteDesde || reporteHasta ? `${reporteCriterio==='instalada'?'Instalada':'Ingreso'} · ${reporteDesde?formatF(reporteDesde):'inicio'} — ${reporteHasta?formatF(reporteHasta):'hoy'}` : 'Histórico completo'}</span>
                 </div>
                 <span className="tabla-count">{reporteData.length} asesores</span>
               </div>
