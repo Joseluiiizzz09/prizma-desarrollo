@@ -1125,15 +1125,23 @@ export default function Jefatura() {
     try { localStorage.removeItem('jef_logs') } catch {}
   }
 
-  /* ── meses para select ── */
+  /* ── meses para select: solo los meses con ventas reales ── */
   const MESES_SALAS = useMemo(() => {
+    const mes = mesActual()
+    const meses = new Set()
+    ventasCache.forEach(v => {
+      const f = soloFecha(v._fecha || v.fecha_ingreso || v.fecha || v.created_at)
+      if (f) meses.add(f.slice(0,7))
+    })
+    meses.delete(mes)
     const arr = [{ value:'', label:'Mes actual' }]
-    for (let i=1;i<=11;i++) {
-      const d = new Date(); d.setMonth(d.getMonth()-i)
-      arr.push({ value:d.toISOString().slice(0,7), label:d.toLocaleString('es-PE',{month:'long',year:'numeric'}) })
-    }
+    ;[...meses].sort((a,b)=>b.localeCompare(a)).forEach(m => {
+      const [y, mo] = m.split('-')
+      const label = new Date(Number(y), Number(mo)-1, 1).toLocaleString('es-PE',{month:'long',year:'numeric'})
+      arr.push({ value:m, label })
+    })
     return arr
-  }, [])
+  }, [ventasCache])
 
   function salir() { logout(); navigate('/login') }
 
