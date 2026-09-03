@@ -111,6 +111,7 @@ const ACCESOS_MODS = [
   { nombre:'Calidad',          desc:'Control de clientes instalados',   icon:'quality',   path:'/calidad',         color:'#fb923c', cargo:'calidad' },
   { nombre:'Super de Calidad', desc:'Supervisión del equipo de Calidad',icon:'quality',   path:'/sup-calidad',     color:'#f97316', cargo:'supcalidad' },
   { nombre:'Back Data Reclutaminto',        desc:'Gestión y asignación de candidatos', icon:'clipboard', path:'/backdata-reclutamiento', color:'#4338ca', cargo:'backreclutamiento' },
+  { nombre:'Capacitación',      desc:'Asistencia y avance de postulantes', icon:'graduation', path:'/backdata-reclutamiento', color:'#dc2626', cargo:'capacitador' },
 ]
 
 function ModuloIcon({ tipo, size = 24 }) {
@@ -126,6 +127,7 @@ function ModuloIcon({ tipo, size = 24 }) {
     headphones: <><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M18 19h-2v-7h4v5a2 2 0 0 1-2 2ZM6 19H4a2 2 0 0 1-2-2v-5h4v7Z"/></>,
     wallet: <><path d="M4 6.5h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a3 3 0 0 1-3-3v-10a3 3 0 0 1 3-3h11"/><path d="M15 11h6v5h-6a2.5 2.5 0 0 1 0-5Z"/></>,
     quality: <><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></>,
+    graduation: <><path d="m2 9 10-5 10 5-10 5L2 9Z"/><path d="M6 11.5V16c3.5 2.7 8.5 2.7 12 0v-4.5M22 9v6"/></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{display:'block', margin:'auto', flex:'0 0 auto'}}>{trazos[tipo] || trazos.activity}</svg>
 }
@@ -1204,7 +1206,7 @@ export default function Jefatura() {
                 const cantidad = usuarios.filter(u=>usuarioTieneCargo(u,m.cargo)).length
                 return (
                   <button
-                    key={m.path}
+                    key={m.cargo}
                     type="button"
                     className="acceso-card"
                     style={{'--mod-color':m.color,'--mod-soft':m.color+'12'}}
