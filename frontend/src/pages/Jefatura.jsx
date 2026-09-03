@@ -446,8 +446,8 @@ export default function Jefatura() {
   const [fvAsesor,     setFvAsesor]     = useState('')
   const [fvSala,       setFvSala]       = useState('')
   const [fvDistrito,   setFvDistrito]   = useState('')
-  const [fvDesde,      setFvDesde]      = useState('')
-  const [fvHasta,      setFvHasta]      = useState('')
+  const [fvFecha,      setFvFecha]      = useState('')
+  const [mesFlujo,     setMesFlujo]     = useState('')
   const [paginaFlujo, setPaginaFlujo] = useState(1)
   const [porPaginaFlujo, setPorPaginaFlujo] = useState(18)
 
@@ -743,20 +743,20 @@ export default function Jefatura() {
   /* ── KPIs dashboard ── */
   const kpis = useMemo(() => {
     const e   = s => (s||'').toLowerCase()
-    const hoy = fechaHoy(), mes = mesActual()
-    const inst  = ventasCache.filter(v=>esVentaInstalada(v.estado)).length
-    const caida = ventasCache.filter(v=>['caida','rechazo_campo'].includes(e(v.estado))).length
-    const instM = ventasCache.filter(v=>v._fecha&&v._fecha.startsWith(mes)&&esVentaInstalada(v.estado)).length
-    const caidM = ventasCache.filter(v=>v._fecha&&v._fecha.startsWith(mes)&&['caida','rechazo_campo'].includes(e(v.estado))).length
-    const efect = (instM+caidM)>0?Math.round(instM/(instM+caidM)*100):0
+    const hoy = fechaHoy()
+    const mes = mesReporte || mesActual()
+    const ventasMes = ventasCache.filter(v=>v._fecha&&v._fecha.startsWith(mes))
+    const inst  = ventasMes.filter(v=>esVentaInstalada(v.estado)).length
+    const caida = ventasMes.filter(v=>['caida','rechazo_campo'].includes(e(v.estado))).length
+    const efect = (inst+caida)>0?Math.round(inst/(inst+caida)*100):0
     return {
       ventasHoy:     ventasCache.filter(v=>v._fecha===hoy).length,
-      validadas:     ventasCache.filter(v=>!['venta',''].includes(e(v.estado))).length,
-      noValidadas:   ventasCache.filter(v=>['venta','corta_llamada','fraude','no_desea','no_contesta','servicio_activo','no_validado'].includes(e(v.estado))).length,
-      grabadas:      ventasCache.filter(flujoGrabada).length,
-      noGrabadas:    ventasCache.filter(flujoNoGrabada).length,
-      enEjecucion:   ventasCache.filter(v=>['aprobado','programado','en_ejecucion','tecnico_casa'].includes(e(v.estado))).length,
-      noProgramadas: ventasCache.filter(v=>['bloqueado','sin_agenda','caracter_especial','fraude','zona_restringida'].includes(e(v.estado))).length,
+      validadas:     ventasMes.filter(v=>!['venta',''].includes(e(v.estado))).length,
+      noValidadas:   ventasMes.filter(v=>['venta','corta_llamada','fraude','no_desea','no_contesta','servicio_activo','no_validado'].includes(e(v.estado))).length,
+      grabadas:      ventasMes.filter(flujoGrabada).length,
+      noGrabadas:    ventasMes.filter(flujoNoGrabada).length,
+      enEjecucion:   ventasMes.filter(v=>['aprobado','programado','en_ejecucion','tecnico_casa'].includes(e(v.estado))).length,
+      noProgramadas: ventasMes.filter(v=>['bloqueado','sin_agenda','caracter_especial','fraude','zona_restringida'].includes(e(v.estado))).length,
       instaladas:    inst,
       caidas:        caida,
       conv:          efect+'%',
@@ -765,7 +765,7 @@ export default function Jefatura() {
       asesores:      usuarios.filter(u=>usuarioTieneCargo(u,'asesor')&&u.activo).length,
       supervisores:  usuarios.filter(u=>usuarioTieneCargo(u,'supervisor')&&u.activo).length,
     }
-  }, [ventasCache, usuarios])
+  }, [ventasCache, usuarios, mesReporte])
 
   /* ── usuarios para el selector de accesos ── */
   const usuariosModulo = useMemo(() => {
@@ -882,14 +882,22 @@ export default function Jefatura() {
   }), [ventasSeg])
 
   /* ── flujo general de ventas ── */
+  const ventasFlujoMes = useMemo(() => {
+    const mesUsar = mesFlujo || mesActual()
+    return ventasCache.filter(v => {
+      const f = soloFecha(v._fecha || v.fecha_ingreso || v.fecha || v.created_at)
+      return f && f.startsWith(mesUsar)
+    })
+  }, [ventasCache, mesFlujo])
+
   const resumenFlujoVentas = useMemo(() => ({
-    todas: ventasCache.length,
-    validadas: ventasCache.filter(flujoValidada).length,
-    noValidadas: ventasCache.filter(flujoNoValidada).length,
-    grabadas: ventasCache.filter(flujoGrabada).length,
-    noGrabadas: ventasCache.filter(flujoNoGrabada).length,
-    seguimiento: ventasCache.filter(v => Boolean(estadoSeguimiento(v))).length,
-  }), [ventasCache])
+    todas: ventasFlujoMes.length,
+    validadas: ventasFlujoMes.filter(flujoValidada).length,
+    noValidadas: ventasFlujoMes.filter(flujoNoValidada).length,
+    grabadas: ventasFlujoMes.filter(flujoGrabada).length,
+    noGrabadas: ventasFlujoMes.filter(flujoNoGrabada).length,
+    seguimiento: ventasFlujoMes.filter(v => Boolean(estadoSeguimiento(v))).length,
+  }), [ventasFlujoMes])
 
   const opcionesFlujo = useMemo(() => ({
     estados: opcionesUnicas(ventasCache.map(v => v.estado || v.estado_venta)),
@@ -897,7 +905,7 @@ export default function Jefatura() {
   }), [ventasCache])
 
   const ventasFlujoFiltradas = useMemo(() => {
-    let lista = [...ventasCache]
+    let lista = [...ventasFlujoMes]
     if (filtroFlujoVentas === 'validadas') lista = lista.filter(flujoValidada)
     if (filtroFlujoVentas === 'noValidadas') lista = lista.filter(flujoNoValidada)
     if (filtroFlujoVentas === 'grabadas') lista = lista.filter(flujoGrabada)
@@ -911,14 +919,8 @@ export default function Jefatura() {
     if (fvAsesor) lista = lista.filter(v => String(v.asesor_nombre || v.asesor || v.vendedor || '').toLowerCase().includes(fvAsesor.trim().toLowerCase()))
     if (fvSala) lista = lista.filter(v => String(v.sala || '').toLowerCase().includes(fvSala.trim().toLowerCase()))
     if (fvDistrito) lista = lista.filter(v => String(v.distrito || '').toLowerCase().includes(fvDistrito.trim().toLowerCase()))
-    if (fvDesde || fvHasta) {
-      lista = lista.filter(v => {
-        const f = soloFecha(v._fecha || v.fecha_ingreso || v.fecha || v.created_at)
-        if (!f) return false
-        if (fvDesde && f < fvDesde) return false
-        if (fvHasta && f > fvHasta) return false
-        return true
-      })
+    if (fvFecha) {
+      lista = lista.filter(v => soloFecha(v._fecha || v.fecha_ingreso || v.fecha || v.created_at) === fvFecha)
     }
 
     const b = busqFlujoVentas.trim().toLowerCase()
@@ -934,7 +936,7 @@ export default function Jefatura() {
       const fa = String(a._fecha || a.fecha_ingreso || a.fecha || a.created_at || '')
       return fb.localeCompare(fa) || Number(b.id || 0) - Number(a.id || 0)
     })
-  }, [ventasCache, filtroFlujoVentas, busqFlujoVentas, fvEstados, fvValidacion, fvGrabacion, fvAsesor, fvSala, fvDistrito, fvDesde, fvHasta])
+  }, [ventasFlujoMes, filtroFlujoVentas, busqFlujoVentas, fvEstados, fvValidacion, fvGrabacion, fvAsesor, fvSala, fvDistrito, fvFecha])
 
   const totalPaginasFlujo = Math.max(1, Math.ceil(ventasFlujoFiltradas.length / porPaginaFlujo))
   const ventasFlujoPagina = useMemo(() => {
@@ -942,7 +944,7 @@ export default function Jefatura() {
     return ventasFlujoFiltradas.slice(inicio, inicio + porPaginaFlujo)
   }, [ventasFlujoFiltradas, paginaFlujo, porPaginaFlujo])
 
-  useEffect(() => { setPaginaFlujo(1) }, [filtroFlujoVentas, busqFlujoVentas, fvEstados, fvValidacion, fvGrabacion, fvAsesor, fvSala, fvDistrito, fvDesde, fvHasta, porPaginaFlujo])
+  useEffect(() => { setPaginaFlujo(1) }, [filtroFlujoVentas, busqFlujoVentas, fvEstados, fvValidacion, fvGrabacion, fvAsesor, fvSala, fvDistrito, fvFecha, mesFlujo, porPaginaFlujo])
   useEffect(() => { if (paginaFlujo > totalPaginasFlujo) setPaginaFlujo(totalPaginasFlujo) }, [paginaFlujo, totalPaginasFlujo])
 
   function limpiarFiltrosFlujo() {
@@ -950,7 +952,7 @@ export default function Jefatura() {
     setBusqFlujoVentas('')
     setFvEstados([]); setFvValidacion(''); setFvGrabacion('')
     setFvAsesor(''); setFvSala(''); setFvDistrito('')
-    setFvDesde(''); setFvHasta('')
+    setFvFecha('')
   }
 
   function exportarVentasExcel() {
@@ -1203,6 +1205,10 @@ export default function Jefatura() {
           <section className={`section${seccion==='dashboard'?' active':''}`}>
             <div className="sec-header">
               <div><h2>Dashboard General</h2><p>Resumen global del sistema</p></div>
+              <select value={mesReporte} onChange={e=>setMesReporte(e.target.value)}
+                style={{padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:'7px',fontSize:'12px',fontFamily:'inherit',outline:'none',color:'#374151',cursor:'pointer'}}>
+                {MESES_SALAS.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
             </div>
 
             <div className="kpi-grid" style={{gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))'}}>
@@ -1229,10 +1235,6 @@ export default function Jefatura() {
               <div className="chart-card">
                 <div className="chart-title-row">
                   <span>Instaladas y Caídas por sala</span>
-                  <select value={mesReporte} onChange={e=>setMesReporte(e.target.value)}
-                    style={{padding:'4px 8px',border:'1px solid #e5e7eb',borderRadius:'7px',fontSize:'11px',fontFamily:'inherit',outline:'none',color:'#374151',cursor:'pointer'}}>
-                    {MESES_SALAS.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
                 </div>
                 <div className="chart-wrap"><canvas ref={canvasSalas}></canvas></div>
               </div>
@@ -1389,7 +1391,13 @@ export default function Jefatura() {
               <div>
                 <h2>Ventas generales</h2>
               </div>
-              <button className="btn-nuevo" onClick={cargarVentasCache}>Actualizar</button>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <select value={mesFlujo} onChange={e=>setMesFlujo(e.target.value)}
+                  style={{padding:'8px 10px',border:'1px solid #e5e7eb',borderRadius:'7px',fontSize:'12px',fontFamily:'inherit',outline:'none',color:'#374151',cursor:'pointer'}}>
+                  {MESES_SALAS.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+                <button className="btn-nuevo" onClick={cargarVentasCache}>Actualizar</button>
+              </div>
             </div>
 
             <div className="flujo-kpi-grid">
@@ -1437,8 +1445,7 @@ export default function Jefatura() {
                 <label><span>Asesor</span><input value={fvAsesor} onChange={e=>setFvAsesor(e.target.value)} placeholder="Escribir asesor..."/></label>
                 <label><span>Sala</span><input value={fvSala} onChange={e=>setFvSala(e.target.value)} placeholder="Escribir sala..."/></label>
                 <label><span>Distrito</span><input value={fvDistrito} onChange={e=>setFvDistrito(e.target.value)} placeholder="Escribir distrito..."/></label>
-                <label><span>Fecha desde</span><input type="date" value={fvDesde} onChange={e=>setFvDesde(e.target.value)}/></label>
-                <label><span>Fecha hasta</span><input type="date" value={fvHasta} onChange={e=>setFvHasta(e.target.value)}/></label>
+                <label><span>Fecha del día</span><input type="date" value={fvFecha} onChange={e=>setFvFecha(e.target.value)}/></label>
                 <button type="button" className="flujo-clear filtro-limpiar" onClick={limpiarFiltrosFlujo}>Limpiar</button>
               </div>
             </div>
