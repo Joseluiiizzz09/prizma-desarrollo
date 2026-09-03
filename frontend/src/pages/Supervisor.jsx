@@ -749,7 +749,7 @@ export default function Supervisor() {
                     : ventasPaginaData.map((v,i)=>(
                         <tr key={v.id}>
                           <td style={{color:'#9ca3af',fontSize:10}}>{(ventasPaginaSegura-1)*ventasPorPagina+i+1}</td>
-                          <td><BadgeEstado id={mapearEstado(v.estado)} /></td>
+                          <td><BadgeEstado id={v._estado} /></td>
                           <td><span className={`sup-flujo-badge ${claseFlujo(estadoValidacionFlujo(v))}`}>{estadoValidacionFlujo(v)}</span></td>
                           <td><span className={`sup-flujo-badge ${claseFlujo(v.estado_grab)}`}>{etiquetaFlujo(v.estado_grab)}</span></td>
                           <td><span className={`sup-flujo-badge ${claseFlujo(v.estado_prog)}`}>{etiquetaFlujo(v.estado_prog)}</span></td>
