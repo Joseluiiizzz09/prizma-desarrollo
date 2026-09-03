@@ -294,6 +294,11 @@ export default function Supervisor() {
       vv = vv.filter(v=>String(v.asesor||'').toLocaleLowerCase('es').includes(busquedaAsesor))
     }
     if (filtroEstado) vv = vv.filter(v=>v._estado===filtroEstado)
+    // Elegir "Instalación" no solo cambia la fecha del rango: representa
+    // exclusivamente las ventas que ya fueron instaladas.
+    if (filtroTipoFecha === 'instalacion') {
+      vv = vv.filter(v=>v._estado === 'instalado' && Boolean(soloFecha(v.fecha_instalado)))
+    }
     const fechaSegunTipo = v => filtroTipoFecha === 'programacion'
       ? soloFecha(v.fecha_programada)
       : filtroTipoFecha === 'instalacion' ? soloFecha(v.fecha_instalado) : v._fecha
@@ -302,7 +307,7 @@ export default function Supervisor() {
       return fecha && (!filtroDesde || fecha >= filtroDesde) && (!filtroHasta || fecha <= filtroHasta)
     })
     if (!filtroDesde&&!filtroHasta&&!filtroAsesor&&!filtroEstado&&!tablaSearch)
-      vv = vv.filter(v=>v._fecha&&v._fecha.startsWith(mesActual()))
+      vv = vv.filter(v=>fechaSegunTipo(v)?.startsWith(mesActual()))
     if (tablaSearch) {
       const q = tablaSearch.toLowerCase()
       vv = vv.filter(v=>v.n1?.includes(tablaSearch)||(v.nombre||'').toLowerCase().includes(q)||(v.dni||'').includes(tablaSearch))
