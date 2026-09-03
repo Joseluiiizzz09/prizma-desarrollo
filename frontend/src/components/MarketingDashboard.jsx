@@ -112,16 +112,20 @@ export default function MarketingDashboard() {
       const cantidad = Number(fila.cantidad || 0)
       total += cantidad
       if (fila.tipificacion === 'SIN TIPIFICAR') sinTipificar += cantidad
-      const actual = porCampana.get(fila.campana) || { campana:fila.campana, total:0, ventas:0, tipificaciones:[] }
+      const actual = porCampana.get(fila.campana) || { campana:fila.campana, total:0, ventas:0, instaladas:0, tipificaciones:[] }
       actual.total += cantidad
-      if (TIPIF_CONJUNTO_VENTA.has(String(fila.tipificacion||'').trim().toUpperCase())) actual.ventas += cantidad
+      const tipificacion = String(fila.tipificacion||'').trim().toUpperCase()
+      if (TIPIF_CONJUNTO_VENTA.has(tipificacion)) actual.ventas += cantidad
+      if (tipificacion === 'EJECUTADA') actual.instaladas += cantidad
       actual.tipificaciones.push({ nombre:fila.tipificacion, cantidad })
       porCampana.set(fila.campana, actual)
     })
     const campanas = [...porCampana.values()].sort((a,b) => ordenCampanas==='ventas'
       ? (b.ventas-a.ventas || b.total-a.total || a.campana.localeCompare(b.campana,'es'))
-      : (b.total-a.total || a.campana.localeCompare(b.campana,'es')))
-    return { total, sinTipificar, tipificados:total-sinTipificar, campanas, max:Math.max(1,...campanas.map(c=>c.total)), maxVentas:Math.max(1,...campanas.map(c=>c.ventas)) }
+      : ordenCampanas==='instaladas'
+        ? (b.instaladas-a.instaladas || b.ventas-a.ventas || b.total-a.total || a.campana.localeCompare(b.campana,'es'))
+        : (b.total-a.total || a.campana.localeCompare(b.campana,'es')))
+    return { total, sinTipificar, tipificados:total-sinTipificar, campanas, max:Math.max(1,...campanas.map(c=>c.total)), maxVentas:Math.max(1,...campanas.map(c=>c.ventas)), maxInstaladas:Math.max(1,...campanas.map(c=>c.instaladas)) }
   }, [marketingData, ordenCampanas])
 
   function exportarMarketingExcel() {
@@ -214,6 +218,7 @@ export default function MarketingDashboard() {
               <div style={{display:'flex',gap:2}}>
                 <button type="button" onClick={()=>setOrdenCampanas('total')} style={{fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:6,border:'1px solid #e5e7eb',background:ordenCampanas==='total'?'#0f172a':'#fff',color:ordenCampanas==='total'?'#fff':'#374151',cursor:'pointer'}}>Leads</button>
                 <button type="button" onClick={()=>setOrdenCampanas('ventas')} style={{fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:6,border:'1px solid #e5e7eb',background:ordenCampanas==='ventas'?'#0f172a':'#fff',color:ordenCampanas==='ventas'?'#fff':'#374151',cursor:'pointer'}}>Ventas</button>
+                <button type="button" onClick={()=>setOrdenCampanas('instaladas')} style={{fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:6,border:'1px solid #e5e7eb',background:ordenCampanas==='instaladas'?'#0f172a':'#fff',color:ordenCampanas==='instaladas'?'#fff':'#374151',cursor:'pointer'}}>Instaladas</button>
               </div>
               {marketingCarga.cargando&&<small>Actualizando…</small>}
             </div>
@@ -227,6 +232,10 @@ export default function MarketingDashboard() {
                   <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
                     <div style={{flex:1,height:3,borderRadius:99,background:'#eef2f7',overflow:'hidden'}}><i style={{display:'block',height:'100%',borderRadius:99,width:`${Math.max(3,c.ventas/resumenMarketing.maxVentas*100)}%`,background:'#86efac'}} /></div>
                     <span style={{fontSize:9,color:'#94a3b8',fontWeight:600,flexShrink:0}}>{c.ventas} venta{c.ventas===1?'':'s'}</span>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+                    <div style={{flex:1,height:3,borderRadius:99,background:'#eef2f7',overflow:'hidden'}}><i style={{display:'block',height:'100%',borderRadius:99,width:`${c.instaladas ? Math.max(3,c.instaladas/resumenMarketing.maxInstaladas*100) : 0}%`,background:'#38bdf8'}} /></div>
+                    <span style={{fontSize:9,color:'#0284c7',fontWeight:600,flexShrink:0}}>{c.instaladas} instalada{c.instaladas===1?'':'s'}</span>
                   </div>
                 </div>)}
           </div>
