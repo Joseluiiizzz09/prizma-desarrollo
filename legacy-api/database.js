@@ -366,6 +366,21 @@ async function initDB() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
+    // Gasto de publicidad por campaña, cargado manualmente desde Jefatura
+    // (Dashboard de Leads por Campaña) para calcular costo por lead/venta.
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS marketing_costos_campana (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        campana     VARCHAR(100)  NOT NULL,
+        fecha       DATE          NOT NULL,
+        monto       DECIMAL(10,2) NOT NULL DEFAULT 0,
+        notas       VARCHAR(255)  DEFAULT '',
+        creado_por  VARCHAR(100)  DEFAULT '',
+        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_costos_campana_fecha (campana, fecha)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
     const columnasDerivacionLeads = [
       ['derivado_por_id', 'INT NULL'],
       ['derivado_por_nombre', "VARCHAR(150) DEFAULT ''"],
