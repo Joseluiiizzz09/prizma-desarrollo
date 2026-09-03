@@ -43,6 +43,24 @@ router.post('/', auth(['jefatura']), async (req, res) => {
   }
 });
 
+// PUT /api/marketing-costos/:id
+router.put('/:id', auth(['jefatura']), async (req, res) => {
+  try {
+    const { fecha, monto, notas } = req.body;
+    if (!fecha) return res.status(400).json({ ok:false, mensaje:'La fecha es obligatoria' });
+    const montoNum = Number(monto);
+    if (!Number.isFinite(montoNum) || montoNum < 0) return res.status(400).json({ ok:false, mensaje:'El monto no es válido' });
+
+    await db.query(
+      `UPDATE marketing_costos_campana SET fecha = ?, monto = ?, notas = ? WHERE id = ?`,
+      [fecha, montoNum, String(notas||'').trim(), req.params.id]
+    );
+    res.json({ ok:true, mensaje:'Gasto actualizado' });
+  } catch (e) {
+    res.status(500).json({ ok:false, mensaje:'Error al actualizar el gasto' });
+  }
+});
+
 // DELETE /api/marketing-costos/:id
 router.delete('/:id', auth(['jefatura']), async (req, res) => {
   try {
