@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import RangoFechasPicker from './RangoFechasPicker'
 import { API, ncHeaders } from '../services/api'
 import * as XLSX from 'xlsx'
@@ -61,8 +61,11 @@ export default function MarketingDashboard() {
   const [marketingReclData, setMarketingReclData] = useState([])
   const [marketingReclCatalogos, setMarketingReclCatalogos] = useState({ campanas:[], tipificaciones:[] })
   const [marketingReclCarga, setMarketingReclCarga] = useState({ cargando:false, error:'' })
+  const marketingRequestRef = useRef(0)
+  const marketingReclRequestRef = useRef(0)
 
-  const cargarMarketing = useCallback(async (filtros = marketingFiltros) => {
+  const cargarMarketing = useCallback(async (filtros) => {
+    const requestId = ++marketingRequestRef.current
     setMarketingCarga({ cargando:true, error:'' })
     try {
       const qs = new URLSearchParams()
@@ -70,6 +73,7 @@ export default function MarketingDashboard() {
       const res = await fetch(`${API}/leads/marketing-resumen?${qs}`, { headers:ncHeaders() })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo cargar el dashboard')
+      if (requestId !== marketingRequestRef.current) return
       setMarketingData(Array.isArray(data.data) ? data.data : [])
       setMarketingCatalogos({
         campanas:Array.isArray(data.filtros?.campanas) ? data.filtros.campanas : [],
@@ -77,11 +81,13 @@ export default function MarketingDashboard() {
       })
       setMarketingCarga({ cargando:false, error:'' })
     } catch (error) {
+      if (requestId !== marketingRequestRef.current) return
       setMarketingCarga({ cargando:false, error:error.message || 'Error de conexión' })
     }
-  }, [marketingFiltros])
+  }, [])
 
-  const cargarMarketingRecl = useCallback(async (filtros = marketingReclFiltros) => {
+  const cargarMarketingRecl = useCallback(async (filtros) => {
+    const requestId = ++marketingReclRequestRef.current
     setMarketingReclCarga({ cargando:true, error:'' })
     try {
       const qs = new URLSearchParams()
@@ -89,6 +95,7 @@ export default function MarketingDashboard() {
       const res = await fetch(`${API}/leads-reclutamiento/marketing-resumen?${qs}`, { headers:ncHeaders() })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo cargar el dashboard')
+      if (requestId !== marketingReclRequestRef.current) return
       setMarketingReclData(Array.isArray(data.data) ? data.data : [])
       setMarketingReclCatalogos({
         campanas:Array.isArray(data.filtros?.campanas) ? data.filtros.campanas : [],
@@ -96,11 +103,13 @@ export default function MarketingDashboard() {
       })
       setMarketingReclCarga({ cargando:false, error:'' })
     } catch (error) {
+      if (requestId !== marketingReclRequestRef.current) return
       setMarketingReclCarga({ cargando:false, error:error.message || 'Error de conexión' })
     }
-  }, [marketingReclFiltros])
+  }, [])
 
-  useEffect(() => { cargarMarketing(); cargarMarketingRecl() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { cargarMarketing(marketingFiltros) }, [marketingFiltros, cargarMarketing])
+  useEffect(() => { cargarMarketingRecl(marketingReclFiltros) }, [marketingReclFiltros, cargarMarketingRecl])
 
   // La métrica comercial de ventas conserva el origen de cada cierre aunque
   // luego haya pasado a caída o ejecución.
