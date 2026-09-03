@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import MediaViewer from '../components/MediaViewer'
@@ -134,9 +135,10 @@ function ModuloIcon({ tipo, size = 24 }) {
 }
 
 /* ── helpers puros ── */
-function fechaHoy()    { return new Date().toISOString().split('T')[0] }
+function fechaHoy()    { return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()) }
 function horaAhora()   { return new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit',hour12:false}) }
 function mesActual()   { return fechaHoy().slice(0,7) }
+function inicioMesActual() { return `${mesActual()}-01` }
 function formatF(f)    { if(!f)return'—'; const p=f.split('-'); return `${p[2]}/${p[1]}/${p[0]}` }
 function cargoObj(id)  { return CARGOS.find(c=>c.id===id)||{label:id,cls:'bc-default'} }
 function colorAvatar(n){ const c=["#3b82f6","#8b5cf6","#22c55e","#f97316","#f97316","#06b6d4","#ec4899","#f59e0b"]; let s=0; for(const ch of n) s+=ch.charCodeAt(0); return c[s%c.length] }
@@ -148,6 +150,44 @@ function efColor(v)    { return v>=70?'#16a34a':v>=40?'#d97706':'#ea580c' }
 function esVentaInstalada(estado) {
   const e = String(estado || '').trim().toLowerCase()
   return e === 'instalado' || e === 'ejecutada'
+}
+
+function VendedorBuscador({ value, asesores, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const [pos, setPos] = useState({ top:0, left:0, width:260 })
+  const btnRef = useRef(null)
+  const boxRef = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    function cerrar(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', cerrar)
+    return () => document.removeEventListener('mousedown', cerrar)
+  }, [open])
+  function abrir() {
+    const r = btnRef.current.getBoundingClientRect()
+    const width = Math.max(r.width, 260)
+    setPos({ top:r.bottom+4, left:Math.max(8,Math.min(r.left,window.innerWidth-width-8)), width })
+    setQ('')
+    setOpen(true)
+  }
+  const lista = asesores.filter(a => String(a.nombre||'').toLocaleLowerCase('es').includes(q.trim().toLocaleLowerCase('es')))
+  return <>
+    <button ref={btnRef} type="button" className="form-control reporte-vendedor-btn" onClick={abrir}>
+      <span>{value?.nombre || 'Todos los vendedores'}</span><span aria-hidden="true">▾</span>
+    </button>
+    {open && createPortal(
+      <div ref={boxRef} className="reporte-vendedor-panel" style={{top:pos.top,left:pos.left,width:pos.width}}>
+        <div className="reporte-vendedor-search"><span>⌕</span><input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar asesor…" onKeyDown={e=>{if(e.key==='Escape')setOpen(false)}} /></div>
+        <div className="reporte-vendedor-lista">
+          <button type="button" className={!value?'activo':''} onClick={()=>{onChange(null);setOpen(false)}}>— Todos los vendedores —</button>
+          {lista.map(a=><button type="button" key={a.id} className={String(value?.id)===String(a.id)?'activo':''} onClick={()=>{onChange(a);setOpen(false)}}>{a.nombre}</button>)}
+          {!lista.length&&<div className="reporte-vendedor-vacio">Sin resultados</div>}
+        </div>
+      </div>, document.body)}
+  </>
 }
 function normEstado(v) {
   return String(v || '')
@@ -387,9 +427,9 @@ export default function Jefatura() {
   const [salaReporte, setSalaReporte] = useState(() => {
     try { return sessionStorage.getItem(JEF_SALA_REPORTE_KEY) || 'todas' } catch { return 'todas' }
   })
-  const mesReporte = ''
-  const [reporteDesde, setReporteDesde] = useState('')
-  const [reporteHasta, setReporteHasta] = useState('')
+  const [mesReporte, setMesReporte] = useState(mesActual)
+  const [reporteDesde, setReporteDesde] = useState(inicioMesActual)
+  const [reporteHasta, setReporteHasta] = useState(fechaHoy)
   const [reporteCriterio, setReporteCriterio] = useState('ingreso')
   const [reporteAsesor, setReporteAsesor] = useState('')
   const [reporteAsesorBusqueda, setReporteAsesorBusqueda] = useState('')
@@ -1588,8 +1628,8 @@ export default function Jefatura() {
               <div className="filtros-grid">
                 <label><span>Rango de fechas</span><RangoFechasPicker desde={reporteDesde} hasta={reporteHasta} onChange={({desde,hasta})=>{setReporteDesde(desde);setReporteHasta(hasta)}} /></label>
                 <label><span>Fecha de selección</span><select value={reporteCriterio} onChange={e=>setReporteCriterio(e.target.value)}><option value="ingreso">Ingreso</option><option value="instalada">Instalada</option></select></label>
-                <label><span>Vendedor</span><input type="search" list="reporte-vendedores" value={reporteAsesorBusqueda} placeholder="Escribe para buscar…" autoComplete="off" onChange={e=>{const texto=e.target.value;setReporteAsesorBusqueda(texto);const encontrado=usuarios.find(u=>usuarioTieneCargo(u,'asesor')&&String(u.nombre||'').trim().toLocaleLowerCase('es')===texto.trim().toLocaleLowerCase('es'));setReporteAsesor(encontrado?String(encontrado.id):'')}} onBlur={()=>{if(reporteAsesor&&!reporteAsesorBusqueda){setReporteAsesor('')}}}/><datalist id="reporte-vendedores">{usuarios.filter(u=>usuarioTieneCargo(u,'asesor')).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')).map(u=><option key={u.id} value={u.nombre} />)}</datalist></label>
-                <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{setReporteDesde('');setReporteHasta('');setReporteCriterio('ingreso');setReporteAsesor('');setReporteAsesorBusqueda('')}}>Limpiar</button>
+                <label><span>Vendedor</span><VendedorBuscador value={usuarios.find(u=>String(u.id)===reporteAsesor)||null} asesores={usuarios.filter(u=>usuarioTieneCargo(u,'asesor')&&u.activo).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'))} onChange={u=>{setReporteAsesor(u?String(u.id):'');setReporteAsesorBusqueda(u?.nombre||'')}} /></label>
+                <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{setReporteDesde(inicioMesActual());setReporteHasta(fechaHoy());setReporteCriterio('ingreso');setReporteAsesor('');setReporteAsesorBusqueda('')}}>Restablecer mes</button>
               </div>
             </div>
             <div className="sala-tabs sala-tabs-pro">
@@ -1615,7 +1655,7 @@ export default function Jefatura() {
               <div className="tabla-header ranking-pro-header">
                 <div>
                   <span className="tabla-title">Ranking de Asesores</span>
-                  <span className="ranking-periodo-label">{reporteDesde || reporteHasta ? `${reporteCriterio==='instalada'?'Instalada':'Ingreso'} · ${reporteDesde?formatF(reporteDesde):'inicio'} — ${reporteHasta?formatF(reporteHasta):'hoy'}` : 'Histórico completo'}</span>
+                  <span className="ranking-periodo-label">{`${reporteCriterio==='instalada'?'Instaladas':'Ingreso'} · ${reporteDesde?formatF(reporteDesde):'inicio'} — ${reporteHasta?formatF(reporteHasta):'hoy'}`}</span>
                 </div>
                 <span className="tabla-count">{reporteData.length} asesores</span>
               </div>
