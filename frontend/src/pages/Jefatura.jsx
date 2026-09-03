@@ -33,7 +33,7 @@ const CARGOS = [
   { id:'calidad',        label:'Calidad',           cls:'bc-calidad'        },
   { id:'supcalidad',     label:'Super de Calidad',  cls:'bc-calidad'        },
   { id:'backreclutamiento',   label:'Back Data Reclutaminto',  cls:'bc-backreclutamiento'   },
-  { id:'asesorreclutamiento', label:'Asesor de Reclutamiento', cls:'bc-asesorreclutamiento' },
+  { id:'capacitador',          label:'Capacitación',             cls:'bc-capacitador'          },
 ]
 const SALAS = ['SALA 1','SALA 2']
 const CARGOS_CON_SALA = ['asesor','supervisor','validacion']
