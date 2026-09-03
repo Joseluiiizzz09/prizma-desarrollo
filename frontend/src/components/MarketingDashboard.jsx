@@ -405,18 +405,18 @@ export default function MarketingDashboard() {
                         <tr>
                           <td colSpan="7">
                             <div style={{padding:'8px 0'}}>
-                              <div style={{display:'flex',gap:8,alignItems:'flex-end',flexWrap:'wrap'}}>
-                                <label style={{display:'flex',flexDirection:'column',gap:4,fontSize:11}}>
+                              <div className="filtros-grid">
+                                <label>
                                   <span>Fecha</span>
                                   <input type="date" value={costoForm.fecha} onChange={e=>setCostoForm(p=>({...p,fecha:e.target.value}))} />
                                 </label>
-                                <label style={{display:'flex',flexDirection:'column',gap:4,fontSize:11}}>
+                                <label>
                                   <span>Monto (S/)</span>
-                                  <input type="number" min="0" step="0.01" value={costoForm.monto} onChange={e=>setCostoForm(p=>({...p,monto:e.target.value}))} placeholder="0.00" />
+                                  <input type="number" min="0" step="0.01" value={costoForm.monto} onChange={e=>setCostoForm(p=>({...p,monto:e.target.value}))} />
                                 </label>
-                                <label style={{display:'flex',flexDirection:'column',gap:4,fontSize:11,flex:1,minWidth:180}}>
+                                <label className="filtro-busqueda">
                                   <span>Notas (opcional)</span>
-                                  <input value={costoForm.notas} onChange={e=>setCostoForm(p=>({...p,notas:e.target.value}))} placeholder="Notas" />
+                                  <input value={costoForm.notas} onChange={e=>setCostoForm(p=>({...p,notas:e.target.value}))} />
                                 </label>
                                 <button type="button" className="btn-nuevo" disabled={guardandoCosto || !costoForm.fecha || !costoForm.monto} onClick={()=>guardarCosto(c.campana)}>
                                   {guardandoCosto ? 'Guardando…' : entradaEditando ? 'Actualizar' : 'Guardar'}
