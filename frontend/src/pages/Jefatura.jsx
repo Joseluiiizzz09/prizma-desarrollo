@@ -392,6 +392,7 @@ export default function Jefatura() {
   const [reporteHasta, setReporteHasta] = useState('')
   const [reporteCriterio, setReporteCriterio] = useState('ingreso')
   const [reporteAsesor, setReporteAsesor] = useState('')
+  const [reporteAsesorBusqueda, setReporteAsesorBusqueda] = useState('')
   const [busqUsuarios, setBusqUsuarios] = useState('')
   const [filtroCargoUsuarios, setFiltroCargoUsuarios] = useState('')
   const [filtroSalaUsuarios, setFiltroSalaUsuarios] = useState('')
@@ -1587,8 +1588,8 @@ export default function Jefatura() {
               <div className="filtros-grid">
                 <label><span>Rango de fechas</span><RangoFechasPicker desde={reporteDesde} hasta={reporteHasta} onChange={({desde,hasta})=>{setReporteDesde(desde);setReporteHasta(hasta)}} /></label>
                 <label><span>Fecha de selección</span><select value={reporteCriterio} onChange={e=>setReporteCriterio(e.target.value)}><option value="ingreso">Ingreso</option><option value="instalada">Instalada</option></select></label>
-                <label><span>Vendedor</span><select value={reporteAsesor} onChange={e=>setReporteAsesor(e.target.value)}><option value="">Todos los vendedores</option>{usuarios.filter(u=>usuarioTieneCargo(u,'asesor')).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')).map(u=><option key={u.id} value={String(u.id)}>{u.nombre}</option>)}</select></label>
-                <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{setReporteDesde('');setReporteHasta('');setReporteCriterio('ingreso');setReporteAsesor('')}}>Limpiar</button>
+                <label><span>Vendedor</span><input type="search" list="reporte-vendedores" value={reporteAsesorBusqueda} placeholder="Escribe para buscar…" autoComplete="off" onChange={e=>{const texto=e.target.value;setReporteAsesorBusqueda(texto);const encontrado=usuarios.find(u=>usuarioTieneCargo(u,'asesor')&&String(u.nombre||'').trim().toLocaleLowerCase('es')===texto.trim().toLocaleLowerCase('es'));setReporteAsesor(encontrado?String(encontrado.id):'')}} onBlur={()=>{if(reporteAsesor&&!reporteAsesorBusqueda){setReporteAsesor('')}}}/><datalist id="reporte-vendedores">{usuarios.filter(u=>usuarioTieneCargo(u,'asesor')).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es')).map(u=><option key={u.id} value={u.nombre} />)}</datalist></label>
+                <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{setReporteDesde('');setReporteHasta('');setReporteCriterio('ingreso');setReporteAsesor('');setReporteAsesorBusqueda('')}}>Limpiar</button>
               </div>
             </div>
             <div className="sala-tabs sala-tabs-pro">
