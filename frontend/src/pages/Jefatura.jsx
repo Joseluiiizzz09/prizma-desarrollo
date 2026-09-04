@@ -687,10 +687,14 @@ export default function Jefatura() {
     (filtroMasivoTipificaciones === null || filtroMasivoTipificaciones.includes((l.tipif_vend && l.tipif_vend.trim()) || 'SIN TIPIFICAR'))
   ), [masivoLeads, filtroMasivoCampanas, filtroMasivoTipificaciones])
 
+  // Un lead que ya salio en un envio masivo anterior se queda visible (con su
+  // etiqueta "Lote #N") pero no puede volver a seleccionarse.
+  const masivoIdsSeleccionables = useMemo(() => masivoLeadsFiltrados.filter(l => !l.masivo_lote_id).map(l => l.id), [masivoLeadsFiltrados])
+
   function masivoSeleccionarPrimerosN() {
     const n = Number(masivoCantidadInput)
     if (!Number.isInteger(n) || n <= 0) { setMasivoMensaje('Ingresa una cantidad válida'); return }
-    setMasivoSeleccion(new Set(masivoLeadsFiltrados.slice(0, n).map(l => l.id)))
+    setMasivoSeleccion(new Set(masivoIdsSeleccionables.slice(0, n)))
   }
 
   async function masivoCopiarNumeros() {
@@ -1601,20 +1605,20 @@ export default function Jefatura() {
               <div className="tabla-header"><span className="tabla-title">Leads elegibles</span><span className="tabla-count">{masivoLeadsFiltrados.length} registros</span></div>
               <div style={{overflowX:'auto'}}><table className="tabla">
                 <thead><tr>
-                  <th><input type="checkbox" checked={masivoLeadsFiltrados.length>0 && masivoSeleccion.size===masivoLeadsFiltrados.length} onChange={e=>setMasivoSeleccion(e.target.checked ? new Set(masivoLeadsFiltrados.map(l=>l.id)) : new Set())} /></th>
+                  <th><input type="checkbox" checked={masivoIdsSeleccionables.length>0 && masivoSeleccion.size===masivoIdsSeleccionables.length} onChange={e=>setMasivoSeleccion(e.target.checked ? new Set(masivoIdsSeleccionables) : new Set())} /></th>
                   <th>N1</th><th>N2</th><th>Campaña</th><th>Distrito</th><th>Asesor</th><th>Tipificación</th><th>Fecha</th><th>Estado</th>
                 </tr></thead>
                 <tbody>
                   {!masivoCargando && masivoLeadsFiltrados.map(l => (
-                    <tr key={l.id}>
-                      <td><input type="checkbox" checked={masivoSeleccion.has(l.id)} onChange={()=>masivoAlternarUno(l.id)} /></td>
+                    <tr key={l.id} style={l.masivo_lote_id ? {opacity:.55} : undefined}>
+                      <td><input type="checkbox" checked={masivoSeleccion.has(l.id)} disabled={!!l.masivo_lote_id} title={l.masivo_lote_id ? 'Ya fue parte de un envío masivo' : ''} onChange={()=>masivoAlternarUno(l.id)} /></td>
                       <td>{l.n1 || (l.usuario_whatsapp ? <span title="Sin número — usuario de WhatsApp">@{l.usuario_whatsapp}</span> : '—')}</td>
                       <td>{l.n2 || '—'}</td>
                       <td>{l.campana || '—'}</td>
                       <td>{l.distrito || '—'}</td>
                       <td>{l.asesor_nombre || '—'}</td>
                       <td><span className="marketing-tipif">{(l.tipif_vend && l.tipif_vend.trim()) || 'SIN TIPIFICAR'}</span></td>
-                      <td>{l.fecha ? new Date(l.fecha).toLocaleDateString('es-PE',{timeZone:'America/Lima'}) : '—'}</td>
+                      <td>{formatF(soloFecha(l.fecha))}</td>
                       <td>{l.masivo_lote_id
                         ? <span style={{display:'inline-block',padding:'3px 8px',borderRadius:6,background:'#fef3c7',color:'#92400e',fontSize:10,fontWeight:700}}>Lote #{l.masivo_lote_id}{l.masivo_fecha ? ` · ${new Date(l.masivo_fecha).toLocaleDateString('es-PE',{timeZone:'America/Lima'})}` : ''}</span>
                         : <span style={{color:'#94a3b8',fontSize:10}}>Sin enviar</span>}
