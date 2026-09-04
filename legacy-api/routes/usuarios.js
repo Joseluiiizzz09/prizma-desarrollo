@@ -10,7 +10,7 @@ const { validar, errorTexto, errorEnum, errorPermisos, GENERO_OK } = require('..
 const { desbloquearLogin } = require('../security/loginRateLimit');
 
 const ROLES = ['jefatura','usuarios'];
-const CARGOS_VALIDOS = ['jefatura','usuarios','supervisor','backoffice','asesor','validacion','grabaciones','seguimiento','cobranzas','calidad','supcalidad','backreclutamiento','entrevistas','capacitador','marketing'];
+const CARGOS_VALIDOS = ['jefatura','usuarios','supervisor','backoffice','asesor','validacion','grabaciones','seguimiento','seguimientolectura','cobranzas','calidad','supcalidad','backreclutamiento','entrevistas','capacitador','marketing'];
 const SALAS_VALIDAS = ['SALA 1', 'SALA 2'];
 const CARGOS_CON_SALA = ['asesor', 'supervisor', 'validacion'];
 
