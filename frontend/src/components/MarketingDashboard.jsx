@@ -356,12 +356,14 @@ export default function MarketingDashboard() {
       <div className="sec-header">
         <div><h2>Dashboard de Leads por Campaña</h2><p>Información de altas y resultados para las áreas de Marketing y Reclutamiento</p></div>
         <div style={{display:'flex',gap:8}}>
-          {marketingVista==='ventas'
+          {marketingVista!=='costos' && (marketingVista==='ventas'
             ? <button className="btn-nuevo" style={{background:'#0f766e'}} onClick={exportarMarketingExcel} disabled={!marketingData.length}>Exportar Excel</button>
-            : <button className="btn-nuevo" style={{background:'#0f766e'}} onClick={exportarMarketingReclExcel} disabled={!marketingReclData.length}>Exportar Excel</button>}
+            : <button className="btn-nuevo" style={{background:'#0f766e'}} onClick={exportarMarketingReclExcel} disabled={!marketingReclData.length}>Exportar Excel</button>)}
           {marketingVista==='ventas'
             ? <button className="btn-nuevo" onClick={()=>cargarMarketing(marketingFiltros)}>Actualizar</button>
-            : <button className="btn-nuevo" onClick={()=>cargarMarketingRecl(marketingReclFiltros)}>Actualizar</button>}
+            : marketingVista==='reclutamiento'
+              ? <button className="btn-nuevo" onClick={()=>cargarMarketingRecl(marketingReclFiltros)}>Actualizar</button>
+              : <button className="btn-nuevo" onClick={()=>{cargarMarketing(marketingFiltros);cargarCostos(marketingFiltros)}}>Actualizar</button>}
         </div>
       </div>
 
@@ -372,6 +374,9 @@ export default function MarketingDashboard() {
         <button type="button" className={`btn-nuevo${marketingVista==='reclutamiento'?'':' btn-tab-inactivo'}`}
           style={marketingVista==='reclutamiento'?{}:{background:'#e5e7eb',color:'#374151'}}
           onClick={()=>setMarketingVista('reclutamiento')}>Reclutamiento</button>
+        <button type="button" className={`btn-nuevo${marketingVista==='costos'?'':' btn-tab-inactivo'}`}
+          style={marketingVista==='costos'?{}:{background:'#e5e7eb',color:'#374151'}}
+          onClick={()=>setMarketingVista('costos')}>Costos</button>
       </div>
 
       {marketingVista==='ventas' && <>
@@ -435,6 +440,45 @@ export default function MarketingDashboard() {
               : marketingData.map((f,i)=><tr key={`${f.campana}-${f.tipificacion}-${i}`}><td><strong>{f.campana}</strong></td><td><span className="marketing-tipif">{f.tipificacion}</span></td><td><strong>{f.cantidad}</strong></td><td>{f.primera_alta?new Date(f.primera_alta).toLocaleString('es-PE',{timeZone:'America/Lima'}):'—'}</td><td>{f.ultima_alta?new Date(f.ultima_alta).toLocaleString('es-PE',{timeZone:'America/Lima'}):'—'}</td></tr>)}</tbody>
           </table></div>
         </div>
+      </div>
+      </>}
+
+      {marketingVista==='costos' && <>
+      <div className="filtros-avanzados marketing-filtros">
+        <div className="filtros-titulo">Filtros de costos</div>
+        <div className="filtros-grid">
+          <label><span>Rango de fechas</span><RangoFechasPicker desde={marketingFiltros.desde} hasta={marketingFiltros.hasta} onChange={v=>setMarketingFiltros(p=>({...p,...v}))} /></label>
+          <label><span>Campaña</span><select value={marketingFiltros.campana} onChange={e=>setMarketingFiltros(p=>({...p,campana:e.target.value}))}><option value="">Todas las campañas</option>{marketingCatalogos.campanas.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
+          <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>setMarketingFiltros({desde:'',hasta:'',campana:'',tipificacion:''})}>Limpiar</button>
+        </div>
+      </div>
+      <div className="kpi-grid marketing-kpis">
+        <div className="kpi-card k-orange"><div className="kpi-num">{formatoSoles(resumenCostos.gastoTotal)}</div><div className="kpi-label">Gasto total</div><div className="kpi-sub">publicidad, según filtros</div></div>
+        <div className="kpi-card k-red"><div className="kpi-num">{formatoSoles(resumenCostos.costoPorVenta)}</div><div className="kpi-label">Costo por venta</div><div className="kpi-sub">promedio del período</div></div>
+      </div>
+      <div className="tabla-wrap marketing-tabla-card">
+        <div className="tabla-header"><span className="tabla-title">Costos por campaña</span><span className="tabla-count">{resumenCostos.filas.length} campañas</span></div>
+        <div style={{overflowX:'auto'}}><table className="tabla marketing-tabla">
+          <thead><tr><th>Campaña</th><th>Leads</th><th>Ventas</th><th>Gasto</th><th>Costo por lead</th><th>Costo por venta</th><th>Acciones</th></tr></thead>
+          <tbody>{resumenCostos.filas.length===0
+            ? <tr><td colSpan="7" className="tabla-empty">Sin campañas para los filtros seleccionados.</td></tr>
+            : resumenCostos.filas.map(c => {
+              const entradas = marketingCostos.filter(e => e.campana === c.campana)
+              return <Fragment key={c.campana}>
+                <tr><td><strong>{c.campana}</strong></td><td>{c.leads}</td><td>{c.ventas}</td><td>{formatoSoles(c.gasto)}</td><td>{formatoSoles(c.costoPorLead)}</td><td>{formatoSoles(c.costoPorVenta)}</td><td><div style={{display:'flex',gap:6}}><IconEditar activo={costoEditando===c.campana} onClick={()=>abrirPanelCosto(c.campana)} /><IconDocumento onClick={()=>abrirPanelCosto(c.campana)} /></div></td></tr>
+                {costoEditando===c.campana && <tr><td colSpan="7"><div style={{padding:'8px 0'}}>
+                  <div className="filtros-grid">
+                    <label><span>Fecha</span><input type="date" value={costoForm.fecha} onChange={e=>setCostoForm(p=>({...p,fecha:e.target.value}))} /></label>
+                    <label><span>Monto (S/)</span><input type="number" min="0" step="0.01" value={costoForm.monto} onChange={e=>setCostoForm(p=>({...p,monto:e.target.value}))} /></label>
+                    <label className="filtro-busqueda"><span>Notas (opcional)</span><input value={costoForm.notas} onChange={e=>setCostoForm(p=>({...p,notas:e.target.value}))} /></label>
+                    <button type="button" className="btn-nuevo" disabled={guardandoCosto||!costoForm.fecha||!costoForm.monto} onClick={()=>guardarCosto(c.campana,'ventas')}>{guardandoCosto?'Guardando…':entradaEditando?'Actualizar':'Guardar'}</button>
+                    {entradaEditando&&<button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{setEntradaEditando(null);setCostoForm({fecha:fechaHoy(),monto:'',notas:''})}}>Cancelar edición</button>}
+                  </div>
+                  {entradas.length>0&&<table className="tabla marketing-tabla" style={{marginTop:10}}><thead><tr><th>Fecha</th><th>Monto</th><th>Notas</th><th>Registrado por</th><th></th></tr></thead><tbody>{entradas.map(en=><tr key={en.id}><td>{String(en.fecha).slice(0,10)}</td><td>{formatoSoles(en.monto)}</td><td>{en.notas||'—'}</td><td>{en.creado_por||'—'}</td><td><div style={{display:'flex',gap:6}}><button type="button" className="venta-action-btn" onClick={()=>editarEntradaCosto(en)}>Editar</button><button type="button" className="venta-action-btn delete" onClick={()=>eliminarCosto(en,'ventas')}>Eliminar</button></div></td></tr>)}</tbody></table>}
+                </div></td></tr>}
+              </Fragment>
+            })}</tbody>
+        </table></div>
       </div>
       </>}
 
