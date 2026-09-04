@@ -365,6 +365,41 @@ function textoFiltroMayuscula(valor) {
   return String(valor || '').replace(/_/g, ' ').toLocaleUpperCase('es-PE')
 }
 
+// Filtro estilo Excel: checkbox por opción + "Todos" para marcar/desmarcar en bloque.
+// seleccionados === null significa "todos" (sin filtro); un array es la selección puntual.
+function MasivoFiltroColumna({ titulo, opciones, seleccionados, onChange, buscable = false }) {
+  const [abierto, setAbierto] = useState(false)
+  const [buscar, setBuscar] = useState('')
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!abierto) return undefined
+    const cerrar = evento => { if (!ref.current?.contains(evento.target)) setAbierto(false) }
+    document.addEventListener('mousedown', cerrar)
+    return () => document.removeEventListener('mousedown', cerrar)
+  }, [abierto])
+  const visibles = opciones.filter(opcion => !buscar || opcion.toLowerCase().includes(buscar.toLowerCase()))
+  const todosMarcados = seleccionados === null || (opciones.length > 0 && seleccionados.length === opciones.length)
+  const alternar = opcion => {
+    const actuales = todosMarcados ? [...opciones] : seleccionados
+    onChange(actuales.includes(opcion) ? actuales.filter(v => v !== opcion) : [...actuales, opcion])
+  }
+  return (
+    <div className="masivo-filtro-columna" ref={ref}>
+      <button type="button" className={!todosMarcados ? 'activo' : ''} onClick={() => setAbierto(v => !v)}>
+        {titulo}<span>▼</span>
+      </button>
+      {abierto && <div className="masivo-filtro-menu">
+        {buscable && <input autoFocus value={buscar} onChange={e => setBuscar(e.target.value)} placeholder={`Buscar ${titulo.toLowerCase()}…`} />}
+        <label className="masivo-filtro-todos"><input type="checkbox" checked={todosMarcados} onChange={() => onChange(todosMarcados ? [] : null)} /> Todos</label>
+        <div className="masivo-filtro-opciones">
+          {visibles.map(opcion => <label key={opcion}><input type="checkbox" checked={todosMarcados || seleccionados.includes(opcion)} onChange={() => alternar(opcion)} /> {opcion}</label>)}
+          {!visibles.length && <small>Sin resultados</small>}
+        </div>
+      </div>}
+    </div>
+  )
+}
+
 function FiltroEstadoMultiple({ opciones, seleccionados, onChange }) {
   const [abierto, setAbierto] = useState(false)
   const boxRef = useRef(null)
@@ -434,6 +469,18 @@ export default function Jefatura() {
   const [cargandoReclutados, setCargandoReclutados] = useState(false)
   const [eliminaciones, setEliminaciones] = useState([])
   const [cargandoEliminaciones, setCargandoEliminaciones] = useState(false)
+
+  const [masivoLeads, setMasivoLeads] = useState([])
+  const [masivoCargando, setMasivoCargando] = useState(false)
+  const [masivoMensaje, setMasivoMensaje] = useState('')
+  const [masivoSeleccion, setMasivoSeleccion] = useState(() => new Set())
+  const [masivoFiltros, setMasivoFiltros] = useState({ campana: '', distrito: '', desde: '', hasta: '' })
+  const [masivoCantidadInput, setMasivoCantidadInput] = useState('')
+  const [masivoCatalogos, setMasivoCatalogos] = useState({ campanas: [], tipificaciones: [] })
+  const [filtroMasivoCampanas, setFiltroMasivoCampanas] = useState(null)
+  const [filtroMasivoTipificaciones, setFiltroMasivoTipificaciones] = useState(null)
+  const [masivoModoFecha, setMasivoModoFecha] = useState('rango')
+  const [masivoCopiando, setMasivoCopiando] = useState(false)
   const [eliminacionBorrandoId, setEliminacionBorrandoId] = useState(null)
   const [detalleEliminacion, setDetalleEliminacion] = useState(null)
 
@@ -603,6 +650,77 @@ export default function Jefatura() {
     }
   }, [])
 
+  const cargarMasivo = useCallback(async (filtros = masivoFiltros) => {
+    setMasivoCargando(true)
+    setMasivoMensaje('')
+    try {
+      const qs = new URLSearchParams()
+      Object.entries(filtros).forEach(([k, v]) => { if (v) qs.set(k, v) })
+      const res = await fetch(`${API}/leads/masivo-elegibles?${qs}`, { headers: ncHeaders() })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo cargar los leads')
+      setMasivoLeads(Array.isArray(data.data) ? data.data : [])
+      setMasivoSeleccion(new Set())
+      setMasivoCatalogos({
+        campanas: Array.isArray(data.filtros?.campanas) ? data.filtros.campanas : [],
+        tipificaciones: Array.isArray(data.filtros?.tipificaciones) ? data.filtros.tipificaciones : [],
+      })
+    } catch (error) {
+      setMasivoLeads([])
+      setMasivoMensaje(error.message || 'Error conectando con el servidor')
+    } finally {
+      setMasivoCargando(false)
+    }
+  }, [masivoFiltros])
+
+  function masivoAlternarUno(id) {
+    setMasivoSeleccion(actual => {
+      const nuevo = new Set(actual)
+      if (nuevo.has(id)) nuevo.delete(id); else nuevo.add(id)
+      return nuevo
+    })
+  }
+
+  const masivoLeadsFiltrados = useMemo(() => masivoLeads.filter(l =>
+    (filtroMasivoCampanas === null || filtroMasivoCampanas.includes(l.campana)) &&
+    (filtroMasivoTipificaciones === null || filtroMasivoTipificaciones.includes((l.tipif_vend && l.tipif_vend.trim()) || 'SIN TIPIFICAR'))
+  ), [masivoLeads, filtroMasivoCampanas, filtroMasivoTipificaciones])
+
+  function masivoSeleccionarPrimerosN() {
+    const n = Number(masivoCantidadInput)
+    if (!Number.isInteger(n) || n <= 0) { setMasivoMensaje('Ingresa una cantidad válida'); return }
+    setMasivoSeleccion(new Set(masivoLeadsFiltrados.slice(0, n).map(l => l.id)))
+  }
+
+  async function masivoCopiarNumeros() {
+    const seleccionados = masivoLeads.filter(l => masivoSeleccion.has(l.id))
+    if (!seleccionados.length) { setMasivoMensaje('No hay leads seleccionados'); return }
+    const texto = seleccionados.map(l => l.n1 || (l.usuario_whatsapp ? `@${l.usuario_whatsapp}` : '')).filter(Boolean).join('\n')
+    setMasivoCopiando(true)
+    setMasivoMensaje('')
+    try {
+      await navigator.clipboard.writeText(texto)
+    } catch {
+      setMasivoMensaje('No se pudo copiar al portapapeles (revisa permisos del navegador)')
+      setMasivoCopiando(false)
+      return
+    }
+    try {
+      const res = await fetch(`${API}/leads/masivo-lote`, {
+        method: 'POST', headers: ncHeaders(), body: JSON.stringify({ ids: seleccionados.map(l => l.id) }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo registrar el lote')
+      const ahora = new Date().toISOString()
+      setMasivoLeads(actuales => actuales.map(l => masivoSeleccion.has(l.id) ? { ...l, masivo_lote_id: data.lote_id, masivo_fecha: ahora } : l))
+      setMasivoMensaje(`Copiados ${seleccionados.length} números al portapapeles (lote #${data.lote_id})`)
+    } catch (error) {
+      setMasivoMensaje(`Se copiaron los números, pero no se pudo dejar constancia: ${error.message || 'error de servidor'}`)
+    } finally {
+      setMasivoCopiando(false)
+    }
+  }
+
   async function eliminarRegistroEliminacion(item) {
     if (!item?.id || eliminacionBorrandoId !== null) return
     if (!window.confirm('¿Eliminar este registro del historial?\n\nEsta acción solo borra el registro de auditoría.')) return
@@ -673,7 +791,8 @@ export default function Jefatura() {
     if (seccion === 'seguimiento') cargarSeguimiento()
     if (seccion === 'reclutados-generales') cargarReclutados()
     if (seccion === 'eliminaciones') cargarEliminaciones()
-  }, [seccion, cargarSeguimiento, cargarReclutados, cargarEliminaciones])
+    if (seccion === 'envio-masivo') cargarMasivo()
+  }, [seccion, cargarSeguimiento, cargarReclutados, cargarEliminaciones, cargarMasivo])
 
   /* charts — siempre en DOM; solo recrear cuando estamos en dashboard */
   useEffect(() => {
@@ -1192,6 +1311,7 @@ export default function Jefatura() {
           <button className={`nav-btn${seccion==='marketing-leads'?' active':''}`} onClick={()=>irSeccion('marketing-leads')}><span className="nav-dot"></span> Marketing · Leads</button>
           <button className={`nav-btn${seccion==='ventas-flujo'?' active':''}`} onClick={()=>irSeccion('ventas-flujo')}><span className="nav-dot"></span> Ventas generales</button>
           <button className={`nav-btn${seccion==='seguimiento'?' active':''}`} onClick={()=>irSeccion('seguimiento')}><span className="nav-dot"></span> Seguimiento en campo</button>
+          <button className={`nav-btn${seccion==='envio-masivo'?' active':''}`} onClick={()=>irSeccion('envio-masivo')}><span className="nav-dot"></span> Envío masivo</button>
           <button className={`nav-btn${seccion==='reclutados-generales'?' active':''}`} onClick={()=>irSeccion('reclutados-generales')}><span className="nav-dot"></span> Reclutados generales</button>
           <div className="sidebar-sep">Gestión</div>
           <button className={`nav-btn${seccion==='usuarios'?'   active':''}`} onClick={()=>irSeccion('usuarios')}><span className="nav-dot"></span> Usuarios</button>
@@ -1393,6 +1513,84 @@ export default function Jefatura() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </section>
+
+          {/* ===== ENVIO MASIVO ===== */}
+          <section className={`section${seccion==='envio-masivo'?' active':''}`}>
+            <div className="sec-header">
+              <div><h2>Envío masivo</h2><p>Arma un lote de números para pegar en una plataforma externa de envío masivo. Excluye leads SIN COBERTURA y VENTA CERRADA.</p></div>
+              <button className="btn-nuevo" onClick={()=>cargarMasivo()} disabled={masivoCargando}>{masivoCargando ? 'Cargando…' : '↻ Actualizar'}</button>
+            </div>
+
+            <div className="filtros-avanzados">
+              <div className="filtros-titulo">Filtros</div>
+              <div className="filtros-grid">
+                <label><span>Fecha</span>
+                  <div style={{display:'flex',gap:4,marginBottom:5}}>
+                    <button type="button" onClick={()=>setMasivoModoFecha('rango')} style={{flex:1,height:26,border:'1px solid #e5e7eb',borderRadius:6,background:masivoModoFecha==='rango'?'#1f2937':'#fff',color:masivoModoFecha==='rango'?'#fff':'#475569',fontSize:10,fontWeight:700,cursor:'pointer'}}>Rango</button>
+                    <button type="button" onClick={()=>{ setMasivoModoFecha('exacta'); setMasivoFiltros(p=>({...p,hasta:p.desde})) }} style={{flex:1,height:26,border:'1px solid #e5e7eb',borderRadius:6,background:masivoModoFecha==='exacta'?'#1f2937':'#fff',color:masivoModoFecha==='exacta'?'#fff':'#475569',fontSize:10,fontWeight:700,cursor:'pointer'}}>Fecha exacta</button>
+                  </div>
+                  <input type="date" value={masivoFiltros.desde} onChange={e=>setMasivoFiltros(p=>({...p, desde:e.target.value, hasta: masivoModoFecha==='exacta' ? e.target.value : p.hasta}))} />
+                </label>
+                {masivoModoFecha === 'rango' && (
+                  <label><span>Fecha hasta</span><input type="date" value={masivoFiltros.hasta} onChange={e=>setMasivoFiltros(p=>({...p,hasta:e.target.value}))} /></label>
+                )}
+                <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{ const vacio={campana:'',distrito:'',desde:'',hasta:''}; setMasivoFiltros(vacio); setFiltroMasivoCampanas(null); setFiltroMasivoTipificaciones(null); setMasivoModoFecha('rango'); cargarMasivo(vacio) }}>Limpiar</button>
+                <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>cargarMasivo(masivoFiltros)}>Buscar</button>
+              </div>
+            </div>
+
+            <div className="filtros-avanzados">
+              <div className="filtros-titulo">Filtrar lo ya cargado (como Excel)</div>
+              <div className="filtros-grid">
+                <MasivoFiltroColumna titulo="CAMPAÑA" opciones={masivoCatalogos.campanas} seleccionados={filtroMasivoCampanas} onChange={setFiltroMasivoCampanas} buscable />
+                <MasivoFiltroColumna titulo="TIPIFICACIÓN DEL VENDEDOR" opciones={masivoCatalogos.tipificaciones} seleccionados={filtroMasivoTipificaciones} onChange={setFiltroMasivoTipificaciones} buscable />
+              </div>
+            </div>
+
+            {masivoMensaje && <div className="marketing-error">{masivoMensaje}</div>}
+
+            <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',margin:'0 0 14px'}}>
+              <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#475569'}}>
+                Seleccionar los primeros
+                <input type="number" min="1" value={masivoCantidadInput} onChange={e=>setMasivoCantidadInput(e.target.value)} placeholder="Ej. 200" style={{width:90,padding:'6px 8px',border:'1px solid #e5e7eb',borderRadius:7,fontFamily:'inherit',fontSize:12}} />
+              </label>
+              <button type="button" className="flujo-clear filtro-limpiar" onClick={masivoSeleccionarPrimerosN}>Seleccionar</button>
+              <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>setMasivoSeleccion(new Set())}>Limpiar selección</button>
+              <span style={{fontSize:12,fontWeight:700,color:'#334155'}}>{masivoSeleccion.size} seleccionados</span>
+              <button className="btn-nuevo" style={{marginLeft:'auto'}} disabled={!masivoSeleccion.size || masivoCopiando} onClick={masivoCopiarNumeros}>
+                {masivoCopiando ? 'Copiando…' : `Copiar números (${masivoSeleccion.size})`}
+              </button>
+            </div>
+
+            <div className="tabla-wrap">
+              <div className="tabla-header"><span className="tabla-title">Leads elegibles</span><span className="tabla-count">{masivoLeadsFiltrados.length} registros</span></div>
+              <div style={{overflowX:'auto'}}><table className="tabla">
+                <thead><tr>
+                  <th><input type="checkbox" checked={masivoLeadsFiltrados.length>0 && masivoSeleccion.size===masivoLeadsFiltrados.length} onChange={e=>setMasivoSeleccion(e.target.checked ? new Set(masivoLeadsFiltrados.map(l=>l.id)) : new Set())} /></th>
+                  <th>N1</th><th>N2</th><th>Campaña</th><th>Distrito</th><th>Asesor</th><th>Fecha</th><th>Estado</th>
+                </tr></thead>
+                <tbody>
+                  {!masivoCargando && masivoLeadsFiltrados.map(l => (
+                    <tr key={l.id}>
+                      <td><input type="checkbox" checked={masivoSeleccion.has(l.id)} onChange={()=>masivoAlternarUno(l.id)} /></td>
+                      <td>{l.n1 || (l.usuario_whatsapp ? <span title="Sin número — usuario de WhatsApp">@{l.usuario_whatsapp}</span> : '—')}</td>
+                      <td>{l.n2 || '—'}</td>
+                      <td>{l.campana || '—'}</td>
+                      <td>{l.distrito || '—'}</td>
+                      <td>{l.asesor_nombre || '—'}</td>
+                      <td>{l.fecha ? new Date(l.fecha).toLocaleDateString('es-PE',{timeZone:'America/Lima'}) : '—'}</td>
+                      <td>{l.masivo_lote_id
+                        ? <span style={{display:'inline-block',padding:'3px 8px',borderRadius:6,background:'#fef3c7',color:'#92400e',fontSize:10,fontWeight:700}}>Lote #{l.masivo_lote_id}{l.masivo_fecha ? ` · ${new Date(l.masivo_fecha).toLocaleDateString('es-PE',{timeZone:'America/Lima'})}` : ''}</span>
+                        : <span style={{color:'#94a3b8',fontSize:10}}>Sin enviar</span>}
+                      </td>
+                    </tr>
+                  ))}
+                  {!masivoCargando && !masivoLeadsFiltrados.length && <tr><td colSpan="8" className="tabla-empty">Sin registros para los filtros seleccionados.</td></tr>}
+                  {masivoCargando && <tr><td colSpan="8" className="tabla-empty">Cargando leads…</td></tr>}
+                </tbody>
+              </table></div>
             </div>
           </section>
 
