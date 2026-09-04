@@ -634,7 +634,7 @@ export default function Seguimiento({ soloLectura = false } = {}) {
           <div className="tabla-scroll">
             <table className="tabla seguimiento-ventas-tabla">
               <colgroup>
-                <col style={{ width: 325 }} />
+                {!soloLectura && <col style={{ width: 325 }} />}
                 <col style={{ width: 125 }} />
                 <col style={{ width: 135 }} />
                 <col style={{ width: 120 }} />
@@ -658,7 +658,7 @@ export default function Seguimiento({ soloLectura = false } = {}) {
               </colgroup>
               <thead>
                 <tr>
-                  <th className="th-acc">ACCIÓN</th>
+                  {!soloLectura && <th className="th-acc">ACCIÓN</th>}
                   <th className="th-fecha">FECHA PREVENTA</th>
                   <th>FECHA INSTALACIÓN</th>
                   <th className="th-est">ESTADO</th>
@@ -683,16 +683,14 @@ export default function Seguimiento({ soloLectura = false } = {}) {
               </thead>
               <tbody>
                 {ventasPag.length === 0 ? (
-                  <tr><td colSpan="21" style={{ textAlign: 'center', color: '#9ca3af', padding: '36px', fontSize: '13px' }}>Sin registros.</td></tr>
+                  <tr><td colSpan={soloLectura ? 20 : 21} style={{ textAlign: 'center', color: '#9ca3af', padding: '36px', fontSize: '13px' }}>Sin registros.</td></tr>
                 ) : ventasPag.map(v => {
                   const est     = estadoObj(v._estadoSeg)
                   const motCls  = motivoBadgeCls(v._motivoRech)
                   return (
                     <tr key={v.id} className={est.fila}>
-                      <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                        {soloLectura ? (
-                          <span style={{ color: '#9ca3af', fontSize: 11 }}>—</span>
-                        ) : (
+                      {!soloLectura && (
+                        <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <div className="acciones-cell seg-acciones">
                             <button className="btn-acc btn-acc-obs"    onClick={() => abrirModalObs(v)}    title="Registrar llamada">Llamada</button>
                             <button className="btn-acc btn-acc-agenda" onClick={() => abrirModalAgenda(v)} title="Agendar">Agenda</button>
@@ -705,8 +703,8 @@ export default function Seguimiento({ soloLectura = false } = {}) {
                               onEnviar={(plantillaId) => enviarWhatsapp(v, plantillaId)}
                             />
                           </div>
-                        )}
-                      </td>
+                        </td>
+                      )}
                       <td style={{ fontWeight: 700, color: '#185FA5', fontSize: '10px' }}>{formatF(v.fechaIngreso)}</td>
                       <td>
                         <strong>{formatF(v.fecha_programada)}</strong>
