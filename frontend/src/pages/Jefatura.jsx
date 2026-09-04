@@ -1569,7 +1569,7 @@ export default function Jefatura() {
               <div style={{overflowX:'auto'}}><table className="tabla">
                 <thead><tr>
                   <th><input type="checkbox" checked={masivoLeadsFiltrados.length>0 && masivoSeleccion.size===masivoLeadsFiltrados.length} onChange={e=>setMasivoSeleccion(e.target.checked ? new Set(masivoLeadsFiltrados.map(l=>l.id)) : new Set())} /></th>
-                  <th>N1</th><th>N2</th><th>Campaña</th><th>Distrito</th><th>Asesor</th><th>Fecha</th><th>Estado</th>
+                  <th>N1</th><th>N2</th><th>Campaña</th><th>Distrito</th><th>Asesor</th><th>Tipificación</th><th>Fecha</th><th>Estado</th>
                 </tr></thead>
                 <tbody>
                   {!masivoCargando && masivoLeadsFiltrados.map(l => (
@@ -1580,6 +1580,7 @@ export default function Jefatura() {
                       <td>{l.campana || '—'}</td>
                       <td>{l.distrito || '—'}</td>
                       <td>{l.asesor_nombre || '—'}</td>
+                      <td><span className="marketing-tipif">{(l.tipif_vend && l.tipif_vend.trim()) || 'SIN TIPIFICAR'}</span></td>
                       <td>{l.fecha ? new Date(l.fecha).toLocaleDateString('es-PE',{timeZone:'America/Lima'}) : '—'}</td>
                       <td>{l.masivo_lote_id
                         ? <span style={{display:'inline-block',padding:'3px 8px',borderRadius:6,background:'#fef3c7',color:'#92400e',fontSize:10,fontWeight:700}}>Lote #{l.masivo_lote_id}{l.masivo_fecha ? ` · ${new Date(l.masivo_fecha).toLocaleDateString('es-PE',{timeZone:'America/Lima'})}` : ''}</span>
@@ -1587,8 +1588,8 @@ export default function Jefatura() {
                       </td>
                     </tr>
                   ))}
-                  {!masivoCargando && !masivoLeadsFiltrados.length && <tr><td colSpan="8" className="tabla-empty">Sin registros para los filtros seleccionados.</td></tr>}
-                  {masivoCargando && <tr><td colSpan="8" className="tabla-empty">Cargando leads…</td></tr>}
+                  {!masivoCargando && !masivoLeadsFiltrados.length && <tr><td colSpan="9" className="tabla-empty">Sin registros para los filtros seleccionados.</td></tr>}
+                  {masivoCargando && <tr><td colSpan="9" className="tabla-empty">Cargando leads…</td></tr>}
                 </tbody>
               </table></div>
             </div>
