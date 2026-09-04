@@ -479,7 +479,6 @@ export default function Jefatura() {
   const [masivoCatalogos, setMasivoCatalogos] = useState({ campanas: [], tipificaciones: [] })
   const [filtroMasivoCampanas, setFiltroMasivoCampanas] = useState(null)
   const [filtroMasivoTipificaciones, setFiltroMasivoTipificaciones] = useState(null)
-  const [masivoModoFecha, setMasivoModoFecha] = useState('rango')
   const [masivoCopiando, setMasivoCopiando] = useState(false)
   const [eliminacionBorrandoId, setEliminacionBorrandoId] = useState(null)
   const [detalleEliminacion, setDetalleEliminacion] = useState(null)
@@ -1527,16 +1526,9 @@ export default function Jefatura() {
               <div className="filtros-titulo">Filtros</div>
               <div className="filtros-grid">
                 <label><span>Fecha</span>
-                  <div style={{display:'flex',gap:4,marginBottom:5}}>
-                    <button type="button" onClick={()=>setMasivoModoFecha('rango')} style={{flex:1,height:26,border:'1px solid #e5e7eb',borderRadius:6,background:masivoModoFecha==='rango'?'#1f2937':'#fff',color:masivoModoFecha==='rango'?'#fff':'#475569',fontSize:10,fontWeight:700,cursor:'pointer'}}>Rango</button>
-                    <button type="button" onClick={()=>{ setMasivoModoFecha('exacta'); setMasivoFiltros(p=>({...p,hasta:p.desde})) }} style={{flex:1,height:26,border:'1px solid #e5e7eb',borderRadius:6,background:masivoModoFecha==='exacta'?'#1f2937':'#fff',color:masivoModoFecha==='exacta'?'#fff':'#475569',fontSize:10,fontWeight:700,cursor:'pointer'}}>Fecha exacta</button>
-                  </div>
-                  <input type="date" value={masivoFiltros.desde} onChange={e=>setMasivoFiltros(p=>({...p, desde:e.target.value, hasta: masivoModoFecha==='exacta' ? e.target.value : p.hasta}))} />
+                  <input type="date" value={masivoFiltros.desde} onChange={e=>setMasivoFiltros(p=>({...p, desde:e.target.value, hasta:e.target.value}))} />
                 </label>
-                {masivoModoFecha === 'rango' && (
-                  <label><span>Fecha hasta</span><input type="date" value={masivoFiltros.hasta} onChange={e=>setMasivoFiltros(p=>({...p,hasta:e.target.value}))} /></label>
-                )}
-                <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{ const vacio={campana:'',distrito:'',desde:'',hasta:''}; setMasivoFiltros(vacio); setFiltroMasivoCampanas(null); setFiltroMasivoTipificaciones(null); setMasivoModoFecha('rango'); cargarMasivo(vacio) }}>Limpiar</button>
+                <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>{ const vacio={campana:'',distrito:'',desde:'',hasta:''}; setMasivoFiltros(vacio); setFiltroMasivoCampanas(null); setFiltroMasivoTipificaciones(null); cargarMasivo(vacio) }}>Limpiar</button>
                 <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>cargarMasivo(masivoFiltros)}>Buscar</button>
               </div>
             </div>
