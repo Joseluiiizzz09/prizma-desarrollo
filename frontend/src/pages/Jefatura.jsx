@@ -482,6 +482,10 @@ export default function Jefatura() {
   const [masivoCopiando, setMasivoCopiando] = useState(false)
   const [eliminacionBorrandoId, setEliminacionBorrandoId] = useState(null)
   const [detalleEliminacion, setDetalleEliminacion] = useState(null)
+  const [cobCodigosTexto, setCobCodigosTexto] = useState('')
+  const [cobCodigosProcesando, setCobCodigosProcesando] = useState(false)
+  const [cobCodigosMensaje, setCobCodigosMensaje] = useState('')
+  const [cobCodigosResultado, setCobCodigosResultado] = useState(null)
 
 
   /* filtros persistentes */
@@ -1082,6 +1086,44 @@ export default function Jefatura() {
   useEffect(() => { setPaginaFlujo(1) }, [filtroFlujoVentas, busqFlujoVentas, fvEstados, fvValidacion, fvGrabacion, fvAsesor, fvSala, fvDistrito, fvFecha, mesFlujo, porPaginaFlujo])
   useEffect(() => { if (paginaFlujo > totalPaginasFlujo) setPaginaFlujo(totalPaginasFlujo) }, [paginaFlujo, totalPaginasFlujo])
 
+  // Pegado desde Excel/Sheets: cada línea trae 4 columnas separadas por TAB —
+  // Número de doc, SOT, Fecha oficial, Código de pago.
+  function parsearFilasCobCodigos(texto) {
+    return texto.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim()).map(linea => {
+      const cols = linea.split('\t')
+      return {
+        documento: (cols[0] || '').trim(),
+        sot: (cols[1] || '').trim(),
+        fecha_oficial: (cols[2] || '').trim(),
+        codigo_pago: (cols[3] || '').trim(),
+      }
+    })
+  }
+
+  async function procesarCobCodigos() {
+    const filas = parsearFilasCobCodigos(cobCodigosTexto)
+    if (!filas.length) { setCobCodigosMensaje('Pega al menos una fila con datos.'); return }
+    setCobCodigosProcesando(true)
+    setCobCodigosMensaje('')
+    setCobCodigosResultado(null)
+    try {
+      const res = await fetch(`${API}/ventas/cobranza-codigos-masivo`, {
+        method: 'POST', headers: ncHeaders(), body: JSON.stringify({ filas }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(data.mensaje || 'No se pudo procesar el lote')
+      setCobCodigosResultado(data)
+    } catch (e) {
+      setCobCodigosMensaje(e.message || 'Error conectando con el servidor')
+    } finally {
+      setCobCodigosProcesando(false)
+    }
+  }
+
+  function limpiarCobCodigos() {
+    setCobCodigosTexto(''); setCobCodigosResultado(null); setCobCodigosMensaje('')
+  }
+
   function limpiarFiltrosFlujo() {
     setFiltroFlujoVentas('todas')
     setBusqFlujoVentas('')
@@ -1311,6 +1353,7 @@ export default function Jefatura() {
           <button className={`nav-btn${seccion==='ventas-flujo'?' active':''}`} onClick={()=>irSeccion('ventas-flujo')}><span className="nav-dot"></span> Ventas generales</button>
           <button className={`nav-btn${seccion==='seguimiento'?' active':''}`} onClick={()=>irSeccion('seguimiento')}><span className="nav-dot"></span> Seguimiento en campo</button>
           <button className={`nav-btn${seccion==='envio-masivo'?' active':''}`} onClick={()=>irSeccion('envio-masivo')}><span className="nav-dot"></span> Envío masivo</button>
+          <button className={`nav-btn${seccion==='cobranza-codigos'?' active':''}`} onClick={()=>irSeccion('cobranza-codigos')}><span className="nav-dot"></span> Cobranza · Códigos</button>
           <button className={`nav-btn${seccion==='reclutados-generales'?' active':''}`} onClick={()=>irSeccion('reclutados-generales')}><span className="nav-dot"></span> Reclutados generales</button>
           <div className="sidebar-sep">Gestión</div>
           <button className={`nav-btn${seccion==='usuarios'?'   active':''}`} onClick={()=>irSeccion('usuarios')}><span className="nav-dot"></span> Usuarios</button>
@@ -1585,6 +1628,78 @@ export default function Jefatura() {
                 </tbody>
               </table></div>
             </div>
+          </section>
+
+          {/* ===== COBRANZA · CÓDIGOS ===== */}
+          <section className={`section${seccion==='cobranza-codigos'?' active':''}`}>
+            <div className="sec-header">
+              <div>
+                <h2>Cobranza · Códigos de pago</h2>
+                <p>Pega el reporte de facturación (Nombres y apellidos, Número de doc, SOT, Fecha oficial, Código de pago). Se cruza por SOT contra las ventas y solo actualiza el código de pago en Cobranza — el ciclo de facturación y los recibos siguen siendo 100% manuales.</p>
+              </div>
+            </div>
+
+            <div className="filtros-avanzados">
+              <div className="filtros-titulo">Pegar datos (copiados desde Excel/Sheets)</div>
+              <textarea
+                value={cobCodigosTexto}
+                onChange={e=>setCobCodigosTexto(e.target.value)}
+                placeholder={'Pega aquí las filas copiadas de la hoja de cálculo (Número de doc, SOT, Fecha oficial, Código de pago)'}
+                rows={8}
+                style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',border:'1px solid #e5e7eb',borderRadius:8,fontFamily:'monospace',fontSize:11.5,resize:'vertical'}}
+              />
+              <div style={{display:'flex',gap:10,marginTop:10}}>
+                <button className="btn-nuevo" onClick={procesarCobCodigos} disabled={cobCodigosProcesando}>
+                  {cobCodigosProcesando ? 'Procesando…' : 'Procesar lote'}
+                </button>
+                <button type="button" className="flujo-clear filtro-limpiar" onClick={limpiarCobCodigos}>Limpiar</button>
+              </div>
+            </div>
+
+            {cobCodigosMensaje && <div className="marketing-error">{cobCodigosMensaje}</div>}
+
+            {cobCodigosResultado && (
+              <>
+                <div className="flujo-kpi-grid">
+                  <div className="kpi-card flujo-kpi k-blue"><div className="kpi-num">{cobCodigosResultado.resumen.total}</div><div className="kpi-label">Filas procesadas</div></div>
+                  <div className="kpi-card flujo-kpi k-green"><div className="kpi-num">{cobCodigosResultado.resumen.actualizados}</div><div className="kpi-label">Actualizados</div></div>
+                  <div className="kpi-card flujo-kpi k-yellow"><div className="kpi-num">{cobCodigosResultado.resumen.sin_cambios}</div><div className="kpi-label">Sin cambios</div></div>
+                  <div className="kpi-card flujo-kpi k-red"><div className="kpi-num">{cobCodigosResultado.resumen.no_encontrados}</div><div className="kpi-label">SOT no encontrado</div></div>
+                </div>
+
+                <div className="tabla-wrap">
+                  <div className="tabla-header"><span className="tabla-title">Resultado del cruce</span><span className="tabla-count">{cobCodigosResultado.resultados.length} filas</span></div>
+                  <div style={{overflowX:'auto'}}><table className="tabla">
+                    <thead><tr>
+                      <th>Nombre (sistema)</th><th>Documento</th><th>SOT</th><th>Código de pago</th>
+                      <th>Vendedor</th><th>Sala</th><th>Tel. 1</th><th>Tel. 2</th><th>Estado</th>
+                    </tr></thead>
+                    <tbody>
+                      {cobCodigosResultado.resultados.map((r, i) => (
+                        <tr key={i}>
+                          <td>{r.nombre_sistema || '—'}</td>
+                          <td>{r.documento || '—'}</td>
+                          <td>{r.sot || '—'}</td>
+                          <td>{r.codigo_pago || '—'}</td>
+                          <td>{r.vendedor || '—'}</td>
+                          <td>{r.sala || '—'}</td>
+                          <td>{r.telefono1 || '—'}</td>
+                          <td>{r.telefono2 || '—'}</td>
+                          <td>
+                            {r.estado === 'actualizado' && <span style={{color:'#047857',fontWeight:700}}>Actualizado</span>}
+                            {r.estado === 'sin_cambios' && <span style={{color:'#94a3b8',fontWeight:700}}>Sin cambios</span>}
+                            {r.estado === 'no_encontrado' && <span style={{color:'#dc2626',fontWeight:700}}>SOT no encontrado</span>}
+                            {r.estado === 'sin_sot' && <span style={{color:'#dc2626',fontWeight:700}}>Fila sin SOT</span>}
+                            {r.estado === 'sin_codigo' && <span style={{color:'#dc2626',fontWeight:700}}>Sin código de pago</span>}
+                            {r.estado === 'codigo_muy_largo' && <span style={{color:'#dc2626',fontWeight:700}}>Código muy largo</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table></div>
+                </div>
+              </>
+            )}
           </section>
 
           {/* ===== DASHBOARD DE LEADS PARA MARKETING (SOLO JEFATURA) ===== */}

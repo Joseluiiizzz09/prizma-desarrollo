@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { usuarioTieneCargo } from '../utils/roles'
 import JefaturaViewControls from '../components/JefaturaViewControls'
 import CambiarAreaMenu from '../components/CambiarAreaMenu'
+import RangoFechasPicker from '../components/RangoFechasPicker'
 import { API, ncHeaders } from '../services/api'
 import '../styles/cobranzas.css'
 
@@ -171,6 +172,7 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
   const [historialCalidad, setHistorialCalidad] = useState(null)
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
   const [filtroVendedores, setFiltroVendedores] = useState(null)
+  const [filtroCodigoPago, setFiltroCodigoPago] = useState('')
   const [filtroEstados, setFiltroEstados] = useState(null)
   const [ordenPendientesPrimero, setOrdenPendientesPrimero] = useState(false)
   const [pestanaCalidad, setPestanaCalidad] = useState('llamadas')
@@ -260,6 +262,8 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
       if (hasta && fecha > hasta) return false
       if (filtroVendedores !== null && !filtroVendedores.includes(String(cliente.vendedor_nombre || 'SIN VENDEDOR').trim())) return false
       if (filtroEstados !== null && !filtroEstados.includes(String(cliente.calidad_estado_cliente || 'PENDIENTE').trim().toUpperCase())) return false
+      if (filtroCodigoPago === 'con' && !String(cliente.cobranza_codigo_pago || '').trim()) return false
+      if (filtroCodigoPago === 'sin' && String(cliente.cobranza_codigo_pago || '').trim()) return false
       if (!texto) return true
       return [cliente.nombre, cliente.dni, cliente.sot, cliente.telefono1, cliente.telefono2, cliente.vendedor_nombre, cliente.paquete]
         .some(valor => String(valor || '').toLowerCase().includes(texto))
@@ -274,9 +278,9 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
       return 1
     }
     return [...resultado].sort((a, b) => rangoEstado(a) - rangoEstado(b))
-  }, [clientes, busqueda, desde, hasta, filtroVendedores, filtroEstados, modoSupervisorCalidad, pestanaCalidad, ordenPendientesPrimero])
+  }, [clientes, busqueda, desde, hasta, filtroVendedores, filtroEstados, filtroCodigoPago, modoSupervisorCalidad, pestanaCalidad, ordenPendientesPrimero])
 
-  useEffect(() => { setPagina(1) }, [busqueda, desde, hasta, filtroVendedores, filtroEstados])
+  useEffect(() => { setPagina(1) }, [busqueda, desde, hasta, filtroVendedores, filtroEstados, filtroCodigoPago])
 
   const vendedoresFiltro = useMemo(() => [...new Set(clientes.map(cliente => String(cliente.vendedor_nombre || 'SIN VENDEDOR').trim()))].sort((a, b) => a.localeCompare(b, 'es')), [clientes])
   const estadosFiltro = useMemo(() => [...new Set([
@@ -462,7 +466,7 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
   useEffect(() => () => { instEvolucion.current?.destroy() }, [])
 
   function salir() { logout(); navigate('/login') }
-  function limpiar() { setBusqueda(''); setDesde(''); setHasta(''); setFiltroVendedores(null); setFiltroEstados(null) }
+  function limpiar() { setBusqueda(''); setDesde(''); setHasta(''); setFiltroVendedores(null); setFiltroEstados(null); setFiltroCodigoPago('') }
 
   async function guardarCalidad(cliente, campo, valor) {
     const propiedad = `calidad_${campo}`
@@ -683,6 +687,11 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
             <span>PANEL DE {areaNombre.toUpperCase()}</span>
           </div>
         </div>
+        {!esCalidad && <div className="cobranzas-topbar-stats" aria-label="Resumen de instalados">
+          <div className="cobranzas-topbar-stat"><strong>{clientes.length}</strong><span>Total</span></div>
+          <div className="cobranzas-topbar-stat blue"><strong>{instaladosHoy}</strong><span>Hoy</span></div>
+          <div className="cobranzas-topbar-stat purple"><strong>{paquetes}</strong><span>Paquetes</span></div>
+        </div>}
         <div className="cobranzas-top-actions">
           <JefaturaViewControls>
             <span className="cobranzas-area-badge">{areaNombre.toUpperCase()}</span>
@@ -694,7 +703,7 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
       </header>
 
       <main className="cobranzas-main">
-        {!modoSupervisorCalidad && <section className="cobranzas-heading">
+        {!esCobranza && !modoSupervisorCalidad && <section className="cobranzas-heading">
           <div><h1>Clientes instalados</h1><p>Información contractual consolidada para el área de {areaNombre}.</p></div>
           <button onClick={cargar} disabled={cargando}>{cargando ? 'Cargando…' : 'Actualizar'}</button>
         </section>}
@@ -718,16 +727,24 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
           </div>
         </section>}
 
-        {pestanaCalidad !== 'rendimiento' && <><section className="cobranzas-kpis">
+        {pestanaCalidad !== 'rendimiento' && <>{esCalidad && <section className="cobranzas-kpis">
           <article><strong>{clientes.length}</strong><span>TOTAL INSTALADOS</span></article>
           <article><strong>{instaladosHoy}</strong><span>INSTALADOS HOY</span></article>
           <article><strong>{paquetes}</strong><span>PAQUETES CONTRATADOS</span></article>
-        </section>
+        </section>}
 
-        <section className="cobranzas-filtros">
+        <section className="cobranzas-filtros cobranzas-filtros-rango">
           <label className="cobranzas-search"><span>BUSCAR CLIENTE</span><input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Nombre, documento, SOT, número o paquete…" /></label>
-          <label><span>DESDE</span><input type="date" value={desde} onChange={e => setDesde(e.target.value)} /></label>
-          <label><span>HASTA</span><input type="date" value={hasta} onChange={e => setHasta(e.target.value)} /></label>
+          <label><span>RANGO DE FECHAS</span><RangoFechasPicker desde={desde} hasta={hasta} onChange={v=>{setDesde(v.desde); setHasta(v.hasta)}} /></label>
+          {esCobranza && (
+            <label><span>CÓDIGO DE PAGO</span>
+              <select value={filtroCodigoPago} onChange={e=>setFiltroCodigoPago(e.target.value)}>
+                <option value="">Todos</option>
+                <option value="con">Con código</option>
+                <option value="sin">Sin código</option>
+              </select>
+            </label>
+          )}
           <button onClick={limpiar}>Limpiar</button>
         </section>
 
@@ -764,7 +781,7 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
           </div>
         </section>
         ) : (
-        <section className="cobranzas-table-card">
+        <section className={`cobranzas-table-card${esCobranza ? ' cobranza-tabla-flat' : ''}`}>
           <div className="cobranzas-table-title">
             <strong>{modoSupervisorCalidad ? 'Llamadas de Calidad' : 'Listado de clientes'}</strong>
             <span>{filtrados.length} registros</span>
@@ -773,7 +790,7 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
           {mensaje && <div className="cobranzas-error">{mensaje}</div>}
           <div className="cobranzas-table-scroll">
             <table>
-              <thead><tr><th>#</th><th>NOMBRE DEL CLIENTE</th><th>DOCUMENTO</th><th>SOT</th><th>N1</th><th>N2</th><th>{esCalidad ? <FiltroColumna titulo="VENDEDOR" opciones={vendedoresFiltro} seleccionados={filtroVendedores} onChange={setFiltroVendedores} buscable /> : 'VENDEDOR'}</th><th>FECHA DE INSTALACIÓN</th><th>PAQUETE CONTRATADO</th>{esCalidad && <><th>RESPONSABLE CALIDAD</th><th><div style={{display:'flex',alignItems:'center',gap:4}}><FiltroColumna titulo="ESTADO FINAL" opciones={estadosFiltro} seleccionados={filtroEstados} onChange={setFiltroEstados} /><button type="button" className={`calidad-orden-btn${ordenPendientesPrimero ? ' activo' : ''}`} onClick={() => setOrdenPendientesPrimero(v => !v)} title="Pendientes primero, satisfechos al final">⇅</button></div></th><th>FECHA DE TRATAMIENTO</th><th>GESTIÓN DE CALIDAD</th><th>HISTORIAL</th><th>COMENTARIO</th></>}{esCobranza && <th>COBRANZA</th>}</tr></thead>
+              <thead><tr><th>#</th><th>NOMBRE DEL CLIENTE</th><th>DOCUMENTO</th><th>SOT</th><th>N1</th><th>N2</th><th>{esCalidad ? <FiltroColumna titulo="VENDEDOR" opciones={vendedoresFiltro} seleccionados={filtroVendedores} onChange={setFiltroVendedores} buscable /> : 'VENDEDOR'}</th><th>FECHA DE INSTALACIÓN</th><th>PAQUETE CONTRATADO</th>{esCalidad && <><th>RESPONSABLE CALIDAD</th><th><div style={{display:'flex',alignItems:'center',gap:4}}><FiltroColumna titulo="ESTADO FINAL" opciones={estadosFiltro} seleccionados={filtroEstados} onChange={setFiltroEstados} /><button type="button" className={`calidad-orden-btn${ordenPendientesPrimero ? ' activo' : ''}`} onClick={() => setOrdenPendientesPrimero(v => !v)} title="Pendientes primero, satisfechos al final">⇅</button></div></th><th>FECHA DE TRATAMIENTO</th><th>GESTIÓN DE CALIDAD</th><th>HISTORIAL</th><th>COMENTARIO</th></>}{esCobranza && <><th>CÓDIGO DE PAGO</th><th>ASESOR DE COBRANZA</th><th>COBRANZA</th></>}</tr></thead>
               <tbody>
                 {!cargando && visibles.map((cliente, index) => (
                   <tr key={cliente.id}>
@@ -783,6 +800,10 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
                     <td>{cliente.telefono1 || '—'}</td><td>{cliente.telefono2 || '—'}</td><td className="cobranzas-vendedor">{cliente.vendedor_nombre || '—'}</td>
                     <td className="cobranzas-date">{fechaVisible(cliente.fecha_instalacion)}</td>
                     <td>{cliente.paquete || '—'}</td>
+                    {esCobranza && <td>{cliente.cobranza_codigo_pago || '—'}</td>}
+                    {esCobranza && <td>{cliente.cobranza_actualizado_por_nombre
+                      ? <><div>{cliente.cobranza_actualizado_por_nombre}</div><small style={{color:'#94a3b8'}}>{fechaHoraVisible(cliente.cobranza_gestionado_en)}</small></>
+                      : '—'}</td>}
                     {esCalidad && <>
                       <td className="calidad-responsable">{cliente.calidad_asignado_a_nombre || 'SIN ASIGNAR'}</td>
                       <td><span className={`calidad-estado-final ${claseCalidad(cliente.calidad_estado_cliente)}`}>{cliente.calidad_estado_cliente || 'PENDIENTE'}</span></td>
@@ -804,8 +825,8 @@ export default function Cobranzas({ areaNombre = 'Cobranzas', modoSupervisorCali
                     )}
                   </tr>
                 ))}
-                {!cargando && !visibles.length && <tr><td colSpan={esCalidad ? 15 : esCobranza ? 10 : 9} className="cobranzas-empty">No hay clientes instalados para los filtros seleccionados.</td></tr>}
-                {cargando && <tr><td colSpan={esCalidad ? 15 : esCobranza ? 10 : 9} className="cobranzas-empty">Cargando clientes instalados…</td></tr>}
+                {!cargando && !visibles.length && <tr><td colSpan={esCalidad ? 15 : esCobranza ? 12 : 9} className="cobranzas-empty">No hay clientes instalados para los filtros seleccionados.</td></tr>}
+                {cargando && <tr><td colSpan={esCalidad ? 15 : esCobranza ? 12 : 9} className="cobranzas-empty">Cargando clientes instalados…</td></tr>}
               </tbody>
             </table>
           </div>

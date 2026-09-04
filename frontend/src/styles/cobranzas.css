@@ -241,7 +241,8 @@
   letter-spacing: .5px;
 }
 
-.cobranzas-filtros input {
+.cobranzas-filtros input,
+.cobranzas-filtros select {
   box-sizing: border-box;
   width: 100%;
   height: 39px;
@@ -256,7 +257,8 @@
   transition: .15s ease;
 }
 .cobranzas-filtros input::placeholder { color: #a8b3c2; }
-.cobranzas-filtros input:focus {
+.cobranzas-filtros input:focus,
+.cobranzas-filtros select:focus {
   border-color: var(--cz-navy);
   background: #fff;
   box-shadow: 0 0 0 3px rgba(15, 23, 42, .08);
@@ -734,6 +736,18 @@ Gestión de Calidad compacta: ficha anterior descartada durante la integración.
 .cobranzas-table-card th:nth-child(13){width:9.2%}
 .cobranzas-table-card th:nth-child(14){width:5.4%}
 .cobranzas-table-card th:nth-child(15){width:8%}
+.cobranza-tabla-flat table{min-width:1416px}
+.cobranza-tabla-flat th:nth-child(1){width:36px}
+.cobranza-tabla-flat th:nth-child(2){width:180px}
+.cobranza-tabla-flat th:nth-child(3){width:90px}
+.cobranza-tabla-flat th:nth-child(4){width:80px}
+.cobranza-tabla-flat th:nth-child(5),.cobranza-tabla-flat th:nth-child(6){width:90px}
+.cobranza-tabla-flat th:nth-child(7){width:160px}
+.cobranza-tabla-flat th:nth-child(8){width:100px}
+.cobranza-tabla-flat th:nth-child(9){width:170px}
+.cobranza-tabla-flat th:nth-child(10){width:110px}
+.cobranza-tabla-flat th:nth-child(11){width:150px}
+.cobranza-tabla-flat th:nth-child(12){width:160px}
 .cobranzas-name,.cobranzas-vendedor,.calidad-responsable,.calidad-gestion-cell,.calidad-comentario-col{min-width:0;max-width:none}
 .calidad-gestion-btn{width:100%;min-width:0;padding:8px 9px}
 .calidad-historial-btn{width:100%;padding-left:5px;padding-right:5px}
@@ -987,3 +1001,17 @@ Gestión de Calidad compacta: ficha anterior descartada durante la integración.
 .calidad-orden-btn{border:1px solid #cbd5e1;background:#fff;color:#64748b;border-radius:6px;width:22px;height:22px;line-height:1;font-size:12px;cursor:pointer;flex-shrink:0}
 .calidad-orden-btn.activo{border-color:#14b8a6;background:#ccfbf1;color:#0f766e}
 .calidad-volver-meses:hover{background:#f0fdfa}
+
+/* Cobranzas: versión compacta equivalente a KRONO. */
+.cobranzas-filtros{padding:7px 12px;margin-bottom:8px}
+.cobranzas-filtros label span{margin-bottom:3px}
+.cobranzas-filtros input,.cobranzas-filtros select,.cobranzas-filtros .form-control{height:30px}
+.cobranzas-filtros>button{height:30px}
+.cobranzas-filtros-rango{grid-template-columns:minmax(260px,1fr) 230px 170px auto}
+.cobranzas-topbar-stats{display:flex;align-items:center;gap:6px;margin:0 auto 0 18px;min-width:0;overflow:hidden}
+.cobranzas-topbar-stat{height:48px;min-width:74px;padding:5px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;border-left:1px solid #f1f5f9;border-right:1px solid #f1f5f9;box-shadow:0 1px 5px rgba(15,23,42,.06);border-radius:6px}
+.cobranzas-topbar-stat strong{font-size:18px;line-height:1;font-weight:800;color:#0f172a}
+.cobranzas-topbar-stat span{font-size:8px;line-height:1.2;margin-top:4px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.35px;white-space:nowrap}
+.cobranzas-topbar-stat.blue strong{color:#2563eb}
+.cobranzas-topbar-stat.purple strong{color:#8b5cf6}
+@media(max-width:850px){.cobranzas-topbar-stats{display:none}}

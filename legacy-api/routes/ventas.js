@@ -653,6 +653,7 @@ function asegurarTablaCobranza() {
         ['recibo5_fecha_llamada', 'DATETIME NULL'],
         ['recibo6_tipificacion_llamada', 'VARCHAR(40) NULL'],
         ['recibo6_fecha_llamada', 'DATETIME NULL'],
+        ['gestionado_en', 'DATETIME NULL'],
       ];
       for (const [columna, definicion] of nuevasCobranza) {
         if (!existentesCobranza.has(columna)) await db.query(`ALTER TABLE cobranza_gestiones ADD COLUMN ${columna} ${definicion}`);
@@ -723,6 +724,8 @@ router.get('/cobranzas-listado', auth(['cobranzas','calidad','supcalidad','jefat
              cb.recibo5_fecha_llamada AS cobranza_recibo5_fecha_llamada,
              cb.recibo6_tipificacion_llamada AS cobranza_recibo6_tipificacion_llamada,
              cb.recibo6_fecha_llamada AS cobranza_recibo6_fecha_llamada,
+             cb.actualizado_por_nombre AS cobranza_actualizado_por_nombre,
+             cb.gestionado_en AS cobranza_gestionado_en,
              cb.updated_at AS cobranza_updated_at` : '';
     const joinCalidad = incluyeCalidad ? 'LEFT JOIN calidad_gestiones cg ON cg.venta_id = v.id' : '';
     const joinCobranza = incluyeCobranza ? 'LEFT JOIN cobranza_gestiones cb ON cb.venta_id = v.id' : '';
@@ -912,10 +915,10 @@ router.patch('/cobranza/:id/ciclo', auth(['cobranzas']), async (req, res) => {
     const [venta] = await db.query('SELECT v.id, cb.ciclo_facturacion AS valor_anterior FROM ventas v LEFT JOIN cobranza_gestiones cb ON cb.venta_id=v.id WHERE v.id=? LIMIT 1', [ventaId]);
     if (!venta.length) return res.status(404).json({ ok:false, mensaje:'Cliente no encontrado' });
     await db.query(`
-      INSERT INTO cobranza_gestiones (venta_id, ciclo_facturacion, actualizado_por_id, actualizado_por_nombre)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO cobranza_gestiones (venta_id, ciclo_facturacion, actualizado_por_id, actualizado_por_nombre, gestionado_en)
+      VALUES (?, ?, ?, ?, NOW())
       ON DUPLICATE KEY UPDATE ciclo_facturacion=VALUES(ciclo_facturacion),
-        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), updated_at=CURRENT_TIMESTAMP
+        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), gestionado_en=NOW(), updated_at=CURRENT_TIMESTAMP
     `, [ventaId, ciclo, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
     await db.query(`INSERT INTO cobranza_historial (venta_id,campo,valor_anterior,valor_nuevo,usuario_id,usuario_nombre) VALUES (?,?,?,?,?,?)`,
       [ventaId, 'ciclo_facturacion', venta[0].valor_anterior != null ? String(venta[0].valor_anterior) : '—', String(ciclo), req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
@@ -940,10 +943,10 @@ router.patch('/cobranza/:id/codigo-pago', auth(['cobranzas']), async (req, res) 
     const [venta] = await db.query('SELECT v.id, cb.codigo_pago AS valor_anterior FROM ventas v LEFT JOIN cobranza_gestiones cb ON cb.venta_id=v.id WHERE v.id=? LIMIT 1', [ventaId]);
     if (!venta.length) return res.status(404).json({ ok:false, mensaje:'Cliente no encontrado' });
     await db.query(`
-      INSERT INTO cobranza_gestiones (venta_id, codigo_pago, actualizado_por_id, actualizado_por_nombre)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO cobranza_gestiones (venta_id, codigo_pago, actualizado_por_id, actualizado_por_nombre, gestionado_en)
+      VALUES (?, ?, ?, ?, NOW())
       ON DUPLICATE KEY UPDATE codigo_pago=VALUES(codigo_pago),
-        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), updated_at=CURRENT_TIMESTAMP
+        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), gestionado_en=NOW(), updated_at=CURRENT_TIMESTAMP
     `, [ventaId, codigoPago || null, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
     await db.query(`INSERT INTO cobranza_historial (venta_id,campo,valor_anterior,valor_nuevo,usuario_id,usuario_nombre) VALUES (?,?,?,?,?,?)`,
       [ventaId, 'codigo_pago', venta[0].valor_anterior || '—', codigoPago, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
@@ -951,6 +954,86 @@ router.patch('/cobranza/:id/codigo-pago', auth(['cobranzas']), async (req, res) 
   } catch (e) {
     console.error('[PATCH /ventas/cobranza/:id/codigo-pago]', e.message || e);
     res.status(500).json({ ok:false, mensaje:'Error al guardar el código de pago' });
+  }
+});
+
+// Carga masiva del código de pago (reporte de facturación pegado por Jefatura).
+// Cruza cada fila por SOT contra `ventas` y solo escribe cobranza_gestiones.codigo_pago —
+// el ciclo de facturación y los recibos (PAGADO/PENDIENTE) siguen siendo 100% manuales.
+router.post('/cobranza-codigos-masivo', auth(['jefatura']), async (req, res) => {
+  try {
+    await asegurarTablaCobranza();
+    const filas = Array.isArray(req.body?.filas) ? req.body.filas : [];
+    if (!filas.length) return res.status(400).json({ ok:false, mensaje:'No se recibieron filas para procesar.' });
+    if (filas.length > 2000) return res.status(400).json({ ok:false, mensaje:'Máximo 2000 filas por lote.' });
+
+    const actorNombre = req.user.nombre || req.user.usuario || 'Jefatura';
+    const resultados = [];
+
+    for (const fila of filas) {
+      const documento = String(fila?.documento || '').trim();
+      const fechaOficial = String(fila?.fecha_oficial || '').trim();
+      const sot = String(fila?.sot || '').trim();
+      const codigoPago = String(fila?.codigo_pago || '').trim();
+
+      if (!sot) { resultados.push({ documento, sot, fecha_oficial: fechaOficial, codigo_pago: codigoPago, estado: 'sin_sot' }); continue; }
+      if (!codigoPago) { resultados.push({ documento, sot, fecha_oficial: fechaOficial, codigo_pago: codigoPago, estado: 'sin_codigo' }); continue; }
+      if (codigoPago.length > 60) { resultados.push({ documento, sot, fecha_oficial: fechaOficial, codigo_pago: codigoPago, estado: 'codigo_muy_largo' }); continue; }
+
+      const [ventas] = await db.query(`
+        SELECT v.id, v.nombre, v.telefono1, v.telefono2, u.sala,
+               COALESCE(u.nombre, v.asesor_nombre) AS vendedor_nombre,
+               cb.codigo_pago AS codigo_pago_actual
+          FROM ventas v
+          LEFT JOIN usuarios u ON u.id = v.asesor_id
+          LEFT JOIN cobranza_gestiones cb ON cb.venta_id = v.id
+         WHERE UPPER(TRIM(v.sot)) = ?
+         ORDER BY v.id DESC LIMIT 1
+      `, [sot.toUpperCase()]);
+
+      if (!ventas.length) {
+        resultados.push({ documento, sot, fecha_oficial: fechaOficial, codigo_pago: codigoPago, estado: 'no_encontrado' });
+        continue;
+      }
+      const venta = ventas[0];
+      const base = {
+        documento, sot, fecha_oficial: fechaOficial, codigo_pago: codigoPago,
+        venta_id: venta.id, nombre_sistema: venta.nombre || '', vendedor: venta.vendedor_nombre || '', sala: venta.sala || '',
+        telefono1: venta.telefono1 || '', telefono2: venta.telefono2 || '',
+      };
+
+      if ((venta.codigo_pago_actual || '') === codigoPago) {
+        resultados.push({ ...base, estado: 'sin_cambios' });
+        continue;
+      }
+
+      // No se toca actualizado_por_id/actualizado_por_nombre/gestionado_en aqui:
+      // esta es una carga administrativa de Jefatura, no una gestion real del
+      // asesor de Cobranza, y no debe figurar como tal en el listado.
+      await db.query(`
+        INSERT INTO cobranza_gestiones (venta_id, codigo_pago)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE codigo_pago=VALUES(codigo_pago), updated_at=CURRENT_TIMESTAMP
+      `, [venta.id, codigoPago]);
+      await db.query(
+        `INSERT INTO cobranza_historial (venta_id,campo,valor_anterior,valor_nuevo,usuario_id,usuario_nombre) VALUES (?,?,?,?,?,?)`,
+        [venta.id, 'codigo_pago', venta.codigo_pago_actual || '—', codigoPago, req.user.id, actorNombre]
+      );
+      resultados.push({ ...base, estado: 'actualizado' });
+    }
+
+    const resumen = {
+      total: filas.length,
+      actualizados: resultados.filter(r => r.estado === 'actualizado').length,
+      sin_cambios: resultados.filter(r => r.estado === 'sin_cambios').length,
+      no_encontrados: resultados.filter(r => r.estado === 'no_encontrado').length,
+      sin_sot: resultados.filter(r => r.estado === 'sin_sot').length,
+      sin_codigo: resultados.filter(r => r.estado === 'sin_codigo').length,
+    };
+    res.json({ ok: true, resumen, resultados });
+  } catch (e) {
+    console.error('[POST /ventas/cobranza-codigos-masivo]', e.message || e);
+    res.status(500).json({ ok: false, mensaje: 'Error al procesar el lote de códigos de pago' });
   }
 });
 
@@ -970,10 +1053,10 @@ router.patch('/cobranza/:id/recibo', auth(['cobranzas']), async (req, res) => {
     const [venta] = await db.query(`SELECT v.id, cb.${columna} AS valor_anterior FROM ventas v LEFT JOIN cobranza_gestiones cb ON cb.venta_id=v.id WHERE v.id=? LIMIT 1`, [ventaId]);
     if (!venta.length) return res.status(404).json({ ok:false, mensaje:'Cliente no encontrado' });
     await db.query(`
-      INSERT INTO cobranza_gestiones (venta_id, ${columna}, actualizado_por_id, actualizado_por_nombre)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO cobranza_gestiones (venta_id, ${columna}, actualizado_por_id, actualizado_por_nombre, gestionado_en)
+      VALUES (?, ?, ?, ?, NOW())
       ON DUPLICATE KEY UPDATE ${columna}=VALUES(${columna}),
-        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), updated_at=CURRENT_TIMESTAMP
+        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), gestionado_en=NOW(), updated_at=CURRENT_TIMESTAMP
     `, [ventaId, valor, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
     await db.query(`INSERT INTO cobranza_historial (venta_id,campo,valor_anterior,valor_nuevo,usuario_id,usuario_nombre) VALUES (?,?,?,?,?,?)`,
       [ventaId, columna, venta[0].valor_anterior || 'PENDIENTE', valor, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
@@ -1001,10 +1084,10 @@ router.patch('/cobranza/:id/recibo-llamada', auth(['cobranzas']), async (req, re
     const [venta] = await db.query(`SELECT v.id, cb.${columna} AS valor_anterior FROM ventas v LEFT JOIN cobranza_gestiones cb ON cb.venta_id=v.id WHERE v.id=? LIMIT 1`, [ventaId]);
     if (!venta.length) return res.status(404).json({ ok:false, mensaje:'Cliente no encontrado' });
     await db.query(`
-      INSERT INTO cobranza_gestiones (venta_id, ${columna}, ${columnaFecha}, actualizado_por_id, actualizado_por_nombre)
-      VALUES (?, ?, NOW(), ?, ?)
+      INSERT INTO cobranza_gestiones (venta_id, ${columna}, ${columnaFecha}, actualizado_por_id, actualizado_por_nombre, gestionado_en)
+      VALUES (?, ?, NOW(), ?, ?, NOW())
       ON DUPLICATE KEY UPDATE ${columna}=VALUES(${columna}), ${columnaFecha}=NOW(),
-        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), updated_at=CURRENT_TIMESTAMP
+        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), gestionado_en=NOW(), updated_at=CURRENT_TIMESTAMP
     `, [ventaId, valor, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
     await db.query(`INSERT INTO cobranza_historial (venta_id,campo,valor_anterior,valor_nuevo,usuario_id,usuario_nombre) VALUES (?,?,?,?,?,?)`,
       [ventaId, columna, venta[0].valor_anterior || '—', valor, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
@@ -1029,10 +1112,10 @@ router.patch('/cobranza/:id/comentario', auth(['cobranzas']), async (req, res) =
     const [venta] = await db.query('SELECT v.id, cb.comentario AS valor_anterior FROM ventas v LEFT JOIN cobranza_gestiones cb ON cb.venta_id=v.id WHERE v.id=? LIMIT 1', [ventaId]);
     if (!venta.length) return res.status(404).json({ ok:false, mensaje:'Cliente no encontrado' });
     await db.query(`
-      INSERT INTO cobranza_gestiones (venta_id, comentario, actualizado_por_id, actualizado_por_nombre)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO cobranza_gestiones (venta_id, comentario, actualizado_por_id, actualizado_por_nombre, gestionado_en)
+      VALUES (?, ?, ?, ?, NOW())
       ON DUPLICATE KEY UPDATE comentario=VALUES(comentario),
-        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), updated_at=CURRENT_TIMESTAMP
+        actualizado_por_id=VALUES(actualizado_por_id), actualizado_por_nombre=VALUES(actualizado_por_nombre), gestionado_en=NOW(), updated_at=CURRENT_TIMESTAMP
     `, [ventaId, comentario || null, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
     await db.query(`INSERT INTO cobranza_historial (venta_id,campo,valor_anterior,valor_nuevo,usuario_id,usuario_nombre) VALUES (?,?,?,?,?,?)`,
       [ventaId, 'comentario', venta[0].valor_anterior || '', comentario, req.user.id, req.user.nombre || req.user.usuario || 'Cobranza']);
