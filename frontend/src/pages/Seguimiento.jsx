@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import * as XLSX from 'xlsx'
 import { useAuth } from '../hooks/useAuth'
 import JefaturaViewControls from '../components/JefaturaViewControls'
 import MediaViewer from '../components/MediaViewer'
@@ -177,7 +178,7 @@ function FiltroEstadoMultiple({ opciones, seleccionados, onChange }) {
   )
 }
 
-export default function Seguimiento() {
+export default function Seguimiento({ soloLectura = false } = {}) {
   const navigate = useNavigate()
   const { sesion, logout } = useAuth()
   const usuarioActual = sesion?.nombre || 'Seguimiento'
@@ -355,6 +356,35 @@ export default function Seguimiento() {
     try { sessionStorage.setItem(SEG_FILTRO_KEY, '') } catch {}
   }
 
+  function exportarExcel() {
+    const filas = ventasFiltradas.map(v => ({
+      'Fecha preventa':      formatF(v.fechaIngreso),
+      'Fecha instalación':   formatF(v.fecha_programada),
+      'Estado':              estadoObj(v._estadoSeg).label,
+      'Cobertura':           v.cobertura_categoria && v.cobertura_opcion ? `${v.cobertura_categoria} · ${v.cobertura_opcion}` : '--',
+      'Tramo':                v._tramo || '--',
+      'Comentario':          v._comentario || '--',
+      'Nombre y apellidos':  v.nombreApellidos || '--',
+      'DNI':                 v.dni || '--',
+      'Distrito':            v.distrito || '--',
+      'Dirección':           v.direccion || '--',
+      'Coordenadas':         v.coordenadas || '--',
+      'Vendedor':            v.asesor_nombre || v.vendedor || '--',
+      'Sala':                v.sala || '--',
+      'Región':              v.claro_hogar || '--',
+      'Plan':                v.paquete || '--',
+      'Winbox':              v.cant_decos ?? '--',
+      'Mesh':                v.cant_mesh ?? '--',
+      'Adicionales':         adicionalesTexto(v.adicionales),
+      'Tel. contacto':       v.telefonoContacto || '--',
+      'Motivo':              v._motivoRech || '--',
+    }))
+    const hoja  = XLSX.utils.json_to_sheet(filas)
+    const libro = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(libro, hoja, 'Seguimiento')
+    XLSX.writeFile(libro, `seguimiento_${fechaHoy()}.xlsx`)
+  }
+
   // MODAL ESTADO
   function abrirModalEstado(v) {
     setModalEstado(v)
@@ -505,6 +535,11 @@ export default function Seguimiento() {
             <h2>Seguimiento de Ventas</h2>
             <p>Todas las ventas — haz clic en un estado para filtrar</p>
           </div>
+          {soloLectura && (
+            <div className="page-header-right">
+              <button className="btn-nuevo" onClick={exportarExcel} disabled={!ventasFiltradas.length}>Exportar Excel</button>
+            </div>
+          )}
         </div>
 
         {/* LEYENDA */}
@@ -655,27 +690,35 @@ export default function Seguimiento() {
                   return (
                     <tr key={v.id} className={est.fila}>
                       <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                        <div className="acciones-cell seg-acciones">
-                          <button className="btn-acc btn-acc-obs"    onClick={() => abrirModalObs(v)}    title="Registrar llamada">Llamada</button>
-                          <button className="btn-acc btn-acc-agenda" onClick={() => abrirModalAgenda(v)} title="Agendar">Agenda</button>
-                          <button className="btn-acc btn-acc-hist"   onClick={() => setModalHist(v)}     title="Historial">Hist.</button>
-                          <button className="btn-fotos" onClick={() => setMediaVenta(v)} title="Ver fotos y audio">Archivos</button>
-                          <WhatsappSeguimientoBoton
-                            enviando={enviandoWA.has(v.id)}
-                            waFecha={v._waFecha}
-                            waPlantilla={v._waPlantilla}
-                            onEnviar={(plantillaId) => enviarWhatsapp(v, plantillaId)}
-                          />
-                        </div>
+                        {soloLectura ? (
+                          <span style={{ color: '#9ca3af', fontSize: 11 }}>—</span>
+                        ) : (
+                          <div className="acciones-cell seg-acciones">
+                            <button className="btn-acc btn-acc-obs"    onClick={() => abrirModalObs(v)}    title="Registrar llamada">Llamada</button>
+                            <button className="btn-acc btn-acc-agenda" onClick={() => abrirModalAgenda(v)} title="Agendar">Agenda</button>
+                            <button className="btn-acc btn-acc-hist"   onClick={() => setModalHist(v)}     title="Historial">Hist.</button>
+                            <button className="btn-fotos" onClick={() => setMediaVenta(v)} title="Ver fotos y audio">Archivos</button>
+                            <WhatsappSeguimientoBoton
+                              enviando={enviandoWA.has(v.id)}
+                              waFecha={v._waFecha}
+                              waPlantilla={v._waPlantilla}
+                              onEnviar={(plantillaId) => enviarWhatsapp(v, plantillaId)}
+                            />
+                          </div>
+                        )}
                       </td>
                       <td style={{ fontWeight: 700, color: '#185FA5', fontSize: '10px' }}>{formatF(v.fechaIngreso)}</td>
                       <td>
                         <strong>{formatF(v.fecha_programada)}</strong>
                       </td>
                       <td className="td-estado">
-                        <span className={`badge-seg ${est.cls}`} onClick={() => abrirModalEstado(v)} style={{ cursor: 'pointer' }} title="Click para cambiar estado">
-                          {est.label}
-                        </span>
+                        {soloLectura ? (
+                          <span className={`badge-seg ${est.cls}`}>{est.label}</span>
+                        ) : (
+                          <span className={`badge-seg ${est.cls}`} onClick={() => abrirModalEstado(v)} style={{ cursor: 'pointer' }} title="Click para cambiar estado">
+                            {est.label}
+                          </span>
+                        )}
                       </td>
                       <td style={{ fontSize: '10px' }}>
                         {v.cobertura_categoria && v.cobertura_opcion

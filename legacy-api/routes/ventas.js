@@ -1187,11 +1187,16 @@ router.get('/validacion-listado', auth(['validacion','jefatura']), async (req, r
 });
 
 // ===== GET /api/ventas =====
-router.get('/', auth(ROLES_VENTAS), async (req, res) => {
+router.get('/', auth([...ROLES_VENTAS, 'seguimientolectura']), async (req, res) => {
   try {
     const { dni, estado, desde, hasta, asesor_id, programacion, alcance, area, seguimiento_campo } = req.query;
     const permisosUsuario = Array.isArray(req.user.permisos) ? req.user.permisos : [];
-    if (area && area !== req.user.cargo && !permisosUsuario.includes(area)) {
+    // La vista de solo lectura pide explícitamente area=seguimiento (mismo
+    // fetch que usa Seguimiento.jsx) aunque su cargo real sea otro — es la
+    // única área a la que este cargo puede acceder, y nunca puede escribir
+    // (los demás endpoints de /ventas siguen usando ROLES_VENTAS sin este cargo).
+    const esLecturaSeguimiento = req.user.cargo === 'seguimientolectura' && area === 'seguimiento';
+    if (area && area !== req.user.cargo && !permisosUsuario.includes(area) && !esLecturaSeguimiento) {
       return res.status(403).json({ ok: false, mensaje: 'Sin permiso para consultar esta área' });
     }
     const cargoEfectivo = area || req.user.cargo;

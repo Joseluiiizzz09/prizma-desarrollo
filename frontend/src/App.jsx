@@ -31,6 +31,7 @@ const Backoffice = lazyConRecarga(() => import('./pages/Backoffice'))
 const Supervisor = lazyConRecarga(() => import('./pages/Supervisor'))
 const Validacion = lazyConRecarga(() => import('./pages/Validacion'))
 const Seguimiento = lazyConRecarga(() => import('./pages/Seguimiento'))
+const SeguimientoLectura = lazyConRecarga(() => import('./pages/SeguimientoLectura'))
 const Grabaciones = lazyConRecarga(() => import('./pages/Grabaciones'))
 const Cobranzas = lazyConRecarga(() => import('./pages/Cobranzas'))
 const Calidad = lazyConRecarga(() => import('./pages/Calidad'))
@@ -107,6 +108,7 @@ export default function App() {
       <Route path="/supervisor"    element={<PrivateRoute cargo="supervisor"><Supervisor /></PrivateRoute>} />
       <Route path="/validacion"    element={<PrivateRoute cargo="validacion"><Validacion /></PrivateRoute>} />
       <Route path="/seguimiento"   element={<PrivateRoute cargo="seguimiento"><Seguimiento /></PrivateRoute>} />
+      <Route path="/seguimiento-lectura" element={<PrivateRoute cargo="seguimientolectura"><SeguimientoLectura /></PrivateRoute>} />
       <Route path="/grabaciones"   element={<PrivateRoute cargo="grabaciones"><Grabaciones /></PrivateRoute>} />
       <Route path="/cobranzas"     element={<PrivateRoute cargo="cobranzas"><Cobranzas /></PrivateRoute>} />
       <Route path="/calidad"       element={<PrivateRoute cargo="calidad"><Calidad /></PrivateRoute>} />

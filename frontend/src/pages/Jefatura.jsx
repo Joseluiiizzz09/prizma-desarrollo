@@ -106,6 +106,7 @@ const ACCESOS_MODS = [
   { nombre:'Validación',       desc:'Control y revisión de ventas',  icon:'shield',    path:'/validacion',      color:'#fdba74', cargo:'validacion' },
   { nombre:'Grabaciones',      desc:'Auditoría de llamadas',         icon:'mic',       path:'/grabaciones',     color:'#fb923c', cargo:'grabaciones' },
   { nombre:'Seguimiento',      desc:'Seguimiento postventa',         icon:'activity',  path:'/seguimiento',     color:'#f97316', cargo:'seguimiento' },
+  { nombre:'Seguimiento (Lectura)', desc:'Solo lectura, exportar a Excel', icon:'activity', path:'/seguimiento-lectura', color:'#fb923c', cargo:'seguimientolectura' },
   { nombre:'Supervisor',       desc:'Gestión de equipos y salas',    icon:'briefcase', path:'/supervisor',      color:'#ea580c', cargo:'supervisor' },
   { nombre:'Dashboard CRM',    desc:'Panel individual del asesor',   icon:'chart',     path:'/dashboard',       color:'#c2410c', cargo:'asesor' },
   { nombre:'Gestión Usuarios', desc:'Administración de accesos',     icon:'users',     path:'/usuarios',        color:'#9a3412', cargo:'usuarios' },
