@@ -112,7 +112,6 @@ const ACCESOS_MODS = [
   { nombre:'Dashboard CRM',    desc:'Panel individual del asesor',   icon:'chart',     path:'/dashboard',       color:'#c2410c', cargo:'asesor' },
   { nombre:'Gestión Usuarios', desc:'Administración de accesos',     icon:'users',     path:'/usuarios',        color:'#9a3412', cargo:'usuarios' },
   { nombre:'Cobranzas',        desc:'Clientes instalados y contratos',icon:'wallet',    path:'/cobranzas',       color:'#fdba74', cargo:'cobranzas' },
-  { nombre:'Calidad',          desc:'Control de clientes instalados',   icon:'quality',   path:'/calidad',         color:'#fb923c', cargo:'calidad' },
   { nombre:'Super de Calidad', desc:'Supervisión del equipo de Calidad',icon:'quality',   path:'/sup-calidad',     color:'#f97316', cargo:'supcalidad' },
   { nombre:'Back Data Reclutaminto',        desc:'Gestión y asignación de candidatos', icon:'clipboard', path:'/backdata-reclutamiento', color:'#4338ca', cargo:'backreclutamiento' },
   { nombre:'Capacitación',      desc:'Asistencia y avance de postulantes', icon:'graduation', path:'/backdata-reclutamiento', color:'#dc2626', cargo:'capacitador' },
