@@ -516,12 +516,12 @@ export default function Seguimiento({ soloLectura = false } = {}) {
           </div>
           <div className="brand-text">
             <span style={{fontSize:22,fontWeight:800,letterSpacing:"0.08em",lineHeight:1}}>PRIZMA</span>
-            <span className="brand-sub">Seguimiento</span>
+            <span className="brand-sub">{soloLectura ? 'Futura' : 'Seguimiento'}</span>
           </div>
         </div>
         <div className="topbar-right">
           <JefaturaViewControls>
-            <span className="topbar-badge">SEGUIMIENTO</span>
+            <span className="topbar-badge">{soloLectura ? 'FUTURA' : 'SEGUIMIENTO'}</span>
             <span className="topbar-user">{usuarioActual}</span>
           </JefaturaViewControls>
           <CambiarAreaMenu />

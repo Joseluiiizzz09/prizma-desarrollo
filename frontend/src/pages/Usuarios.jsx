@@ -30,7 +30,7 @@ const CARGOS = [
   { value: 'validacion',     label: 'Validación'       },
   { value: 'grabaciones',    label: 'Grabaciones'      },
   { value: 'seguimiento',    label: 'Seguimiento'      },
-  { value: 'seguimientolectura', label: 'Seguimiento (Solo lectura)' },
+  { value: 'seguimientolectura', label: 'Futura' },
   { value: 'jefatura',       label: 'Jefatura'         },
   { value: 'usuarios',       label: 'Usuarios'         },
   { value: 'cobranzas',      label: 'Cobranzas'        },

@@ -28,7 +28,7 @@ export const CARGO_LABELS = {
   validacion: 'Validación',
   grabaciones: 'Grabaciones',
   seguimiento: 'Seguimiento',
-  seguimientolectura: 'Seguimiento (Solo lectura)',
+  seguimientolectura: 'Futura',
   jefatura: 'Jefatura',
   usuarios: 'Usuarios',
   cobranzas: 'Cobranzas',
