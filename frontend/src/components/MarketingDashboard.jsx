@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react'
-import RangoFechasPicker from './RangoFechasPicker'
 import { API, ncHeaders } from '../services/api'
 import * as XLSX from 'xlsx'
 
@@ -383,7 +382,7 @@ export default function MarketingDashboard() {
       <div className="filtros-avanzados marketing-filtros">
         <div className="filtros-titulo">Filtros del reporte</div>
         <div className="filtros-grid">
-          <label><span>Rango de fechas</span><RangoFechasPicker desde={marketingFiltros.desde} hasta={marketingFiltros.hasta} onChange={v=>setMarketingFiltros(p=>({...p,...v}))} /></label>
+          <label><span>Fecha del día</span><input type="date" value={marketingFiltros.desde===marketingFiltros.hasta?marketingFiltros.desde:(marketingFiltros.desde||marketingFiltros.hasta||'')} onChange={e=>setMarketingFiltros(p=>({...p,desde:e.target.value,hasta:e.target.value}))} /></label>
           <label><span>Campaña</span><select value={marketingFiltros.campana} onChange={e=>setMarketingFiltros(p=>({...p,campana:e.target.value}))}><option value="">Todas las campañas</option>{marketingCatalogos.campanas.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
           <label><span>Tipificación</span><select value={marketingFiltros.tipificacion} onChange={e=>setMarketingFiltros(p=>({...p,tipificacion:e.target.value}))}><option value="">Todas las tipificaciones</option>{TIPIF_VEND_VENTAS_ACTUALES.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
           <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>setMarketingFiltros({desde:'',hasta:'',campana:'',tipificacion:''})}>Limpiar</button>
@@ -447,7 +446,7 @@ export default function MarketingDashboard() {
       <div className="filtros-avanzados marketing-filtros">
         <div className="filtros-titulo">Filtros de costos</div>
         <div className="filtros-grid">
-          <label><span>Rango de fechas</span><RangoFechasPicker desde={marketingFiltros.desde} hasta={marketingFiltros.hasta} onChange={v=>setMarketingFiltros(p=>({...p,...v}))} /></label>
+          <label><span>Fecha del día</span><input type="date" value={marketingFiltros.desde===marketingFiltros.hasta?marketingFiltros.desde:(marketingFiltros.desde||marketingFiltros.hasta||'')} onChange={e=>setMarketingFiltros(p=>({...p,desde:e.target.value,hasta:e.target.value}))} /></label>
           <label><span>Campaña</span><select value={marketingFiltros.campana} onChange={e=>setMarketingFiltros(p=>({...p,campana:e.target.value}))}><option value="">Todas las campañas</option>{marketingCatalogos.campanas.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
           <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>setMarketingFiltros({desde:'',hasta:'',campana:'',tipificacion:''})}>Limpiar</button>
         </div>
@@ -486,7 +485,7 @@ export default function MarketingDashboard() {
       <div className="filtros-avanzados marketing-filtros">
         <div className="filtros-titulo">Filtros del reporte</div>
         <div className="filtros-grid">
-          <label><span>Rango de fechas</span><RangoFechasPicker desde={marketingReclFiltros.desde} hasta={marketingReclFiltros.hasta} onChange={v=>setMarketingReclFiltros(p=>({...p,...v}))} /></label>
+          <label><span>Fecha del día</span><input type="date" value={marketingReclFiltros.desde===marketingReclFiltros.hasta?marketingReclFiltros.desde:(marketingReclFiltros.desde||marketingReclFiltros.hasta||'')} onChange={e=>setMarketingReclFiltros(p=>({...p,desde:e.target.value,hasta:e.target.value}))} /></label>
           <label><span>Campaña</span><select value={marketingReclFiltros.campana} onChange={e=>setMarketingReclFiltros(p=>({...p,campana:e.target.value}))}><option value="">Todas las campañas</option>{marketingReclCatalogos.campanas.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
           <label><span>Tipificación</span><select value={marketingReclFiltros.tipificacion} onChange={e=>setMarketingReclFiltros(p=>({...p,tipificacion:e.target.value}))}><option value="">Todas las tipificaciones</option>{marketingReclCatalogos.tipificaciones.map(v=><option key={v} value={v}>{labelTipifVendRecl(v)}</option>)}</select></label>
           <button type="button" className="flujo-clear filtro-limpiar" onClick={()=>setMarketingReclFiltros({desde:'',hasta:'',campana:'',tipificacion:''})}>Limpiar</button>
