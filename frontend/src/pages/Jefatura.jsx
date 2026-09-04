@@ -29,6 +29,7 @@ const CARGOS = [
   { id:'validacion',     label:'Validación',        cls:'bc-validacion'     },
   { id:'grabaciones',    label:'Grabaciones',       cls:'bc-grabaciones'    },
   { id:'seguimiento',    label:'Seguimiento',       cls:'bc-seguimiento'    },
+  { id:'seguimientolectura', label:'Futura',        cls:'bc-seguimiento'    },
   { id:'jefatura',       label:'Jefatura',          cls:'bc-jefatura'       },
   { id:'usuarios',       label:'Usuarios',          cls:'bc-usuarios'       },
   { id:'cobranzas',      label:'Cobranzas',         cls:'bc-cobranzas'      },
