@@ -33,8 +33,6 @@ const CARGOS = [
   { id:'jefatura',       label:'Jefatura',          cls:'bc-jefatura'       },
   { id:'usuarios',       label:'Usuarios',          cls:'bc-usuarios'       },
   { id:'cobranzas',      label:'Cobranzas',         cls:'bc-cobranzas'      },
-  { id:'calidad',        label:'Calidad',           cls:'bc-calidad'        },
-  { id:'supcalidad',     label:'Super de Calidad',  cls:'bc-calidad'        },
   { id:'backreclutamiento',   label:'Back Data Reclutaminto',  cls:'bc-backreclutamiento'   },
   { id:'capacitador',          label:'Capacitación',             cls:'bc-capacitador'          },
 ]

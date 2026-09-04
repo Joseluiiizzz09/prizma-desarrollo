@@ -10,13 +10,19 @@ const { validar, errorTexto, errorEnum, errorPermisos, GENERO_OK } = require('..
 const { desbloquearLogin } = require('../security/loginRateLimit');
 
 const ROLES = ['jefatura','usuarios'];
-const CARGOS_VALIDOS = ['jefatura','usuarios','supervisor','backoffice','asesor','validacion','grabaciones','seguimiento','seguimientolectura','cobranzas','calidad','supcalidad','backreclutamiento','entrevistas','capacitador','marketing'];
+const CARGOS_VALIDOS = ['jefatura','usuarios','supervisor','backoffice','asesor','validacion','grabaciones','seguimiento','seguimientolectura','cobranzas','backreclutamiento','entrevistas','capacitador','marketing'];
 const SALAS_VALIDAS = ['SALA 1', 'SALA 2'];
 const CARGOS_CON_SALA = ['asesor', 'supervisor', 'validacion'];
 
 function requiereSala(cargo, permisos = []) {
   const cargos = [cargo, ...(Array.isArray(permisos) ? permisos : [])];
   return cargos.some(valor => CARGOS_CON_SALA.includes(String(valor || '').toLowerCase()));
+}
+
+function hayCargoNoValido(cargo, permisos = []) {
+  if (!CARGOS_VALIDOS.includes(String(cargo || '').toLowerCase())) return true;
+  return Array.isArray(permisos)
+    && permisos.some(permiso => !CARGOS_VALIDOS.includes(String(permiso || '').toLowerCase()));
 }
 
 function normalizarNombrePersonal(nombre) {
@@ -58,7 +64,7 @@ router.post('/', auth(ROLES), async (req, res) => {
     ]);
     if (errores) return res.status(400).json({ ok: false, mensaje: errores[0], errores });
 
-    if (!CARGOS_VALIDOS.includes(cargo))
+    if (hayCargoNoValido(cargo, permisos))
       return res.status(400).json({ ok: false, mensaje: 'Cargo inválido' });
     const salaFinal = requiereSala(cargo, permisos) ? sala : null;
     if (requiereSala(cargo, permisos) && !SALAS_VALIDAS.includes(salaFinal))
@@ -120,6 +126,8 @@ router.patch('/:id', auth(ROLES), async (req, res) => {
     const permisosFinales = req.user.cargo === 'jefatura'
       ? (permisos || [])
       : (() => { try { return JSON.parse(rows[0].permisos || '[]'); } catch { return []; } })();
+    if (hayCargoNoValido(cargofinal, permisosFinales))
+      return res.status(400).json({ ok: false, mensaje: 'Cargo inválido' });
     const salaFinal = requiereSala(cargofinal, permisosFinales) ? sala : null;
     if (requiereSala(cargofinal, permisosFinales) && !SALAS_VALIDAS.includes(salaFinal))
       return res.status(400).json({ ok: false, mensaje: 'Sala inválida. Usa SALA 1 o SALA 2.' });
