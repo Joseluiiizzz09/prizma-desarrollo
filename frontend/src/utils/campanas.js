@@ -14,7 +14,6 @@ export const CAMPANAS = [
   'REFERIDOS',
   'DIEGO',
   'JOSS',
-  'YOPI',
   'MASIVO',
   'CAIDAS CLARO',
   'LEAD CRM',
