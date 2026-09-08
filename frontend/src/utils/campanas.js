@@ -18,6 +18,8 @@ export const CAMPANAS = [
   'CAIDAS CLARO',
   'LEAD CRM',
   'LADY',
+  'P2',
+  'S3',
 ]
 
 // ── Lista de campañas de Reclutamiento ───────────────────────────────────
